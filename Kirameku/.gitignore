@@ -43,3 +43,7 @@ next-env.d.ts
 
 # blog posts (content is managed separately)
 /content/posts/
+
+# local SQLite database and backups
+/data/
+/backups/

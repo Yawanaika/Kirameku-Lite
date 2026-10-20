@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kirameku
 
-## Getting Started
+TypeScript + Next.js 16 单体应用。公开站点、管理后台和 API 共用同一个进程；数据库为 SQLite（WAL）。
 
-First, run the development server:
+## 本地启动
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local
+# 编辑 .env.local，至少设置 AUTH_SECRET（32+ 字符）
+pnpm db:migrate
+ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的强密码' pnpm db:seed-admin
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- 公开站点：<http://localhost:3000>
+- 后台登录：<http://localhost:3000/admin/login>
+- 健康检查：<http://localhost:3000/api/health>
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+不提供默认管理员密码；`db:seed-admin` 对已存在的用户名会更新密码。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> `.env.local` 由 Next.js 运行时读取；`db:*` / `migrate:*` CLI 脚本只读取当前 shell 环境变量。若修改了 `DATABASE_PATH`，请在命令前显式传入。
 
-## Learn More
+## 目录
 
-To learn more about Next.js, take a look at the following resources:
+```text
+app/
+├── layout.tsx              # 根布局，仅 html/body
+├── (site)/                 # 公开站点（导航、主题、背景、音乐、访客追踪）
+├── (admin)/admin/          # 登录页 + 受保护的仪表盘
+├── api/auth/               # 登录、登出、当前用户、改密
+└── api/health/             # 健康检查
+server/
+├── auth/                   # JWT、Cookie、bcrypt、requireAdmin
+├── db/                     # Drizzle schema、迁移、SQLite 连接
+├── http/                   # 错误信封、requestId、日志、限流、同源校验
+└── modules/                # 认证、仪表盘服务
+scripts/
+├── seed-admin.ts
+├── db-migrate.ts
+├── backup-db.ts / restore-db.ts
+└── migrate/                # PostgreSQL → SQLite 导出/审计
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 常用命令
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| 命令 | 说明 |
+|:---|:---|
+| `pnpm dev` | 启动开发服务器 |
+| `pnpm typecheck` | TypeScript 检查 |
+| `pnpm test` | Vitest 单测 |
+| `pnpm build` | 生产构建 |
+| `pnpm db:migrate` | 应用未执行的 SQLite 迁移 |
+| `pnpm db:seed-admin` | 创建/更新管理员 |
+| `pnpm db:backup` | 在线备份 + 完整性校验 |
+| `pnpm db:restore <file>` | 恢复备份（先停应用） |
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+数据库默认路径 `./data/kirameku.db`，由 `DATABASE_PATH` 覆盖。备份与迁移说明见 [`server/db/README.md`](./server/db/README.md)，整体方案见 [`../docs/单体化重写方案.md`](../docs/单体化重写方案.md)。

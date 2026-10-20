@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck, test, migrate, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Kirameku
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.8.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: Kirameku/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Migrate an empty SQLite database
+        run: pnpm db:migrate
+        env:
+          DATABASE_PATH: ./data/ci.db
+
+      - name: Production build
+        run: pnpm build
+        env:
+          DATABASE_PATH: ./data/ci.db
+          AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef

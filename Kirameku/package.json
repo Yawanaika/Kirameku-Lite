@@ -7,7 +7,19 @@
     "dev:clean": "rm -rf .next/dev && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "tsx scripts/db-generate.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:seed-admin": "tsx scripts/seed-admin.ts",
+    "db:backup": "tsx scripts/backup-db.ts",
+    "db:restore": "tsx scripts/restore-db.ts",
+    "migrate:audit": "tsx scripts/migrate/audit-pg-schema.ts",
+    "migrate:pg2sqlite": "tsx scripts/migrate/pg-to-sqlite.ts"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",
@@ -30,12 +42,16 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@types/leaflet": "^1.9.21",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
+    "drizzle-orm": "^0.45.4",
     "framer-motion": "^12.38.0",
     "function-plot": "^1.25.4",
     "gray-matter": "^4.0.3",
     "highlight.js": "^11.11.1",
+    "jose": "^6.2.12",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.14.0",
     "marked": "^18.0.3",
@@ -50,19 +66,26 @@
     "rehype-stringify": "^10.0.1",
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
+    "server-only": "^0.0.1",
     "three": "^0.184.0",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.184.1",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "postgres": "^3.4.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   }
 }
