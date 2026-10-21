@@ -1,8 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import { env, getAuthSecret } from "@/server/env";
+import { ADMIN_COOKIE, ADMIN_TTL_SECONDS } from "./constants";
 
-export const ADMIN_COOKIE = "kir_admin";
-export const ADMIN_TTL_SECONDS = 72 * 60 * 60;
+export { ADMIN_COOKIE, ADMIN_TTL_SECONDS } from "./constants";
 
 export interface AdminClaims {
   sub: string;

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:clean": "rm -rf .next/dev && next dev",
+    "dev:webpack": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -19,7 +20,7 @@
     "migrate:pg2sqlite": "tsx scripts/migrate/pg-to-sqlite.ts"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.0.0 <25"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.2",

@@ -1,3 +1,5 @@
+import { Geist_Mono } from "next/font/google";
+import "highlight.js/styles/vs2015.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { BackgroundProvider } from "@/components/providers/BackgroundProvider";
@@ -14,6 +16,11 @@ import KiraSparkle from "@/components/ui/KiraSparkle";
 import WelcomeScreen from "@/components/layout/WelcomeScreen";
 import VisitorTracker from "@/components/layout/VisitorTracker";
 
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
 export default function SiteLayout({
   children,
 }: Readonly<{
@@ -26,7 +33,9 @@ export default function SiteLayout({
         <BackgroundProvider>
           <MusicProvider>
             <ToastProvider>
-              <div className="flex min-h-screen flex-col">
+              <div
+                className={`${geistMono.variable} flex min-h-screen flex-col`}
+              >
                 <BackgroundRenderer />
                 <VisitorTracker />
                 <ClickEffect />

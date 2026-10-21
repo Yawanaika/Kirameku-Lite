@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import LoginForm from "@/components/admin/LoginForm";
-import { getAdminSession } from "@/server/auth/guard";
+import { env } from "@/server/env";
 import { siteConfig } from "@/siteConfig";
 
 export const metadata: Metadata = {
@@ -9,24 +8,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const dynamic = "force-dynamic";
+const authConfigured = Boolean(
+  env.AUTH_SECRET && env.AUTH_SECRET.length >= 32,
+);
 
-function safeNext(value: string | string[] | undefined): string {
-  if (typeof value !== "string") return "/admin";
-  if (!value.startsWith("/admin") || value.startsWith("//")) return "/admin";
-  return value;
-}
-
-export default async function AdminLoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ next?: string | string[] }>;
-}) {
-  const admin = await getAdminSession();
-  if (admin) redirect("/admin");
-
-  const params = await searchParams;
-  const nextPath = safeNext(params.next);
+export default function AdminLoginPage() {
+  const showDevWarning = env.NODE_ENV !== "production" && !authConfigured;
 
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-slate-950 px-4 py-12">
@@ -47,8 +34,19 @@ export default async function AdminLoginPage({
           </p>
         </div>
 
+        {showDevWarning ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3.5 py-2.5 text-xs leading-5 text-amber-200"
+          >
+            未配置 <code className="font-mono">AUTH_SECRET</code>。请在
+            <code className="mx-1 font-mono">.env.local</code>
+            中设置至少 32 位随机字符后重启 dev server，否则登录会返回 500。
+          </p>
+        ) : null}
+
         <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/30 backdrop-blur">
-          <LoginForm nextPath={nextPath} />
+          <LoginForm />
         </div>
 
         <p className="mt-5 text-center text-[11px] text-slate-600">

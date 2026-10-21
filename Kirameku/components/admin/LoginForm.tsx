@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface LoginFormProps {
-  nextPath: string;
+  nextPath?: string;
 }
 
-export default function LoginForm({ nextPath }: LoginFormProps) {
+export default function LoginForm({ nextPath = "/admin" }: LoginFormProps) {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

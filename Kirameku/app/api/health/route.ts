@@ -1,5 +1,10 @@
 import { getSqlite } from "@/server/db/client";
+import { env } from "@/server/env";
 import { handle } from "@/server/http/handler";
+
+const authConfigured = Boolean(
+  env.AUTH_SECRET && env.AUTH_SECRET.length >= 32,
+);
 
 export async function GET(request: Request) {
   return handle(
@@ -19,6 +24,7 @@ export async function GET(request: Request) {
           ok: row?.ok === 1,
           db: "ok",
           migration: migration?.filename ?? null,
+          auth: authConfigured ? "ok" : "missing",
           version: "0.1.0",
         };
       } catch {
@@ -26,6 +32,7 @@ export async function GET(request: Request) {
           {
             ok: false,
             db: "unavailable",
+            auth: authConfigured ? "ok" : "missing",
             version: "0.1.0",
           },
           { status: 503 },

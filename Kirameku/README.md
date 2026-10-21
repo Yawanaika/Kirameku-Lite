@@ -4,13 +4,23 @@ TypeScript + Next.js 16 单体应用。公开站点、管理后台和 API 共用
 
 ## 本地启动
 
+需要 **Node.js 22 LTS**（见 `.nvmrc`；CI 同样使用 22）。从其他 Node 大版本切换后，重新编译 SQLite 原生模块：
+
 ```bash
 pnpm install
+pnpm rebuild better-sqlite3
 cp .env.example .env.local
 # 编辑 .env.local，至少设置 AUTH_SECRET（32+ 字符）
 pnpm db:migrate
 ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的强密码' pnpm db:seed-admin
 pnpm dev
+```
+
+如果 Turbopack 开发缓存异常或登录页长时间停在 `Compiling /admin/login`：
+
+```bash
+pnpm dev:clean     # 删除 .next/dev 后重新启动
+pnpm dev:webpack   # 备用：改用 webpack 开发服务器
 ```
 
 - 公开站点：<http://localhost:3000>
@@ -47,6 +57,8 @@ scripts/
 | 命令 | 说明 |
 |:---|:---|
 | `pnpm dev` | 启动开发服务器 |
+| `pnpm dev:clean` | 清除 `.next/dev` 后启动 |
+| `pnpm dev:webpack` | 使用 webpack 启动（Turbopack 异常时备用） |
 | `pnpm typecheck` | TypeScript 检查 |
 | `pnpm test` | Vitest 单测 |
 | `pnpm build` | 生产构建 |
