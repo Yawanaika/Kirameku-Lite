@@ -230,6 +230,25 @@ describe("posts service", () => {
     ).resolves.toEqual([]);
   });
 
+  it("lists all published posts for sitemap generation", async () => {
+    const rows = await posts.listAllPublished();
+
+    expect(rows).toEqual([
+      {
+        slug: "third",
+        updated_at: new Date(Date.UTC(2026, 1, 15)).toISOString(),
+      },
+      {
+        slug: "second",
+        updated_at: new Date(Date.UTC(2026, 1, 1)).toISOString(),
+      },
+      {
+        slug: "first",
+        updated_at: new Date(Date.UTC(2026, 0, 1)).toISOString(),
+      },
+    ]);
+  });
+
   it("counts by status", async () => {
     await expect(posts.count("published")).resolves.toBe(3);
     await expect(posts.count("draft")).resolves.toBe(1);

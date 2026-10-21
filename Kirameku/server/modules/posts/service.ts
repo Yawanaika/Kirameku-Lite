@@ -238,6 +238,21 @@ export function createPostsService(db: AppDatabase) {
       return toDetail(row, tagMap.get(row.id) ?? []);
     },
 
+    async listAllPublished(): Promise<
+      Array<{ slug: string; updated_at: string }>
+    > {
+      const rows = await db
+        .select({ slug: post.slug, updatedAt: post.updatedAt })
+        .from(post)
+        .where(eq(post.status, "published"))
+        .orderBy(desc(post.updatedAt), desc(post.id));
+
+      return rows.map((row) => ({
+        slug: row.slug,
+        updated_at: iso(row.updatedAt),
+      }));
+    },
+
     async count(status?: string): Promise<number> {
       const query = db
         .select({ value: sql<number>`count(*)` })
