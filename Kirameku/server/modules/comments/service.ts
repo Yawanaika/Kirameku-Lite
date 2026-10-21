@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import {
   chatter,
@@ -9,6 +9,8 @@ import {
 } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
 import type {
+  AdminChatterCommentItem,
+  AdminPostCommentItem,
   ChatterCommentItem,
   CommentGitHubUser,
   PostCommentItem,
@@ -42,6 +44,16 @@ const chatterCommentSelection = {
   ghBio: githubUser.bio,
 };
 
+const adminPostCommentSelection = {
+  ...postCommentSelection,
+  ip: comment.ip,
+};
+
+const adminChatterCommentSelection = {
+  ...chatterCommentSelection,
+  ip: chatterComment.ip,
+};
+
 interface CommentRowBase {
   id: number;
   parentId: number | null;
@@ -61,6 +73,14 @@ interface PostCommentRow extends CommentRowBase {
 
 interface ChatterCommentRow extends CommentRowBase {
   chatterId: number;
+}
+
+interface AdminPostCommentRow extends PostCommentRow {
+  ip: string | null;
+}
+
+interface AdminChatterCommentRow extends ChatterCommentRow {
+  ip: string | null;
 }
 
 function toGitHubUser(row: CommentRowBase): CommentGitHubUser | null {
@@ -97,6 +117,24 @@ function toChatterComment(row: ChatterCommentRow): ChatterCommentItem {
   return {
     ...baseFields(row),
     chatter_id: row.chatterId,
+    replies: [],
+  };
+}
+
+function toAdminPostComment(row: AdminPostCommentRow): AdminPostCommentItem {
+  return {
+    ...toPostComment(row),
+    ip: row.ip ?? "",
+    replies: [],
+  };
+}
+
+function toAdminChatterComment(
+  row: AdminChatterCommentRow,
+): AdminChatterCommentItem {
+  return {
+    ...toChatterComment(row),
+    ip: row.ip ?? "",
     replies: [],
   };
 }
@@ -162,6 +200,122 @@ export function createCommentsService(db: AppDatabase) {
 
     if (!row) throw errors.notFound("评论不存在");
     return toChatterComment(row);
+  }
+
+  async function loadAdminChildren(
+    parentIds: number[],
+  ): Promise<AdminPostCommentRow[]> {
+    if (parentIds.length === 0) return [];
+    return db
+      .select(adminPostCommentSelection)
+      .from(comment)
+      .leftJoin(githubUser, eq(comment.githubUserId, githubUser.id))
+      .where(inArray(comment.parentId, parentIds))
+      .orderBy(asc(comment.createdAt), asc(comment.id));
+  }
+
+  async function buildAdminTree(
+    roots: AdminPostCommentRow[],
+  ): Promise<AdminPostCommentItem[]> {
+    const itemsById = new Map<number, AdminPostCommentItem>();
+    const rootItems = roots.map((row) => {
+      const item = toAdminPostComment(row);
+      itemsById.set(row.id, item);
+      return item;
+    });
+
+    let frontier = roots.map((row) => row.id);
+    while (frontier.length > 0) {
+      const children = await loadAdminChildren(frontier);
+      if (children.length === 0) break;
+
+      const next: number[] = [];
+      for (const child of children) {
+        const item = toAdminPostComment(child);
+        itemsById.set(child.id, item);
+        if (child.parentId !== null) {
+          itemsById.get(child.parentId)?.replies.push(item);
+        }
+        next.push(child.id);
+      }
+      frontier = next;
+    }
+
+    return rootItems;
+  }
+
+  async function getAdminComment(
+    id: number,
+  ): Promise<AdminPostCommentItem> {
+    const [row] = await db
+      .select(adminPostCommentSelection)
+      .from(comment)
+      .leftJoin(githubUser, eq(comment.githubUserId, githubUser.id))
+      .where(eq(comment.id, id))
+      .limit(1);
+    if (!row) throw errors.notFound("评论不存在");
+    return toAdminPostComment(row);
+  }
+
+  async function loadAdminChatterChildren(
+    parentIds: number[],
+  ): Promise<AdminChatterCommentRow[]> {
+    if (parentIds.length === 0) return [];
+    return db
+      .select(adminChatterCommentSelection)
+      .from(chatterComment)
+      .leftJoin(
+        githubUser,
+        eq(chatterComment.githubUserId, githubUser.id),
+      )
+      .where(inArray(chatterComment.parentId, parentIds))
+      .orderBy(asc(chatterComment.createdAt), asc(chatterComment.id));
+  }
+
+  async function buildAdminChatterTree(
+    roots: AdminChatterCommentRow[],
+  ): Promise<AdminChatterCommentItem[]> {
+    const itemsById = new Map<number, AdminChatterCommentItem>();
+    const rootItems = roots.map((row) => {
+      const item = toAdminChatterComment(row);
+      itemsById.set(row.id, item);
+      return item;
+    });
+
+    let frontier = roots.map((row) => row.id);
+    while (frontier.length > 0) {
+      const children = await loadAdminChatterChildren(frontier);
+      if (children.length === 0) break;
+
+      const next: number[] = [];
+      for (const child of children) {
+        const item = toAdminChatterComment(child);
+        itemsById.set(child.id, item);
+        if (child.parentId !== null) {
+          itemsById.get(child.parentId)?.replies.push(item);
+        }
+        next.push(child.id);
+      }
+      frontier = next;
+    }
+
+    return rootItems;
+  }
+
+  async function getAdminChatterComment(
+    id: number,
+  ): Promise<AdminChatterCommentItem> {
+    const [row] = await db
+      .select(adminChatterCommentSelection)
+      .from(chatterComment)
+      .leftJoin(
+        githubUser,
+        eq(chatterComment.githubUserId, githubUser.id),
+      )
+      .where(eq(chatterComment.id, id))
+      .limit(1);
+    if (!row) throw errors.notFound("评论不存在");
+    return toAdminChatterComment(row);
   }
 
   return {
@@ -342,6 +496,108 @@ export function createCommentsService(db: AppDatabase) {
         })
         .where(eq(chatterComment.id, id));
       return getChatterComment(id);
+    },
+
+    async listAdminComments(params: {
+      status?: string;
+      page: number;
+      size: number;
+    }): Promise<AdminPostCommentItem[]> {
+      const conditions = [isNull(comment.parentId)];
+      if (params.status) conditions.push(eq(comment.status, params.status));
+
+      const roots = await db
+        .select(adminPostCommentSelection)
+        .from(comment)
+        .leftJoin(githubUser, eq(comment.githubUserId, githubUser.id))
+        .where(and(...conditions))
+        .orderBy(desc(comment.createdAt), desc(comment.id))
+        .limit(params.size)
+        .offset((params.page - 1) * params.size);
+
+      return buildAdminTree(roots);
+    },
+
+    async updatePostCommentStatus(
+      id: number,
+      status: string,
+    ): Promise<AdminPostCommentItem> {
+      const [row] = await db
+        .update(comment)
+        .set({ status })
+        .where(eq(comment.id, id))
+        .returning({ id: comment.id });
+      if (!row) throw errors.notFound("评论不存在");
+      return getAdminComment(id);
+    },
+
+    async removePostComment(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(comment)
+        .where(eq(comment.id, id))
+        .returning({ id: comment.id });
+      if (!row) throw errors.notFound("评论不存在");
+      return { ok: true };
+    },
+
+    async listAdminChatterComments(params: {
+      status?: string;
+      page: number;
+      size: number;
+    }): Promise<AdminChatterCommentItem[]> {
+      const conditions = [isNull(chatterComment.parentId)];
+      if (params.status) {
+        conditions.push(eq(chatterComment.status, params.status));
+      }
+
+      const roots = await db
+        .select(adminChatterCommentSelection)
+        .from(chatterComment)
+        .leftJoin(
+          githubUser,
+          eq(chatterComment.githubUserId, githubUser.id),
+        )
+        .where(and(...conditions))
+        .orderBy(desc(chatterComment.createdAt), desc(chatterComment.id))
+        .limit(params.size)
+        .offset((params.page - 1) * params.size);
+
+      return buildAdminChatterTree(roots);
+    },
+
+    async updateChatterCommentStatus(
+      id: number,
+      status: string,
+    ): Promise<AdminChatterCommentItem> {
+      const [row] = await db
+        .update(chatterComment)
+        .set({ status })
+        .where(eq(chatterComment.id, id))
+        .returning({ id: chatterComment.id });
+      if (!row) throw errors.notFound("评论不存在");
+      return getAdminChatterComment(id);
+    },
+
+    async removeChatterComment(id: number): Promise<{ ok: true }> {
+      const [target] = await db
+        .select({ chatterId: chatterComment.chatterId })
+        .from(chatterComment)
+        .where(eq(chatterComment.id, id))
+        .limit(1);
+      if (!target) throw errors.notFound("评论不存在");
+
+      await db.delete(chatterComment).where(eq(chatterComment.id, id));
+
+      const [total] = await db
+        .select({ value: sql<number>`count(*)` })
+        .from(chatterComment)
+        .where(eq(chatterComment.chatterId, target.chatterId));
+      await db
+        .update(chatter)
+        .set({ commentsCount: total?.value ?? 0 })
+        .where(eq(chatter.id, target.chatterId));
+
+      return { ok: true };
     },
   };
 }

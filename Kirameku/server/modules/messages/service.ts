@@ -73,7 +73,8 @@ function groupChildren(rows: MessageRow[]): Map<number, MessageRow[]> {
 }
 
 export function createMessagesService(db: AppDatabase) {
-  async function loadApprovedRows(): Promise<MessageRow[]> {
+  async function loadRows(status?: string): Promise<MessageRow[]> {
+    const conditions = [status ? eq(message.status, status) : sql`1 = 1`];
     return db
       .select({
         id: message.id,
@@ -91,12 +92,23 @@ export function createMessagesService(db: AppDatabase) {
       })
       .from(message)
       .leftJoin(githubUser, eq(message.githubUserId, githubUser.id))
-      .where(eq(message.status, "approved"))
+      .where(and(...conditions))
       .orderBy(desc(message.createdAt), desc(message.id));
+  }
+
+  async function loadApprovedRows(): Promise<MessageRow[]> {
+    return loadRows("approved");
   }
 
   async function getApprovedById(id: number): Promise<MessageItem> {
     const rows = await loadApprovedRows();
+    const row = rows.find((item) => item.id === id);
+    if (!row) throw errors.notFound("留言不存在");
+    return toItem(row, groupChildren(rows));
+  }
+
+  async function getAdminById(id: number): Promise<MessageItem> {
+    const rows = await loadRows();
     const row = rows.find((item) => item.id === id);
     if (!row) throw errors.notFound("留言不存在");
     return toItem(row, groupChildren(rows));
@@ -166,6 +178,54 @@ export function createMessagesService(db: AppDatabase) {
         })
         .where(eq(message.id, id));
       return getApprovedById(id);
+    },
+
+    async listAdmin(params: {
+      status?: string;
+      page: number;
+      size: number;
+    }): Promise<MessageItem[]> {
+      const rows = await loadRows();
+      const childrenByParent = groupChildren(rows);
+      const topLevel = rows.filter(
+        (row) =>
+          row.parentId === null &&
+          (params.status === undefined || row.status === params.status),
+      );
+      const start = (params.page - 1) * params.size;
+      return topLevel
+        .slice(start, start + params.size)
+        .map((row) => toItem(row, childrenByParent));
+    },
+
+    async adminCount(status?: string): Promise<number> {
+      const conditions = [isNull(message.parentId)];
+      if (status) conditions.push(eq(message.status, status));
+
+      const [row] = await db
+        .select({ value: count() })
+        .from(message)
+        .where(and(...conditions));
+      return row?.value ?? 0;
+    },
+
+    async updateStatus(id: number, status: string): Promise<MessageItem> {
+      const [row] = await db
+        .update(message)
+        .set({ status })
+        .where(eq(message.id, id))
+        .returning({ id: message.id });
+      if (!row) throw errors.notFound("留言不存在");
+      return getAdminById(id);
+    },
+
+    async remove(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(message)
+        .where(eq(message.id, id))
+        .returning({ id: message.id });
+      if (!row) throw errors.notFound("留言不存在");
+      return { ok: true };
     },
   };
 }

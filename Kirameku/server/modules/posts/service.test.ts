@@ -292,6 +292,185 @@ describe("posts service", () => {
     await expect(posts.like(1, true)).resolves.toEqual({ likes: 0 });
     await expect(posts.like(4)).rejects.toBeInstanceOf(AppError);
   });
+
+  it("lists drafts and all statuses for the admin view", async () => {
+    const all = await posts.list({ page: 1, size: 10 });
+    const drafts = await posts.list({
+      status: "draft",
+      page: 1,
+      size: 10,
+    });
+
+    expect(all.map((row) => row.slug)).toEqual([
+      "first",
+      "draft",
+      "third",
+      "second",
+    ]);
+    expect(drafts.map((row) => row.slug)).toEqual(["draft"]);
+  });
+
+  it("creates a post with automatic counts and tag syncing", async () => {
+    const created = await posts.create({
+      title: "New Post",
+      slug: "new-post",
+      description: "new description",
+      content: "你好世界",
+      cover: "/new.png",
+      category_id: techId,
+      tags: ["TypeScript", "新标签", "新标签", "  "],
+      status: "draft",
+      is_pinned: false,
+    });
+
+    expect(created).toMatchObject({
+      title: "New Post",
+      slug: "new-post",
+      description: "new description",
+      content: "你好世界",
+      cover: "/new.png",
+      category: "Tech",
+      tags: ["TypeScript", "新标签"],
+      status: "draft",
+      is_pinned: false,
+      word_count: 4,
+      reading_time: 1,
+      published_at: null,
+    });
+
+    const published = await posts.create({
+      title: "Published Post",
+      slug: "published-post",
+      description: "",
+      content: "a".repeat(600),
+      cover: "",
+      category_id: null,
+      tags: [],
+      status: "published",
+      is_pinned: true,
+    });
+    expect(published.published_at).not.toBeNull();
+    expect(published.word_count).toBe(600);
+    expect(published.reading_time).toBe(2);
+
+    await expect(
+      posts.create({
+        title: "Duplicate",
+        slug: "new-post",
+        description: "",
+        content: "",
+        cover: "",
+        category_id: null,
+        tags: [],
+        status: "draft",
+        is_pinned: false,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+
+    await expect(
+      posts.create({
+        title: "Missing Category",
+        slug: "missing-category",
+        description: "",
+        content: "",
+        cover: "",
+        category_id: 999999,
+        tags: [],
+        status: "draft",
+        is_pinned: false,
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("updates content, tags, category and publish state", async () => {
+    const created = await posts.create({
+      title: "Editable",
+      slug: "editable",
+      description: "",
+      content: "short",
+      cover: "",
+      category_id: techId,
+      tags: ["TypeScript"],
+      status: "draft",
+      is_pinned: false,
+    });
+
+    const updated = await posts.update(created.id, {
+      content: "b".repeat(600),
+      tags: ["SQLite", "另一个标签"],
+      category_id: lifeId,
+      status: "published",
+      is_pinned: true,
+    });
+
+    expect(updated).toMatchObject({
+      slug: "editable",
+      content: "b".repeat(600),
+      category: "Life",
+      tags: ["SQLite", "另一个标签"],
+      status: "published",
+      is_pinned: true,
+      word_count: 600,
+      reading_time: 2,
+    });
+    expect(updated.published_at).not.toBeNull();
+
+    await expect(
+      posts.update(created.id, { slug: "first" }),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      posts.update(created.id, { category_id: 999999 }),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(posts.update(999999, { title: "missing" })).rejects.toMatchObject(
+      { status: 404 },
+    );
+  });
+
+  it("respects manually supplied word count and reading time", async () => {
+    const created = await posts.create({
+      title: "Manual Counts",
+      slug: "manual-counts",
+      description: "",
+      content: "abc",
+      cover: "",
+      category_id: null,
+      tags: [],
+      status: "draft",
+      is_pinned: false,
+      word_count: 999,
+      reading_time: 7,
+    });
+
+    expect(created.word_count).toBe(999);
+    expect(created.reading_time).toBe(7);
+  });
+
+  it("deletes a post and its tag links", async () => {
+    const created = await posts.create({
+      title: "Delete Me",
+      slug: "delete-me",
+      description: "",
+      content: "content",
+      cover: "",
+      category_id: techId,
+      tags: ["TypeScript"],
+      status: "draft",
+      is_pinned: false,
+    });
+
+    await expect(posts.remove(created.id)).resolves.toEqual({ ok: true });
+    await expect(posts.getById(created.id)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(posts.remove(created.id)).rejects.toMatchObject({
+      status: 404,
+    });
+
+    const links = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "post_tag" WHERE "post_id" = ?')
+      .get(created.id) as { count: number };
+    expect(links.count).toBe(0);
+  });
 });
 
 describe("taxonomy and site stats", () => {

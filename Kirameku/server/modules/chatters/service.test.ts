@@ -166,6 +166,65 @@ describe("chatters service", () => {
     await expect(chatters.toggleLike(999999)).rejects.toBeInstanceOf(AppError);
   });
 
+  it("lists drafts and all statuses for the admin view", async () => {
+    const all = await chatters.list({ page: 1, size: 10 });
+    const drafts = await chatters.list({
+      status: "draft",
+      page: 1,
+      size: 10,
+    });
+
+    expect(all.map((row) => row.id)).toEqual([draft, publishedB, publishedA]);
+    expect(drafts.map((row) => row.id)).toEqual([draft]);
+  });
+
+  it("creates, updates and deletes chatters", async () => {
+    const created = await chatters.create({
+      content: "new chatter",
+      images: ["/new.jpg"],
+      mood: "平静",
+      status: "draft",
+    });
+    expect(created).toMatchObject({
+      content: "new chatter",
+      images: ["/new.jpg"],
+      mood: "平静",
+      likes: 0,
+      comments_count: 0,
+      status: "draft",
+    });
+    expect(created.created_at).not.toBe(new Date(0).toISOString());
+    expect(created.updated_at).not.toBeNull();
+
+    const updated = await chatters.update(created.id, {
+      content: "updated chatter",
+      images: [],
+      mood: "",
+      status: "published",
+    });
+    expect(updated).toMatchObject({
+      id: created.id,
+      content: "updated chatter",
+      images: [],
+      mood: "",
+      status: "published",
+    });
+    expect(updated.updated_at).not.toBeNull();
+
+    await expect(chatters.remove(created.id)).resolves.toEqual({ ok: true });
+    await expect(chatters.getById(created.id)).rejects.toBeInstanceOf(AppError);
+    await expect(chatters.remove(created.id)).rejects.toBeInstanceOf(AppError);
+    await expect(
+      chatters.update(999999, { content: "missing" }),
+    ).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("counts all statuses for admin", async () => {
+    await expect(chatters.adminCount()).resolves.toBe(3);
+    await expect(chatters.adminCount("published")).resolves.toBe(2);
+    await expect(chatters.adminCount("draft")).resolves.toBe(1);
+  });
+
   it("rejects draft status query parameters for public callers", () => {
     expect(chatterListQuery.safeParse({ status: "draft" }).success).toBe(false);
     expect(chatterCountQuery.safeParse({ status: "draft" }).success).toBe(false);

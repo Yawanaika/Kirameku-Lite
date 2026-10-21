@@ -404,6 +404,127 @@ describe("comments service", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("lists all comment statuses for admin with full reply trees", async () => {
+    const roots = await comments.listAdminComments({ page: 1, size: 20 });
+
+    expect(roots.map((root) => root.content)).toEqual([
+      "draft post comment",
+      "post rejected root",
+      "post root B",
+      "post root A",
+    ]);
+    expect(roots[1]).toMatchObject({
+      post_id: publishedPost,
+      status: "rejected",
+      ip: "",
+    });
+    expect(roots[3].replies.map((reply) => reply.content)).toEqual([
+      "post reply 1",
+      "post reply 2",
+      "post rejected reply",
+    ]);
+    expect(roots[3].replies[0].replies.map((reply) => reply.content)).toEqual([
+      "post nested",
+    ]);
+
+    const rejected = await comments.listAdminComments({
+      status: "rejected",
+      page: 1,
+      size: 20,
+    });
+    expect(rejected.map((root) => root.content)).toEqual([
+      "post rejected root",
+    ]);
+  });
+
+  it("updates comment status and deletes comment trees", async () => {
+    const roots = await comments.listAdminComments({ page: 1, size: 20 });
+    const rejected = roots.find((root) => root.status === "rejected");
+    expect(rejected).toBeDefined();
+
+    await expect(
+      comments.updatePostCommentStatus(rejected!.id, "approved"),
+    ).resolves.toMatchObject({ id: rejected!.id, status: "approved" });
+
+    await expect(
+      comments.updatePostCommentStatus(999999, "approved"),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const rootA = roots.find((root) => root.content === "post root A");
+    expect(rootA).toBeDefined();
+    await expect(comments.removePostComment(rootA!.id)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(comments.removePostComment(rootA!.id)).rejects.toMatchObject({
+      status: 404,
+    });
+
+    const remaining = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "comment" WHERE "id" = ? OR "parent_id" = ?')
+      .get(rootA!.id, rootA!.id) as { count: number };
+    expect(remaining.count).toBe(0);
+  });
+
+  it("lists, moderates and deletes chatter comments for admin", async () => {
+    const roots = await comments.listAdminChatterComments({
+      page: 1,
+      size: 20,
+    });
+
+    expect(roots.map((root) => root.content)).toEqual([
+      "draft chatter comment",
+      "chatter rejected root",
+      "chatter root B",
+      "chatter root A",
+    ]);
+    expect(roots[1]).toMatchObject({
+      chatter_id: publishedChatter,
+      status: "rejected",
+      ip: "",
+    });
+    expect(roots[3].replies.map((reply) => reply.content)).toEqual([
+      "chatter reply",
+    ]);
+
+    const rejected = await comments.listAdminChatterComments({
+      status: "rejected",
+      page: 1,
+      size: 20,
+    });
+    expect(rejected.map((root) => root.content)).toEqual([
+      "chatter rejected root",
+    ]);
+
+    await expect(
+      comments.updateChatterCommentStatus(rejected[0].id, "approved"),
+    ).resolves.toMatchObject({
+      id: rejected[0].id,
+      status: "approved",
+    });
+    await expect(
+      comments.updateChatterCommentStatus(999999, "approved"),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const publicRoots = await comments.listChatterComments(publishedChatter);
+    expect(publicRoots.map((root) => root.content)).toContain(
+      "chatter rejected root",
+    );
+
+    const rootA = roots.find((root) => root.content === "chatter root A");
+    expect(rootA).toBeDefined();
+    await expect(
+      comments.removeChatterComment(rootA!.id),
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      comments.removeChatterComment(rootA!.id),
+    ).rejects.toMatchObject({ status: 404 });
+
+    const count = connection
+      .prepare('SELECT comments_count AS value FROM "chatter" WHERE id = ?')
+      .get(publishedChatter) as { value: number };
+    expect(count.value).toBe(2);
+  });
+
   it("validates post and chatter comment ids and create inputs", () => {
     expect(postCommentsParams.parse({ postId: "12" })).toEqual({ postId: 12 });
     expect(chatterCommentsParams.parse({ chatterId: "34" })).toEqual({

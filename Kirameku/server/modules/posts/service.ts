@@ -1,8 +1,14 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { category, post, postTag, tag } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
-import type { PostDetail, PostItem, PostListParams } from "./contracts";
+import type {
+  CreatePostInput,
+  PostDetail,
+  PostItem,
+  PostListParams,
+  UpdatePostInput,
+} from "./contracts";
 
 type PostRow = Pick<
   typeof post.$inferSelect,
@@ -112,10 +118,132 @@ async function taggedPostIds(
   return rows.map((row) => row.postId);
 }
 
+function tagSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+
+function autoReadingTime(wordCount: number): number {
+  return wordCount > 0 ? Math.max(1, Math.floor(wordCount / 300)) : 0;
+}
+
 export function createPostsService(db: AppDatabase) {
+  async function loadDetailById(
+    id: number,
+    options: { publishedOnly?: boolean } = {},
+  ): Promise<PostDetail> {
+    const conditions = [eq(post.id, id)];
+    if (options.publishedOnly) conditions.push(eq(post.status, "published"));
+
+    const [row] = await db
+      .select({
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        description: post.description,
+        content: post.content,
+        cover: post.cover,
+        status: post.status,
+        isPinned: post.isPinned,
+        views: post.views,
+        likes: post.likes,
+        wordCount: post.wordCount,
+        readingTime: post.readingTime,
+        publishedAt: post.publishedAt,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        categoryName: category.name,
+      })
+      .from(post)
+      .leftJoin(category, eq(post.categoryId, category.id))
+      .where(and(...conditions))
+      .limit(1);
+
+    if (!row) throw errors.notFound("文章不存在");
+
+    const tagMap = await loadTags(db, [row.id]);
+    return toDetail(row, tagMap.get(row.id) ?? []);
+  }
+
+  async function ensureCategory(id: number): Promise<void> {
+    const [row] = await db
+      .select({ id: category.id })
+      .from(category)
+      .where(eq(category.id, id))
+      .limit(1);
+    if (!row) throw errors.notFound("分类不存在");
+  }
+
+  async function assertSlugUnique(
+    slug: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const conditions = [eq(post.slug, slug)];
+    if (excludeId !== undefined) conditions.push(ne(post.id, excludeId));
+
+    const [row] = await db
+      .select({ id: post.id })
+      .from(post)
+      .where(and(...conditions))
+      .limit(1);
+    if (row) throw errors.conflict("文章 slug 已存在");
+  }
+
+  async function syncTags(postId: number, names: string[]): Promise<void> {
+    await db.delete(postTag).where(eq(postTag.postId, postId));
+
+    const uniqueNames = [...new Set(names.map((name) => name.trim()))].filter(
+      Boolean,
+    );
+    for (const name of uniqueNames) {
+      let [tagRow] = await db
+        .select({ id: tag.id })
+        .from(tag)
+        .where(eq(tag.name, name))
+        .limit(1);
+
+      if (!tagRow) {
+        const slug = tagSlug(name);
+        [tagRow] = await db
+          .select({ id: tag.id })
+          .from(tag)
+          .where(eq(tag.slug, slug))
+          .limit(1);
+
+        if (!tagRow) {
+          [tagRow] = await db
+            .insert(tag)
+            .values({ name, slug })
+            .returning({ id: tag.id });
+        }
+      }
+
+      if (!tagRow) throw errors.internal("保存标签失败");
+      await db.insert(postTag).values({ postId, tagId: tagRow.id });
+    }
+  }
+
+  async function recalcTaxonomyCounts(): Promise<void> {
+    await db.run(sql`
+      UPDATE "category"
+      SET "post_count" = (
+        SELECT COUNT(*) FROM "post"
+        WHERE "post"."category_id" = "category"."id"
+      )
+    `);
+    await db.run(sql`
+      UPDATE "tag"
+      SET "post_count" = (
+        SELECT COUNT(*) FROM "post_tag"
+        WHERE "post_tag"."tag_id" = "tag"."id"
+      )
+    `);
+  }
+
   return {
     async list(params: PostListParams): Promise<PostItem[]> {
-      const conditions = [eq(post.status, params.status)];
+      const conditions = [
+        params.status ? eq(post.status, params.status) : sql`1 = 1`,
+      ];
 
       if (params.category) {
         const id = await categoryIdBySlug(db, params.category);
@@ -205,37 +333,123 @@ export function createPostsService(db: AppDatabase) {
       id: number,
       options: { publishedOnly?: boolean } = {},
     ): Promise<PostDetail> {
-      const conditions = [eq(post.id, id)];
-      if (options.publishedOnly) conditions.push(eq(post.status, "published"));
+      return loadDetailById(id, options);
+    },
 
+    async create(input: CreatePostInput): Promise<PostDetail> {
+      await assertSlugUnique(input.slug);
+      if (input.category_id != null) await ensureCategory(input.category_id);
+
+      const wordCount = input.word_count ?? input.content.length;
+      const readingTime =
+        input.reading_time ?? autoReadingTime(wordCount);
       const [row] = await db
+        .insert(post)
+        .values({
+          title: input.title,
+          slug: input.slug,
+          description: input.description,
+          content: input.content,
+          cover: input.cover,
+          categoryId: input.category_id ?? null,
+          status: input.status,
+          isPinned: input.is_pinned,
+          wordCount,
+          readingTime,
+          publishedAt: input.status === "published" ? new Date() : null,
+        })
+        .returning({ id: post.id });
+      if (!row) throw errors.internal("保存文章失败");
+
+      await syncTags(row.id, input.tags);
+      await recalcTaxonomyCounts();
+      return loadDetailById(row.id);
+    },
+
+    async update(id: number, input: UpdatePostInput): Promise<PostDetail> {
+      const [existing] = await db
         .select({
           id: post.id,
-          title: post.title,
-          slug: post.slug,
-          description: post.description,
           content: post.content,
-          cover: post.cover,
           status: post.status,
-          isPinned: post.isPinned,
-          views: post.views,
-          likes: post.likes,
-          wordCount: post.wordCount,
-          readingTime: post.readingTime,
           publishedAt: post.publishedAt,
-          createdAt: post.createdAt,
-          updatedAt: post.updatedAt,
-          categoryName: category.name,
+          wordCount: post.wordCount,
+          categoryId: post.categoryId,
         })
         .from(post)
-        .leftJoin(category, eq(post.categoryId, category.id))
-        .where(and(...conditions))
+        .where(eq(post.id, id))
         .limit(1);
+      if (!existing) throw errors.notFound("文章不存在");
 
+      if (input.slug !== undefined) {
+        await assertSlugUnique(input.slug, id);
+      }
+      if (input.category_id !== undefined && input.category_id !== null) {
+        await ensureCategory(input.category_id);
+      }
+
+      const values: Partial<typeof post.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (input.title !== undefined) values.title = input.title;
+      if (input.slug !== undefined) values.slug = input.slug;
+      if (input.description !== undefined) {
+        values.description = input.description;
+      }
+      if (input.content !== undefined) values.content = input.content;
+      if (input.cover !== undefined) values.cover = input.cover;
+      if (input.category_id !== undefined) {
+        values.categoryId = input.category_id;
+      }
+      if (input.status !== undefined) values.status = input.status;
+      if (input.is_pinned !== undefined) values.isPinned = input.is_pinned;
+
+      let wordCount = existing.wordCount ?? 0;
+      if (input.content !== undefined && input.word_count === undefined) {
+        wordCount = input.content.length;
+        values.wordCount = wordCount;
+      }
+      if (input.word_count !== undefined) {
+        wordCount = input.word_count;
+        values.wordCount = wordCount;
+      }
+      if (input.reading_time !== undefined) {
+        values.readingTime = input.reading_time;
+      } else if (
+        input.content !== undefined ||
+        input.word_count !== undefined
+      ) {
+        values.readingTime = autoReadingTime(wordCount);
+      }
+
+      const nextStatus = input.status ?? existing.status ?? "draft";
+      if (nextStatus === "published" && !existing.publishedAt) {
+        values.publishedAt = new Date();
+      }
+
+      const [row] = await db
+        .update(post)
+        .set(values)
+        .where(eq(post.id, id))
+        .returning({ id: post.id });
       if (!row) throw errors.notFound("文章不存在");
 
-      const tagMap = await loadTags(db, [row.id]);
-      return toDetail(row, tagMap.get(row.id) ?? []);
+      if (input.tags !== undefined) {
+        await syncTags(id, input.tags);
+      }
+      await recalcTaxonomyCounts();
+      return loadDetailById(id);
+    },
+
+    async remove(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(post)
+        .where(eq(post.id, id))
+        .returning({ id: post.id });
+      if (!row) throw errors.notFound("文章不存在");
+
+      await recalcTaxonomyCounts();
+      return { ok: true };
     },
 
     async listAllPublished(): Promise<

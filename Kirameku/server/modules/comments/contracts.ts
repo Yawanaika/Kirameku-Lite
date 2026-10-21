@@ -29,6 +29,30 @@ export const commentIdParams = z.object({
   commentId: z.coerce.number().int().min(1),
 });
 
+export const adminCommentListQuery = z.object({
+  status: z.string().trim().min(1).max(50).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  size: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const adminCommentIdParams = z.object({
+  id: z.coerce.number().int().min(1),
+});
+
+export const updateCommentStatusInput = z.object({
+  status: z.enum(["approved", "rejected", "pending"]),
+});
+
+export const adminChatterCommentListQuery = z.object({
+  status: z.string().trim().min(1).max(50).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  size: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const adminChatterCommentIdParams = z.object({
+  id: z.coerce.number().int().min(1),
+});
+
 export interface CommentGitHubUser {
   id: number;
   login: string;
@@ -59,3 +83,13 @@ export interface ChatterCommentItem {
   github_user: CommentGitHubUser | null;
   replies: ChatterCommentItem[];
 }
+
+export type AdminPostCommentItem = Omit<PostCommentItem, "replies"> & {
+  ip: string;
+  replies: AdminPostCommentItem[];
+};
+
+export type AdminChatterCommentItem = Omit<ChatterCommentItem, "replies"> & {
+  ip: string;
+  replies: AdminChatterCommentItem[];
+};

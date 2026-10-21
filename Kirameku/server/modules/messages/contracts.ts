@@ -25,6 +25,24 @@ export const messageIdParams = z.object({
   messageId: z.coerce.number().int().min(1),
 });
 
+export const adminMessageListQuery = z.object({
+  status: z.string().trim().min(1).max(50).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  size: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const adminMessageCountQuery = z.object({
+  status: z.string().trim().min(1).max(50).optional(),
+});
+
+export const adminMessageIdParams = z.object({
+  id: z.coerce.number().int().min(1),
+});
+
+export const updateMessageStatusInput = z.object({
+  status: z.enum(["approved", "rejected", "pending"]),
+});
+
 /** Internal service input; the public route narrows status to approved. */
 export interface MessageListParams {
   page: number;

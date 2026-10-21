@@ -224,6 +224,58 @@ describe("messages service", () => {
     ).resolves.toMatchObject({ likes: 0 });
   });
 
+  it("lists all message statuses for admin with full reply trees", async () => {
+    const rows = await messages.listAdmin({ page: 1, size: 20 });
+
+    expect(rows.map((row) => row.id)).toEqual([3, topTwo, topOne]);
+    expect(rows[0]).toMatchObject({
+      content: "rejected top",
+      status: "rejected",
+    });
+    expect(rows[2].replies.map((reply) => reply.content)).toEqual([
+      "first reply",
+      "second reply",
+      "rejected reply",
+    ]);
+    expect(rows[2].replies[0].replies.map((reply) => reply.content)).toEqual([
+      "nested reply",
+    ]);
+    expect(rows[2].replies[2].status).toBe("rejected");
+
+    const rejected = await messages.listAdmin({
+      status: "rejected",
+      page: 1,
+      size: 20,
+    });
+    expect(rejected.map((row) => row.content)).toEqual(["rejected top"]);
+  });
+
+  it("counts, updates and deletes messages for admin", async () => {
+    await expect(messages.adminCount()).resolves.toBe(3);
+    await expect(messages.adminCount("approved")).resolves.toBe(2);
+    await expect(messages.adminCount("rejected")).resolves.toBe(1);
+
+    await expect(messages.updateStatus(3, "approved")).resolves.toMatchObject({
+      id: 3,
+      content: "rejected top",
+      status: "approved",
+    });
+    await expect(messages.adminCount("approved")).resolves.toBe(3);
+    await expect(
+      messages.updateStatus(999999, "approved"),
+    ).rejects.toMatchObject({ status: 404 });
+
+    await expect(messages.remove(topOne)).resolves.toEqual({ ok: true });
+    await expect(messages.remove(topOne)).rejects.toMatchObject({
+      status: 404,
+    });
+
+    const remaining = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "message" WHERE "id" = ? OR "parent_id" = ?')
+      .get(topOne, topOne) as { count: number };
+    expect(remaining.count).toBe(0);
+  });
+
   it("rejects non-approved status query parameters", () => {
     expect(messageListQuery.parse({})).toEqual({
       status: "approved",
