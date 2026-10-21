@@ -175,4 +175,105 @@ describe("albums service", () => {
     expect(albumIdParams.safeParse({ id: "0" }).success).toBe(false);
     expect(albumIdParams.safeParse({ id: "abc" }).success).toBe(false);
   });
+
+  it("gets one album by id", async () => {
+    await expect(albums.getById(albumOne)).resolves.toMatchObject({
+      title: "first album",
+      photo_count: 1,
+    });
+    await expect(albums.getById(999999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("creates, updates and deletes albums", async () => {
+    const created = await albums.create({
+      title: "new album",
+      description: "new description",
+      cover: "/new.jpg",
+      sort: 3,
+    });
+    expect(created).toMatchObject({
+      title: "new album",
+      description: "new description",
+      cover: "/new.jpg",
+      photo_count: 0,
+      sort: 3,
+    });
+
+    const updated = await albums.update(created.id, {
+      title: "renamed album",
+      sort: 0,
+    });
+    expect(updated).toMatchObject({
+      title: "renamed album",
+      sort: 0,
+      photo_count: 0,
+    });
+
+    await expect(albums.remove(created.id)).resolves.toEqual({ ok: true });
+    await expect(albums.remove(created.id)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it("adds and removes photos while maintaining photo_count", async () => {
+    const created = await albums.create({
+      title: "photo album",
+      description: "",
+      cover: "",
+      sort: 0,
+    });
+
+    const first = await albums.addPhoto({
+      album_id: created.id,
+      url: "/new-1.jpg",
+      caption: "first",
+      orientation: "portrait",
+      sort: 1,
+    });
+    expect(first).toMatchObject({
+      album_id: created.id,
+      url: "/new-1.jpg",
+      orientation: "portrait",
+      sort: 1,
+    });
+
+    const second = await albums.addPhoto({
+      album_id: created.id,
+      url: "/new-2.jpg",
+      caption: "second",
+      orientation: "landscape",
+      sort: 2,
+    });
+
+    await expect(albums.getById(created.id)).resolves.toMatchObject({
+      photo_count: 2,
+    });
+
+    await expect(albums.removePhoto(first.id)).resolves.toEqual({ ok: true });
+    await expect(albums.getById(created.id)).resolves.toMatchObject({
+      photo_count: 1,
+    });
+    await expect(albums.removePhoto(first.id)).rejects.toMatchObject({
+      status: 404,
+    });
+
+    await albums.remove(created.id);
+    const remaining = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "photo" WHERE "album_id" = ?')
+      .get(created.id) as { count: number };
+    expect(remaining.count).toBe(0);
+    expect(second.id).toBeGreaterThan(0);
+  });
+
+  it("rejects photos for a missing album", async () => {
+    await expect(
+      albums.addPhoto({
+        album_id: 999999,
+        url: "/orphan.jpg",
+        caption: "",
+        orientation: "landscape",
+        sort: 0,
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+  });
 });
