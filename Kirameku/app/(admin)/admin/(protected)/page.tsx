@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { MessageSquare, PenLine, Users, Eye } from "lucide-react";
+import Link from "next/link";
+import { MessageSquare, PenLine, Users, Eye, Plus } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { dashboardService } from "@/server/modules/dashboard/service";
 
 export const metadata: Metadata = {
@@ -47,16 +49,22 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      <header>
-        <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
-          Overview
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-          仪表盘
-        </h1>
-        <p className="mt-1.5 text-sm text-slate-500">
-          站点内容与待处理事项概览。
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
+            Overview
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+            仪表盘
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            站点内容与待处理事项概览。
+          </p>
+        </div>
+        <Link href="/admin/posts/new" className={buttonVariants()}>
+          <Plus className="size-4" aria-hidden />
+          新建文章
+        </Link>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -87,16 +95,19 @@ export default async function AdminDashboardPage() {
               按更新时间排序，最多显示 5 条。
             </p>
           </div>
-          <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-slate-500">
-            P3 开放编辑
-          </span>
+          <Link
+            href="/admin/posts"
+            className="text-[11px] text-slate-500 transition hover:text-sky-300"
+          >
+            查看全部
+          </Link>
         </div>
 
         {recentPosts.length === 0 ? (
           <div className="px-5 py-14 text-center">
             <p className="text-sm text-slate-400">还没有文章</p>
             <p className="mt-1 text-xs text-slate-600">
-              文章编辑器将在 P3 管理后台阶段接入。
+              从后台创建第一篇文章，发布后会出现在前台。
             </p>
           </div>
         ) : (
@@ -106,9 +117,12 @@ export default async function AdminDashboardPage() {
                 key={item.id}
                 className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5"
               >
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
+                <Link
+                  href={`/admin/posts/${item.id}`}
+                  className="min-w-0 flex-1 truncate text-sm text-slate-200 hover:text-sky-300"
+                >
                   {item.title}
-                </span>
+                </Link>
                 <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">
                   {item.status ?? "draft"}
                 </span>

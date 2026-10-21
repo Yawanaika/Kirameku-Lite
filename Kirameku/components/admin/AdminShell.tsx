@@ -1,15 +1,5 @@
 import Link from "next/link";
-import {
-  Bookmark,
-  FileText,
-  FolderKanban,
-  Images,
-  LayoutDashboard,
-  Link2,
-  MessageSquare,
-  Settings,
-  Users,
-} from "lucide-react";
+import AdminNav from "./AdminNav";
 import LogoutButton from "./LogoutButton";
 
 interface AdminShellProps {
@@ -21,17 +11,6 @@ interface AdminShellProps {
   };
   children: React.ReactNode;
 }
-
-const upcoming = [
-  { label: "文章", icon: FileText },
-  { label: "评论 / 留言", icon: MessageSquare },
-  { label: "相册", icon: Images },
-  { label: "项目", icon: FolderKanban },
-  { label: "友链", icon: Link2 },
-  { label: "收藏夹", icon: Bookmark },
-  { label: "访客", icon: Users },
-  { label: "站点配置", icon: Settings },
-];
 
 export default function AdminShell({ admin, children }: AdminShellProps) {
   const displayName = admin.nickname || admin.username;
@@ -51,35 +30,7 @@ export default function AdminShell({ admin, children }: AdminShellProps) {
           </span>
         </Link>
 
-        <nav className="mt-8 space-y-1" aria-label="后台导航">
-          <Link
-            href="/admin"
-            className="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-medium text-white"
-          >
-            <LayoutDashboard className="size-4 text-sky-300" aria-hidden />
-            仪表盘
-          </Link>
-
-          <p className="px-3 pt-5 pb-2 text-[10px] font-semibold tracking-[0.18em] text-slate-600 uppercase">
-            内容管理
-          </p>
-          {upcoming.map((item) => {
-            const Icon = item.icon;
-            return (
-              <span
-                key={item.label}
-                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500"
-                title="P3 管理后台阶段开放"
-              >
-                <Icon className="size-4" aria-hidden />
-                {item.label}
-                <span className="ml-auto rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-600">
-                  P3
-                </span>
-              </span>
-            );
-          })}
-        </nav>
+        <AdminNav />
       </aside>
 
       <div className="min-w-0">
