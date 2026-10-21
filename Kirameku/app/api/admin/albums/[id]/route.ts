@@ -11,6 +11,25 @@ import { getAlbumsService } from "@/server/modules/albums";
 
 export const dynamic = "force-dynamic";
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return handle(
+    async () => {
+      await requireAdmin();
+      const { id } = albumIdParams.parse(await params);
+      const service = getAlbumsService();
+      const [album, photos] = await Promise.all([
+        service.getById(id),
+        service.listPhotos(id),
+      ]);
+      return { album, photos };
+    },
+    { request },
+  );
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

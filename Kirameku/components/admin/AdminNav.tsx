@@ -23,15 +23,12 @@ const primaryItems = [
   { href: "/admin/projects", label: "项目", icon: FolderKanban },
   { href: "/admin/comments", label: "评论", icon: MessageSquare },
   { href: "/admin/messages", label: "留言", icon: MessageSquare },
-];
-
-const upcomingItems = [
-  { label: "分类 / 标签", icon: FolderOpen },
-  { label: "相册", icon: Images },
-  { label: "友链", icon: Link2 },
-  { label: "收藏夹", icon: Bookmark },
-  { label: "站点配置", icon: Settings },
-  { label: "访客", icon: Users },
+  { href: "/admin/taxonomy", label: "分类 / 标签", icon: FolderOpen },
+  { href: "/admin/friend-links", label: "友链", icon: Link2 },
+  { href: "/admin/bookmarks", label: "收藏夹", icon: Bookmark },
+  { href: "/admin/albums", label: "相册", icon: Images },
+  { href: "/admin/site-config", label: "站点配置", icon: Settings },
+  { href: "/admin/visitors", label: "访客", icon: Users },
 ];
 
 export default function AdminNav() {
@@ -69,26 +66,6 @@ export default function AdminNav() {
             />
             {item.label}
           </Link>
-        );
-      })}
-
-      <p className="px-3 pt-5 pb-2 text-[10px] font-semibold tracking-[0.18em] text-slate-600 uppercase">
-        待接入
-      </p>
-      {upcomingItems.map((item) => {
-        const Icon = item.icon;
-        return (
-          <span
-            key={item.label}
-            className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-600"
-            title="后续批次开放"
-          >
-            <Icon className="size-4" aria-hidden />
-            {item.label}
-            <span className="ml-auto rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-600">
-              Soon
-            </span>
-          </span>
         );
       })}
     </nav>
