@@ -68,6 +68,7 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 3. 文章编辑器接入 CodeMirror 和 Markdown 预览。
 4. 后台移动端导航、操作审计日志和更细的权限控制。
 5. 为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。
+6. 按 P3.2 的评估结果完成旧后端下线。
 
 ## P3.1 图片上传（2026-10-22）
 
@@ -84,3 +85,25 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 本轮没有引入 `sharp` / `ali-oss` 依赖：尺寸与格式校验由 `server/storage/image.ts` 内置完成，OSS 使用原生 `fetch` + HMAC-SHA1 签名。后续如需 EXIF 纠正或转码，可保持 `storeImageFile()` 接口不变，替换图片解析实现。
 
 新增测试：`server/storage/image.test.ts`、`server/storage/local.test.ts`、`server/storage/oss.test.ts`。已运行 `pnpm exec vitest run server/storage/image.test.ts server/storage/local.test.ts server/storage/oss.test.ts`，3 个文件 / 14 个测试全部通过；按约定未运行 `build` 或开发服务器。
+
+## P3.2 旧后端下线评估（2026-10-22）
+
+结论：`Kirameku/` 运行时已经不依赖 `Kirameku-backend/`，但当前不建议直接删除；先完成代理清理、全站 smoke 和生产切流确认。
+
+已确认：
+
+- `siteConfig.apiBaseUrl` 为 `""`，前端请求全部走同源 `/api/*`。
+- 文章、评论、留言、相册、项目、收藏夹、友链、站点配置、访客、认证等接口均有本地 Route Handler。
+- `/api/music`、`/api/uapis` 已是 Next 本地反代外部服务，不再经过 FastAPI。
+- 图片上传已迁到 `/api/admin/upload/image`，本地文件由 `/uploads/[...path]` 提供。
+- `Kirameku-backend/uploads/` 不存在，没有本地图片文件需要先迁移。
+
+删除前必须处理：
+
+1. [ ] 删除 `Kirameku/next.config.mjs` 中的两条 fallback rewrite（`/api/:path*`、`/uploads/:path*` → `127.0.0.1:8000`），并确认未命中的路径返回预期 404，而不是误代理。
+2. [ ] 跑一次全站 smoke：公开页面/API、后台登录与 CRUD、图片上传、RSS、sitemap、`/api/health`。
+3. [ ] 确认生产已切到 SQLite，PostgreSQL 备份可恢复，且已经超过 `T+7` 回滚窗口。
+4. [ ] 删除 `Kirameku-backend/`，同步更新 `README.md`、`AGENTS.md`、`DEPLOY_NOTES.md` 和迁移文档中的旧后端描述。
+5. [ ] 若确认不再需要 PostgreSQL → SQLite 迁移，再清理 `postgres` devDependency、`init_db.sql` 引用和迁移脚本说明；否则先保留迁移脚本。
+
+注意：源码可以从 Git 历史恢复，但生产 PostgreSQL 数据、旧环境变量、旧 Nginx 配置和回滚窗口不能仅靠仓库历史恢复。
