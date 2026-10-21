@@ -59,6 +59,7 @@ export default function PostCard({ post, index }: PostCardProps) {
 
   const dateStr = post.published_at
     ? new Date(post.published_at).toLocaleDateString("zh-CN", {
+      timeZone: "Asia/Shanghai",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -121,7 +122,7 @@ export default function PostCard({ post, index }: PostCardProps) {
                 </p>
                 <div className="flex items-center justify-between text-white/60 text-xs">
                   <div className="flex items-center gap-3">
-                    {dateStr && <span>{dateStr}</span>}
+                    {dateStr && <span suppressHydrationWarning>{dateStr}</span>}
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {post.reading_time} 分钟

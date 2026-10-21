@@ -1,33 +1,30 @@
 import { NextResponse } from "next/server";
 import { siteConfig } from "@/siteConfig";
 import { marked } from "marked";
-import type { PostItem } from "@/app/api/posts";
+import { getPostsService } from "@/server/modules/posts";
+import type {
+  PostDetail,
+  PostItem,
+} from "@/server/modules/posts/contracts";
 
 export const revalidate = 3600;
 
-const BACKEND_URL = "http://127.0.0.1:8000";
-
 const FEED_AUTHOR = `guh982719@gmail.com (${siteConfig.authorName})`;
-
-interface PostDetail extends PostItem {
-  content: string;
-}
 
 export async function GET() {
   try {
-    const listRes = await fetch(
-      `${BACKEND_URL}/api/posts?status=published&size=10`
-    );
-    if (!listRes.ok) throw new Error(`Backend returned ${listRes.status}`);
-    const posts: PostItem[] = await listRes.json();
+    const service = getPostsService();
+    const posts = await service.list({
+      status: "published",
+      page: 1,
+      size: 10,
+    });
 
-    // 并行拉取每篇文章的全文（markdown content）
+    // The list response intentionally omits content; fetch each body locally.
     const detailResults = await Promise.allSettled(
-      posts.map((p) =>
-        fetch(`${BACKEND_URL}/api/posts/${p.slug}`).then(
-          (r) => r.json() as Promise<PostDetail>
-        )
-      )
+      posts.map((post) =>
+        service.getBySlug(post.slug, { publishedOnly: true }),
+      ),
     );
 
     const items = (

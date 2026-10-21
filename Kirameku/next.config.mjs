@@ -12,20 +12,24 @@ const nextConfig = {
   },
 
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/api/:path*",
-      },
-      {
-        source: "/uploads/:path*",
-        destination: "http://127.0.0.1:8000/uploads/:path*",
-      },
-      {
-        source: "/reader3/:path*",
-        destination: `${process.env.NOVEL_API_URL || "http://localhost:8085"}/reader3/:path*`,
-      },
-    ];
+    // Keep the legacy FastAPI proxy as a fallback: fallback rewrites run after
+    // filesystem and dynamic routes, so local /api/posts/[slug] handlers win.
+    return {
+      fallback: [
+        {
+          source: "/api/:path*",
+          destination: "http://127.0.0.1:8000/api/:path*",
+        },
+        {
+          source: "/uploads/:path*",
+          destination: "http://127.0.0.1:8000/uploads/:path*",
+        },
+        {
+          source: "/reader3/:path*",
+          destination: `${process.env.NOVEL_API_URL || "http://localhost:8085"}/reader3/:path*`,
+        },
+      ],
+    };
   },
 
   experimental: {
