@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
+import ImageUploader from "./ImageUploader";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -286,12 +287,11 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="project-cover">封面图片</Label>
-                <Input
+                <ImageUploader
                   id="project-cover"
+                  label="封面图片"
                   value={form.coverImage}
-                  onChange={(event) => update("coverImage", event.target.value)}
-                  placeholder="/images/projects/example.webp"
+                  onChange={(url) => update("coverImage", url)}
                 />
               </div>
               <div className="space-y-1.5">

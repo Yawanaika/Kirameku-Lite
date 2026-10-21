@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ImagePlus, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
+import ImageUploader from "./ImageUploader";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -267,15 +268,12 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="album-edit-cover">封面地址</Label>
-              <Input
+              <ImageUploader
                 id="album-edit-cover"
+                label="封面图片"
                 value={form.cover}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    cover: event.target.value,
-                  }))
+                onChange={(url) =>
+                  setForm((current) => ({ ...current, cover: url }))
                 }
               />
             </div>
@@ -305,7 +303,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
             <div>
               <CardTitle>照片</CardTitle>
               <p className="mt-0.5 text-xs text-slate-500">
-                当前只保存图片 URL；上传控件会在图片上传迁移后接入。
+                上传图片或填写 URL 后添加；上传会自动识别方向。
               </p>
             </div>
           </CardHeader>
@@ -315,18 +313,19 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
             className="grid gap-3 border-b border-white/10 p-5 sm:grid-cols-2"
           >
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="photo-url">图片 URL</Label>
-              <Input
+              <ImageUploader
                 id="photo-url"
+                label="图片"
                 value={photoForm.url}
-                onChange={(event) =>
+                onChange={(url) =>
+                  setPhotoForm((current) => ({ ...current, url }))
+                }
+                onUploaded={(image) =>
                   setPhotoForm((current) => ({
                     ...current,
-                    url: event.target.value,
+                    orientation: image.orientation,
                   }))
                 }
-                placeholder="https://... 或 /images/..."
-                required
               />
             </div>
             <div className="space-y-1.5">

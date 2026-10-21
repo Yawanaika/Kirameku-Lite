@@ -39,6 +39,12 @@ export const errors = {
     new AppError("VALIDATION_ERROR", message, 422, details),
   rateLimited: (message = "请求过于频繁，请稍后再试", details?: unknown) =>
     new AppError("RATE_LIMITED", message, 429, details),
+  payloadTooLarge: (message = "文件超过大小限制") =>
+    new AppError("PAYLOAD_TOO_LARGE", message, 413),
+  unsupportedMediaType: (message = "不支持的文件类型") =>
+    new AppError("UNSUPPORTED_MEDIA_TYPE", message, 415),
+  upstream: (message = "上游服务请求失败", details?: unknown) =>
+    new AppError("UPSTREAM_ERROR", message, 502, details),
   readOnly: () =>
     new AppError("READ_ONLY", "当前处于只读维护期，暂时不能写入", 503),
   internal: (message = "服务器内部错误") =>

@@ -5,6 +5,19 @@ const flag = z.preprocess(
   z.boolean(),
 );
 
+/** Treat blank `.env` entries as missing instead of failing validation. */
+const optionalString = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().min(1).optional(),
+);
+
+const optionalUrl = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().url().optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -16,6 +29,13 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: z.string().url().optional(),
   FRONTEND_ORIGIN: z.string().url().default("http://localhost:3000"),
+  OSS_ACCESS_KEY_ID: optionalString,
+  OSS_ACCESS_KEY_SECRET: optionalString,
+  OSS_BUCKET_NAME: optionalString,
+  OSS_ENDPOINT: optionalString,
+  OSS_CUSTOM_DOMAIN: optionalUrl,
+  OSS_PREFIX: optionalString,
+  UPLOAD_DIR: optionalString,
 });
 
 const parsed = envSchema.safeParse(process.env);

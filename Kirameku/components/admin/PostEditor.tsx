@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
+import ImageUploader from "./ImageUploader";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { useAdminData } from "./use-admin-data";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -352,17 +353,13 @@ export default function PostEditor({ postId }: PostEditorProps) {
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
             <h2 className="text-sm font-semibold text-white">封面</h2>
-            <div className="mt-4 space-y-1.5">
-              <Label htmlFor="post-cover">图片地址</Label>
-              <Input
+            <div className="mt-4">
+              <ImageUploader
                 id="post-cover"
+                label="封面图片"
                 value={form.cover}
-                onChange={(event) => update("cover", event.target.value)}
-                placeholder="/images/cover.webp"
+                onChange={(url) => update("cover", url)}
               />
-              <p className="text-[11px] text-slate-600">
-                支持站内路径或完整 URL。
-              </p>
             </div>
           </section>
 

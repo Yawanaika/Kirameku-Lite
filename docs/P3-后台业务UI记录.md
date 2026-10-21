@@ -63,8 +63,24 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 
 ## 后续
 
-1. 图片上传迁移到本地/对象存储，随后把相册照片 URL 输入替换为上传控件。
+1. ~~图片上传迁移到本地/对象存储，随后把相册照片 URL 输入替换为上传控件。~~ 已在 P3.1 完成。
 2. 引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。
 3. 文章编辑器接入 CodeMirror 和 Markdown 预览。
 4. 后台移动端导航、操作审计日志和更细的权限控制。
 5. 为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。
+
+## P3.1 图片上传（2026-10-22）
+
+图片上传已从旧 FastAPI 迁到 Next Route Handler，不再依赖 `127.0.0.1:8000`：
+
+- 新增 `POST /api/admin/upload/image`：要求管理员会话、同源、非只读模式，并按管理员限流 20 次/小时。
+- 新增兼容别名 `POST /api/upload/image`，保留一个版本，新代码只使用管理路径。
+- `server/storage/image.ts` 用魔数识别 JPG/PNG/WebP/GIF，拒绝 SVG、伪造 Content-Type、空文件、截断文件和超过 10MB 的文件，并从容器头读取宽高与横竖方向。
+- `server/storage/index.ts` 优先写入 OSS（配置完整的 `OSS_*` 时使用签名 PUT），否则写入 `UPLOAD_DIR`（默认 `./uploads`）。
+- 新增 `GET /uploads/[...path]` 读取本地上传文件，带路径穿越防护、`nosniff` 和长期缓存；生产仍建议由 Nginx alias 直接提供。
+- 后台 `ImageUploader` 支持上传、URL 回填和预览，已接入文章封面、项目封面、相册封面与相册照片；相册照片上传后自动回填方向。
+- `.env.example` 增加 `OSS_*` / `UPLOAD_DIR`，删除过渡期的 `NEXT_PUBLIC_API_URL`。
+
+本轮没有引入 `sharp` / `ali-oss` 依赖：尺寸与格式校验由 `server/storage/image.ts` 内置完成，OSS 使用原生 `fetch` + HMAC-SHA1 签名。后续如需 EXIF 纠正或转码，可保持 `storeImageFile()` 接口不变，替换图片解析实现。
+
+新增测试：`server/storage/image.test.ts`、`server/storage/local.test.ts`、`server/storage/oss.test.ts`。已运行 `pnpm exec vitest run server/storage/image.test.ts server/storage/local.test.ts server/storage/oss.test.ts`，3 个文件 / 14 个测试全部通过；按约定未运行 `build` 或开发服务器。

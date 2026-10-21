@@ -47,3 +47,6 @@ next-env.d.ts
 # local SQLite database and backups
 /data/
 /backups/
+
+# local image uploads
+/uploads/
