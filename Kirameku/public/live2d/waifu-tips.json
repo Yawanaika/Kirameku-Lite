@@ -33,9 +33,6 @@
 		"selector": "nav a[href='/moments']",
 		"text": ["来看看最新的说说吧～", "有什么新鲜事呢？"]
 	}, {
-		"selector": "nav a[href='/novel']",
-		"text": ["想看小说了吗？这里有好多故事呢！", "来挑一本喜欢的小说吧～"]
-	}, {
 		"selector": "nav a[href='/projects']",
 		"text": ["这里都是主人的项目哦！", "来看看主人都做了什么厉害的东西吧～"]
 	}, {

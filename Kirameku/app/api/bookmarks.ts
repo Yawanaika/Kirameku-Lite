@@ -10,6 +10,7 @@ export interface BookmarkSite {
   platforms: string[];
   sort: number;
   created_at: string;
+  updated_at: string | null;
 }
 
 export interface BookmarkCategory {
@@ -19,6 +20,7 @@ export interface BookmarkCategory {
   description: string;
   sort: number;
   created_at: string;
+  updated_at: string | null;
   sites: BookmarkSite[];
 }
 
