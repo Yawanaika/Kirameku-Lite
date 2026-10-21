@@ -12,7 +12,5 @@ export interface FriendLinkItem {
 }
 
 export function getFriendLinks() {
-  // Transitional path: /api/friend-links still needs the legacy POST/PUT/DELETE
-  // admin handlers until friend-link writes move to the local admin API.
-  return request<FriendLinkItem[]>("/api/friend-links/list");
+  return request<FriendLinkItem[]>("/api/friend-links");
 }

@@ -152,4 +152,92 @@ describe("bookmarks service", () => {
     const rows = await bookmarks.list();
     expect(rows[1].sites[0].platforms).toEqual([]);
   });
+
+  it("lists categories and sites for the admin view", async () => {
+    const categories = await bookmarks.listCategories();
+    expect(categories.map((row) => row.name)).toEqual([
+      "工具",
+      "阅读",
+      "空分类",
+    ]);
+    expect(categories[0].sites).toEqual([]);
+
+    const sites = await bookmarks.listSites(categories[0].id);
+    expect(sites.map((row) => row.name)).toEqual(["First", "Second"]);
+    expect(sites[0].platforms).toEqual(["web"]);
+  });
+
+  it("creates, updates and deletes categories and sites", async () => {
+    const category = await bookmarks.createCategory({
+      name: "新分类",
+      icon: "/new.png",
+      description: "new category",
+      sort: 4,
+    });
+    expect(category).toMatchObject({
+      name: "新分类",
+      icon: "/new.png",
+      description: "new category",
+      sort: 4,
+    });
+
+    const site = await bookmarks.createSite({
+      category_id: category.id,
+      name: "New Site",
+      url: "https://new.example",
+      icon: "/new-site.png",
+      description: "new site",
+      platforms: ["web", "mac"],
+      sort: 1,
+    });
+    expect(site).toMatchObject({
+      category_id: category.id,
+      name: "New Site",
+      platforms: ["web", "mac"],
+    });
+
+    const updatedSite = await bookmarks.updateSite(site.id, {
+      name: "Renamed Site",
+      platforms: ["ios"],
+    });
+    expect(updatedSite).toMatchObject({
+      name: "Renamed Site",
+      platforms: ["ios"],
+    });
+    expect(updatedSite.updated_at).not.toBeNull();
+
+    const updatedCategory = await bookmarks.updateCategory(category.id, {
+      name: "重命名分类",
+      sort: 5,
+    });
+    expect(updatedCategory).toMatchObject({
+      name: "重命名分类",
+      sort: 5,
+    });
+
+    await expect(bookmarks.removeSite(site.id)).resolves.toEqual({ ok: true });
+    await expect(bookmarks.removeSite(site.id)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(bookmarks.removeCategory(category.id)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(
+      bookmarks.removeCategory(category.id),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rejects a site whose category does not exist", async () => {
+    await expect(
+      bookmarks.createSite({
+        category_id: 999_999,
+        name: "Orphan",
+        url: "https://orphan.example",
+        icon: "",
+        description: "",
+        platforms: [],
+        sort: 0,
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+  });
 });

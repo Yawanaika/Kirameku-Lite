@@ -1,7 +1,15 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { bookmarkCategory, bookmarkSite } from "@/server/db/schema";
-import type { BookmarkCategoryItem, BookmarkSiteItem } from "./contracts";
+import { errors } from "@/server/http/errors";
+import type {
+  BookmarkCategoryItem,
+  BookmarkSiteItem,
+  CreateBookmarkCategoryInput,
+  CreateBookmarkSiteInput,
+  UpdateBookmarkCategoryInput,
+  UpdateBookmarkSiteInput,
+} from "./contracts";
 
 type CategoryRow = Pick<
   typeof bookmarkCategory.$inferSelect,
@@ -70,6 +78,15 @@ function toCategory(
 }
 
 export function createBookmarksService(db: AppDatabase) {
+  async function ensureCategory(id: number): Promise<void> {
+    const [row] = await db
+      .select({ id: bookmarkCategory.id })
+      .from(bookmarkCategory)
+      .where(eq(bookmarkCategory.id, id))
+      .limit(1);
+    if (!row) throw errors.notFound("分类不存在");
+  }
+
   return {
     async list(): Promise<BookmarkCategoryItem[]> {
       const [categories, sites] = await Promise.all([
@@ -113,6 +130,160 @@ export function createBookmarksService(db: AppDatabase) {
       return categories.map((row) =>
         toCategory(row, sitesByCategory.get(row.id) ?? []),
       );
+    },
+
+    async listCategories(): Promise<BookmarkCategoryItem[]> {
+      const rows = await db
+        .select({
+          id: bookmarkCategory.id,
+          name: bookmarkCategory.name,
+          icon: bookmarkCategory.icon,
+          description: bookmarkCategory.description,
+          sort: bookmarkCategory.sort,
+          createdAt: bookmarkCategory.createdAt,
+          updatedAt: bookmarkCategory.updatedAt,
+        })
+        .from(bookmarkCategory)
+        .orderBy(asc(bookmarkCategory.sort), asc(bookmarkCategory.id));
+
+      return rows.map((row) => toCategory(row, []));
+    },
+
+    async listSites(categoryId?: number): Promise<BookmarkSiteItem[]> {
+      const query = db
+        .select({
+          id: bookmarkSite.id,
+          categoryId: bookmarkSite.categoryId,
+          name: bookmarkSite.name,
+          url: bookmarkSite.url,
+          icon: bookmarkSite.icon,
+          description: bookmarkSite.description,
+          platforms: bookmarkSite.platforms,
+          sort: bookmarkSite.sort,
+          createdAt: bookmarkSite.createdAt,
+          updatedAt: bookmarkSite.updatedAt,
+        })
+        .from(bookmarkSite);
+
+      const rows = categoryId
+        ? await query
+            .where(eq(bookmarkSite.categoryId, categoryId))
+            .orderBy(asc(bookmarkSite.sort), asc(bookmarkSite.id))
+        : await query.orderBy(asc(bookmarkSite.sort), asc(bookmarkSite.id));
+
+      return rows.map(toSite);
+    },
+
+    async createCategory(
+      input: CreateBookmarkCategoryInput,
+    ): Promise<BookmarkCategoryItem> {
+      const [row] = await db
+        .insert(bookmarkCategory)
+        .values({
+          name: input.name,
+          icon: input.icon,
+          description: input.description,
+          sort: input.sort,
+        })
+        .returning();
+      if (!row) throw errors.internal("保存收藏夹分类失败");
+      return toCategory(row, []);
+    },
+
+    async updateCategory(
+      id: number,
+      input: UpdateBookmarkCategoryInput,
+    ): Promise<BookmarkCategoryItem> {
+      const values: Partial<typeof bookmarkCategory.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (input.name !== undefined) values.name = input.name;
+      if (input.icon !== undefined) values.icon = input.icon;
+      if (input.description !== undefined) {
+        values.description = input.description;
+      }
+      if (input.sort !== undefined) values.sort = input.sort;
+
+      const [row] = await db
+        .update(bookmarkCategory)
+        .set(values)
+        .where(eq(bookmarkCategory.id, id))
+        .returning();
+      if (!row) throw errors.notFound("分类不存在");
+      return toCategory(row, []);
+    },
+
+    async removeCategory(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(bookmarkCategory)
+        .where(eq(bookmarkCategory.id, id))
+        .returning({ id: bookmarkCategory.id });
+      if (!row) throw errors.notFound("分类不存在");
+      return { ok: true };
+    },
+
+    async createSite(
+      input: CreateBookmarkSiteInput,
+    ): Promise<BookmarkSiteItem> {
+      await ensureCategory(input.category_id);
+
+      const [row] = await db
+        .insert(bookmarkSite)
+        .values({
+          categoryId: input.category_id,
+          name: input.name,
+          url: input.url,
+          icon: input.icon,
+          description: input.description,
+          platforms: JSON.stringify(input.platforms),
+          sort: input.sort,
+        })
+        .returning();
+      if (!row) throw errors.internal("保存收藏站点失败");
+      return toSite(row);
+    },
+
+    async updateSite(
+      id: number,
+      input: UpdateBookmarkSiteInput,
+    ): Promise<BookmarkSiteItem> {
+      if (input.category_id !== undefined) {
+        await ensureCategory(input.category_id);
+      }
+
+      const values: Partial<typeof bookmarkSite.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (input.category_id !== undefined) {
+        values.categoryId = input.category_id;
+      }
+      if (input.name !== undefined) values.name = input.name;
+      if (input.url !== undefined) values.url = input.url;
+      if (input.icon !== undefined) values.icon = input.icon;
+      if (input.description !== undefined) {
+        values.description = input.description;
+      }
+      if (input.platforms !== undefined) {
+        values.platforms = JSON.stringify(input.platforms);
+      }
+      if (input.sort !== undefined) values.sort = input.sort;
+
+      const [row] = await db
+        .update(bookmarkSite)
+        .set(values)
+        .where(eq(bookmarkSite.id, id))
+        .returning();
+      if (!row) throw errors.notFound("站点不存在");
+      return toSite(row);
+    },
+
+    async removeSite(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(bookmarkSite)
+        .where(eq(bookmarkSite.id, id))
+        .returning({ id: bookmarkSite.id });
+      if (!row) throw errors.notFound("站点不存在");
+      return { ok: true };
     },
   };
 }

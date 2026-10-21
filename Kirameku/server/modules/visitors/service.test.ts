@@ -158,4 +158,18 @@ describe("visitors service", () => {
     expect(getOrgCn("China Telecom", "AS4134")).toBe("中国电信");
     expect(getOrgCn("Cloudflare, Inc.", "AS13335")).toBe("Cloudflare");
   });
+
+  it("deletes one visitor and clears all records", async () => {
+    const visitors = createVisitorsService(db);
+    const [row] = await visitors.list({ page: 1, size: 1 });
+
+    await expect(visitors.remove(row.id)).resolves.toEqual({ ok: true });
+    await expect(visitors.count()).resolves.toBe(1);
+    await expect(visitors.remove(row.id)).rejects.toMatchObject({
+      status: 404,
+    });
+
+    await expect(visitors.clear()).resolves.toEqual({ ok: true });
+    await expect(visitors.count()).resolves.toBe(0);
+  });
 });

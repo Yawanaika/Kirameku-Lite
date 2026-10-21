@@ -1,6 +1,7 @@
-import { count, desc } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { visitor } from "@/server/db/schema";
+import { errors } from "@/server/http/errors";
 import type {
   VisitorGeo,
   VisitorItem,
@@ -430,6 +431,20 @@ export function createVisitorsService(
 
     async location(ip: string): Promise<Partial<VisitorGeo>> {
       return resolveGeo(ip);
+    },
+
+    async remove(id: number): Promise<{ ok: true }> {
+      const [row] = await db
+        .delete(visitor)
+        .where(eq(visitor.id, id))
+        .returning({ id: visitor.id });
+      if (!row) throw errors.notFound("访客记录不存在");
+      return { ok: true };
+    },
+
+    async clear(): Promise<{ ok: true }> {
+      await db.delete(visitor);
+      return { ok: true };
     },
   };
 }

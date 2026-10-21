@@ -108,4 +108,49 @@ describe("friend links service", () => {
     const rows = await friendLinks.listApproved();
     expect(rows.some((row) => row.name === "pending")).toBe(false);
   });
+
+  it("lists every link for the admin view", async () => {
+    const rows = await friendLinks.listAll();
+    expect(rows.map((row) => row.name)).toEqual(["pending", "first", "second"]);
+  });
+
+  it("creates, updates and deletes links", async () => {
+    const created = await friendLinks.create({
+      name: "new",
+      url: "https://new.example",
+      avatar: "/new.png",
+      description: "new friend",
+      sort: 3,
+      is_approved: false,
+    });
+
+    expect(created).toMatchObject({
+      name: "new",
+      url: "https://new.example",
+      avatar: "/new.png",
+      description: "new friend",
+      sort: 3,
+      is_approved: false,
+    });
+
+    const updated = await friendLinks.update(created.id, {
+      name: "renamed",
+      is_approved: true,
+      sort: 0,
+    });
+    expect(updated).toMatchObject({
+      name: "renamed",
+      is_approved: true,
+      sort: 0,
+    });
+    expect(updated.updated_at).not.toBeNull();
+
+    const approved = await friendLinks.listApproved();
+    expect(approved[0].name).toBe("renamed");
+
+    await expect(friendLinks.remove(created.id)).resolves.toEqual({ ok: true });
+    await expect(friendLinks.remove(created.id)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
 });

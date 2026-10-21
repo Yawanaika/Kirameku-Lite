@@ -8,12 +8,10 @@ export interface SiteConfigItem {
 }
 
 export function getSiteConfig() {
-  // Transitional path: keep the legacy write routes at /api/site-config free
-  // until site-config management moves to the local admin API.
-  return request<Record<string, unknown>>("/api/site-config/public");
+  return request<Record<string, unknown>>("/api/site-config");
 }
 
 export function getSiteConfigByKey(key: string) {
-  // The legacy endpoint returns the parsed value, not a SiteConfigItem.
-  return request<unknown>(`/api/site-config/${key}`);
+  // Public config values are returned parsed, not as SiteConfigItem rows.
+  return request<unknown>(`/api/site-config/${encodeURIComponent(key)}`);
 }
