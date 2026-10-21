@@ -157,6 +157,15 @@ describe("chatters service", () => {
     await expect(chatters.getById(999999)).rejects.toBeInstanceOf(AppError);
   });
 
+  it("toggles likes only for published chatters", async () => {
+    await expect(chatters.toggleLike(publishedA)).resolves.toEqual({ likes: 4 });
+    await expect(chatters.toggleLike(publishedA, true)).resolves.toEqual({
+      likes: 3,
+    });
+    await expect(chatters.toggleLike(draft)).rejects.toBeInstanceOf(AppError);
+    await expect(chatters.toggleLike(999999)).rejects.toBeInstanceOf(AppError);
+  });
+
   it("rejects draft status query parameters for public callers", () => {
     expect(chatterListQuery.safeParse({ status: "draft" }).success).toBe(false);
     expect(chatterCountQuery.safeParse({ status: "draft" }).success).toBe(false);

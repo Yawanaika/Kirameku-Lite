@@ -7,7 +7,9 @@ import { runMigrations } from "@/server/db/migrate";
 import { openDatabase, type DatabaseConnection } from "@/server/db/open";
 import * as schema from "@/server/db/schema";
 import {
+  createMessageInput,
   messageCountQuery,
+  messageIdParams,
   messageListQuery,
 } from "@/server/modules/messages/contracts";
 import { createMessagesService } from "./service";
@@ -179,6 +181,49 @@ describe("messages service", () => {
     await expect(messages.count()).resolves.toBe(2);
   });
 
+  it("creates messages and replies and toggles likes", async () => {
+    const created = await messages.create({
+      content: "new message",
+      ip: "127.0.0.1",
+      githubUserId: alice,
+    });
+
+    expect(created).toMatchObject({
+      github_user_id: alice,
+      parent_id: null,
+      content: "new message",
+      likes: 0,
+      status: "approved",
+      github_user: { id: alice, login: "alice" },
+      replies: [],
+    });
+
+    const reply = await messages.create({
+      content: "new reply",
+      parentId: created.id,
+      ip: "127.0.0.1",
+      githubUserId: bob,
+    });
+    expect(reply.parent_id).toBe(created.id);
+    expect(reply.github_user).toMatchObject({ login: "bob" });
+
+    await expect(
+      messages.create({
+        content: "missing parent",
+        parentId: 999999,
+        ip: "127.0.0.1",
+        githubUserId: alice,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await expect(messages.toggleLike(created.id)).resolves.toMatchObject({
+      likes: 1,
+    });
+    await expect(
+      messages.toggleLike(created.id, true),
+    ).resolves.toMatchObject({ likes: 0 });
+  });
+
   it("rejects non-approved status query parameters", () => {
     expect(messageListQuery.parse({})).toEqual({
       status: "approved",
@@ -192,5 +237,13 @@ describe("messages service", () => {
       false,
     );
     expect(messageListQuery.safeParse({ size: 101 }).success).toBe(false);
+
+    expect(
+      createMessageInput.parse({ content: "  hello  ", parent_id: null }),
+    ).toEqual({ content: "hello", parent_id: undefined });
+    expect(createMessageInput.safeParse({ content: "" }).success).toBe(false);
+    expect(messageIdParams.parse({ messageId: "12" })).toEqual({
+      messageId: 12,
+    });
   });
 });

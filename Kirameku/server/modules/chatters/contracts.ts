@@ -11,6 +11,10 @@ export const chatterCountQuery = z.object({
   status: z.literal("published").default("published"),
 });
 
+export const chatterParams = z.object({
+  chatterId: z.coerce.number().int().min(1),
+});
+
 /** Internal service input; the public route narrows status to published. */
 export interface ChatterListParams {
   status: string;

@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { chatter } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
@@ -103,6 +103,23 @@ export function createChattersService(db: AppDatabase) {
         .from(chatter)
         .where(eq(chatter.status, status));
       return row?.value ?? 0;
+    },
+
+    async toggleLike(
+      id: number,
+      unlike = false,
+    ): Promise<{ likes: number }> {
+      const delta = unlike ? -1 : 1;
+      const [row] = await db
+        .update(chatter)
+        .set({
+          likes: sql<number>`max(0, coalesce(${chatter.likes}, 0) + ${delta})`,
+        })
+        .where(and(eq(chatter.id, id), eq(chatter.status, "published")))
+        .returning({ likes: chatter.likes });
+
+      if (!row) throw errors.notFound("说说不存在");
+      return { likes: row.likes ?? 0 };
     },
   };
 }

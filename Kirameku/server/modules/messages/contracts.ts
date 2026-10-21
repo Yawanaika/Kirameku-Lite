@@ -11,6 +11,20 @@ export const messageCountQuery = z.object({
   status: z.literal("approved").default("approved"),
 });
 
+const optionalParentId = z
+  .union([z.coerce.number().int().min(1), z.null()])
+  .optional()
+  .transform((value) => value ?? undefined);
+
+export const createMessageInput = z.object({
+  parent_id: optionalParentId,
+  content: z.string().trim().min(1).max(5000),
+});
+
+export const messageIdParams = z.object({
+  messageId: z.coerce.number().int().min(1),
+});
+
 /** Internal service input; the public route narrows status to approved. */
 export interface MessageListParams {
   page: number;

@@ -1,7 +1,12 @@
 import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import { getAuthSecret } from "@/server/env";
-import { signAdminToken, verifyAdminToken } from "./session";
+import {
+  signAdminToken,
+  signGithubToken,
+  verifyAdminToken,
+  verifyGithubToken,
+} from "./session";
 
 describe("admin session", () => {
   it("signs and verifies an admin token", async () => {
@@ -34,5 +39,25 @@ describe("admin session", () => {
     expect(
       await verifyAdminToken(`${header}.${payload}.${tamperedSignature}`),
     ).toBeNull();
+  });
+});
+
+describe("github session", () => {
+  it("signs and verifies a github token", async () => {
+    const token = await signGithubToken(7, "octocat");
+    expect(await verifyGithubToken(token)).toEqual({
+      sub: "7",
+      aud: "github",
+      login: "octocat",
+      ver: 1,
+    });
+  });
+
+  it("keeps admin and github audiences separate", async () => {
+    const adminToken = await signAdminToken(42);
+    const githubToken = await signGithubToken(7, "octocat");
+
+    expect(await verifyGithubToken(adminToken)).toBeNull();
+    expect(await verifyAdminToken(githubToken)).toBeNull();
   });
 });

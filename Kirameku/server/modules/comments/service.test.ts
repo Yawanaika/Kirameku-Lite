@@ -8,6 +8,8 @@ import { openDatabase, type DatabaseConnection } from "@/server/db/open";
 import * as schema from "@/server/db/schema";
 import {
   chatterCommentsParams,
+  createChatterCommentInput,
+  createPostCommentInput,
   postCommentsParams,
 } from "@/server/modules/comments/contracts";
 import { createCommentsService } from "./service";
@@ -303,7 +305,106 @@ describe("comments service", () => {
     ).resolves.toEqual([]);
   });
 
-  it("validates post and chatter comment ids", () => {
+  it("creates post comments and toggles likes", async () => {
+    const root = await comments.createPostComment({
+      postId: publishedPost,
+      content: "new root",
+      ip: "127.0.0.1",
+      githubUserId: alice,
+    });
+
+    expect(root).toMatchObject({
+      post_id: publishedPost,
+      parent_id: null,
+      content: "new root",
+      likes: 0,
+      status: "approved",
+      github_user: { id: alice, login: "alice" },
+      replies: [],
+    });
+
+    const reply = await comments.createPostComment({
+      postId: publishedPost,
+      parentId: root.id,
+      content: "new reply",
+      ip: "127.0.0.1",
+      githubUserId: bob,
+    });
+    expect(reply.parent_id).toBe(root.id);
+    expect(reply.github_user).toMatchObject({ login: "bob" });
+
+    await expect(
+      comments.createPostComment({
+        postId: draftPost,
+        content: "not allowed",
+        ip: "127.0.0.1",
+        githubUserId: alice,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await expect(
+      comments.createPostComment({
+        postId: publishedPost,
+        parentId: 999999,
+        content: "missing parent",
+        ip: "127.0.0.1",
+        githubUserId: alice,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await expect(comments.togglePostCommentLike(root.id)).resolves.toMatchObject(
+      { likes: 1 },
+    );
+    await expect(
+      comments.togglePostCommentLike(root.id, true),
+    ).resolves.toMatchObject({ likes: 0 });
+  });
+
+  it("creates chatter comments and increments the chatter comment count", async () => {
+    const before = connection
+      .prepare('SELECT comments_count AS value FROM "chatter" WHERE id = ?')
+      .get(publishedChatter) as { value: number };
+
+    const created = await comments.createChatterComment({
+      chatterId: publishedChatter,
+      content: "new chatter comment",
+      ip: "127.0.0.1",
+      githubUserId: bob,
+    });
+
+    expect(created).toMatchObject({
+      chatter_id: publishedChatter,
+      parent_id: null,
+      content: "new chatter comment",
+      likes: 0,
+      status: "approved",
+      github_user: { id: bob, login: "bob" },
+      replies: [],
+    });
+
+    const after = connection
+      .prepare('SELECT comments_count AS value FROM "chatter" WHERE id = ?')
+      .get(publishedChatter) as { value: number };
+    expect(after.value).toBe(before.value + 1);
+
+    await expect(
+      comments.toggleChatterCommentLike(created.id),
+    ).resolves.toMatchObject({ likes: 1 });
+    await expect(
+      comments.toggleChatterCommentLike(created.id, true),
+    ).resolves.toMatchObject({ likes: 0 });
+
+    await expect(
+      comments.createChatterComment({
+        chatterId: draftChatter,
+        content: "not allowed",
+        ip: "127.0.0.1",
+        githubUserId: alice,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("validates post and chatter comment ids and create inputs", () => {
     expect(postCommentsParams.parse({ postId: "12" })).toEqual({ postId: 12 });
     expect(chatterCommentsParams.parse({ chatterId: "34" })).toEqual({
       chatterId: 34,
@@ -312,6 +413,20 @@ describe("comments service", () => {
     expect(postCommentsParams.safeParse({ postId: "abc" }).success).toBe(false);
     expect(
       chatterCommentsParams.safeParse({ chatterId: "0" }).success,
+    ).toBe(false);
+
+    expect(
+      createPostCommentInput.parse({
+        post_id: "12",
+        parent_id: null,
+        content: "  hello  ",
+      }),
+    ).toEqual({ post_id: 12, parent_id: undefined, content: "hello" });
+    expect(
+      createChatterCommentInput.safeParse({
+        chatter_id: 1,
+        content: "",
+      }).success,
     ).toBe(false);
   });
 });
