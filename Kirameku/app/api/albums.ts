@@ -21,8 +21,10 @@ export interface PhotoItem {
   created_at: string;
 }
 
+// Read-only path until album admin writes move off the legacy API. Keeping the
+// local handler off /api/albums preserves the legacy POST/PUT/DELETE fallbacks.
 export function getAlbums() {
-  return request<AlbumItem[]>("/api/albums");
+  return request<AlbumItem[]>("/api/albums/list");
 }
 
 export function getAlbumById(albumId: number) {

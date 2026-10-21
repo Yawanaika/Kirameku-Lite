@@ -13,8 +13,10 @@ export interface MessageItem {
   replies: MessageItem[];
 }
 
+// Read-only path until message writes move off the legacy API. Keeping the
+// local handler off /api/messages preserves the legacy POST/like fallbacks.
 export function getMessages(params?: { page?: number; size?: number }) {
-  return request<MessageItem[]>(`/api/messages${qs(params)}`);
+  return request<MessageItem[]>(`/api/messages/list${qs(params)}`);
 }
 
 export function getMessagesCount() {

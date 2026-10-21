@@ -10,7 +10,7 @@ export interface ChatterItem {
   comments_count: number;
   status: string;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 export interface ChatterCommentItem {

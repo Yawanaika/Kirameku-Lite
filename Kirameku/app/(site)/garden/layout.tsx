@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, redirect } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft, LayoutDashboard, MapPin, Orbit, CloudRain, User,
   Sparkles, Droplets, Flower2, Mountain, Code2, Grid3x3,
@@ -37,13 +37,20 @@ export default function GardenLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [unlocked] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("garden-unlock") === "true";
-  });
+  const router = useRouter();
+  const [access, setAccess] = useState<"checking" | "allowed" | "denied">(
+    "checking"
+  );
 
-  if (!unlocked) {
-    redirect("/");
+  useEffect(() => {
+    const unlocked = localStorage.getItem("garden-unlock") === "true";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only access gate
+    setAccess(unlocked ? "allowed" : "denied");
+    if (!unlocked) router.replace("/");
+  }, [router]);
+
+  if (access !== "allowed") {
+    return null;
   }
 
   return (

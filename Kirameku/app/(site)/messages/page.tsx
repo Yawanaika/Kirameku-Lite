@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -70,7 +70,7 @@ function relativeTime(dateStr: string): string {
   return `${days}天前`;
 }
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -651,5 +651,19 @@ function ReplyCard({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-slate-400">
+          加载留言中…
+        </div>
+      }
+    >
+      <MessagesContent />
+    </Suspense>
   );
 }
