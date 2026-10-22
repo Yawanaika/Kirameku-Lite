@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+# Keep Kirameku/data/*.ts source modules; only exclude the local database.
+data/*.db
+data/*.db-*
+backups
+uploads
+coverage
+*.log
+*.tsbuildinfo
+Dockerfile
+.dockerignore

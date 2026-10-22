@@ -1,3 +1,7 @@
+# Keep the virtual store free of the optional database-driver peers that
+# drizzle-orm declares (postgres, mysql2, pg, ...). Only better-sqlite3 is used.
+autoInstallPeers: false
+
 allowBuilds:
   better-sqlite3: true
   esbuild: true

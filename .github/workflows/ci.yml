@@ -48,3 +48,19 @@ jobs:
         env:
           DATABASE_PATH: ./data/ci.db
           AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+
+  docker:
+    name: Docker image and Compose config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t kirameku:ci ./Kirameku
+
+      - name: Validate Compose config
+        env:
+          AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
+        run: docker compose config -q

@@ -11,6 +11,8 @@
 - Main checks: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`. CI runs typecheck → tests → `pnpm db:migrate` → build; it does not run lint.
 - Run one test with `pnpm exec vitest run server/modules/posts/service.test.ts` (replace with the test path).
 - Copy `.env.example` to `.env.local` for the app and set `AUTH_SECRET` to at least 32 characters. Database scripts do not load `.env.local`; pass `DATABASE_PATH` in the command environment when using a non-default database.
+- Container deployment lives at the repository root: `docker-compose.yml` builds `Kirameku/Dockerfile`. The image runs `pnpm start` (not `output: "standalone"`) so `tsx` and the `db:*` maintenance scripts stay available; the entrypoint runs `pnpm db:migrate` unless `RUN_MIGRATIONS=0`. SQLite, uploads and backups live under the `kirameku-data` volume at `/data`, and the published port is bound to `127.0.0.1:3000` for host Nginx.
+- `Kirameku/pnpm-workspace.yaml` sets `autoInstallPeers: false`; `@types/node` tracks Node 22. Keep both in sync with the runtime when upgrading Node.
 - Server-only code imports `server-only`; Vitest aliases that package to `tests/server-only-stub.ts`.
 - Markdown is rendered and sanitized on the server with `lib/markdown.ts`. Do not reintroduce client-side `marked` + `dangerouslySetInnerHTML`.
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# Kirameku
+# Kirameku-Lite
 
 **きらめく — 像星光一样闪烁**
 
@@ -32,7 +32,7 @@
 ## 架构
 
 ```
-Browser → Nginx (443) → Next.js standalone (Node, :3000)
+Browser → Nginx (443) → Next.js 16 (Node 22, :3000)
                               ├── app/(site)/**     前台页面（RSC + 客户端岛屿）
                               ├── app/(admin)/**    管理后台（/:3000/admin）
                               ├── app/api/**        Route Handlers
@@ -120,6 +120,20 @@ pnpm build
 DATABASE_PATH=/data/kirameku.db pnpm start
 ```
 
+### Docker Compose（可选）
+
+仓库根目录已经提供 `docker-compose.yml` 和 `Kirameku/Dockerfile`，镜像里只运行一个 Node 进程，SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
+
+```bash
+cp compose.env.example .env      # 至少填写 AUTH_SECRET
+docker compose up -d --build
+docker compose exec app \
+  env ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的密码' \
+  pnpm db:seed-admin
+```
+
+容器默认监听 `127.0.0.1:3000`，对外仍由宿主机 Nginx 终止 TLS。升级、备份、恢复和 bind mount 说明见 [DEPLOY_NOTES.md](./DEPLOY_NOTES.md#5-docker-compose-部署可选)。
+
 ## 常用脚本
 
 | 命令 | 作用 |
@@ -134,7 +148,7 @@ DATABASE_PATH=/data/kirameku.db pnpm start
 
 ## 环境变量
 
-`Kirameku/.env.local`（完整清单见 `.env.example`）：
+本地开发使用 `Kirameku/.env.local`（完整清单见 `.env.example`）；Docker Compose 使用仓库根目录 `.env`（模板见 `compose.env.example`）。
 
 ```env
 DATABASE_PATH=./data/kirameku.db

@@ -1,0 +1,47 @@
+# Docker Compose deployment for the single-process Kirameku app.
+#
+#   cp compose.env.example .env
+#   # fill in AUTH_SECRET and the optional OAuth/OSS values
+#   docker compose up -d --build
+#
+# The app listens on 127.0.0.1:3000 so the host Nginx can keep terminating TLS.
+# SQLite, uploads and backups live in named volumes and survive image upgrades.
+name: kirameku
+
+services:
+  app:
+    build:
+      context: ./Kirameku
+      dockerfile: Dockerfile
+    image: kirameku:local
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_PATH: /data/db/kirameku.db
+      UPLOAD_DIR: /data/uploads
+      BACKUP_DIR: /data/backups
+      # Required: generate with `openssl rand -base64 48` (>= 32 chars).
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required; copy compose.env.example to .env and fill it in}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      SITE_READ_ONLY: ${SITE_READ_ONLY:-0}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME:-}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      OSS_CUSTOM_DOMAIN: ${OSS_CUSTOM_DOMAIN:-}
+      OSS_PREFIX: ${OSS_PREFIX:-}
+      VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-90}
+    volumes:
+      - kirameku-data:/data
+
+volumes:
+  kirameku-data:

@@ -124,7 +124,78 @@ DATABASE_PATH=/data/kirameku.db BACKUP_DIR=/data/backups pnpm db:backup --prune
 
 新增迁移只允许**追加** `server/db/migrations/*.sql`；迁移执行器会校验已应用文件的 SHA-256，改旧文件会导致启动/迁移失败。
 
-## 5. 环境变量
+## 5. Docker Compose 部署（可选）
+
+仓库根目录提供 `docker-compose.yml` 和 `Kirameku/Dockerfile`。镜像内只有一个 Node 进程；SQLite、上传文件和备份都在命名卷里，适合不想在宿主机安装 Node/pnpm 的环境。
+
+### 5.1 首次启动
+
+```bash
+cp compose.env.example .env
+# 必填 AUTH_SECRET（≥32 字符，openssl rand -base64 48）
+# 按需填写 FRONTEND_ORIGIN / GITHUB_* / OSS_*
+
+docker compose build
+docker compose up -d
+
+docker compose exec app \
+  env ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的密码' \
+  pnpm db:seed-admin
+
+curl -fsS http://127.0.0.1:3000/api/health
+```
+
+- 容器 entrypoint 启动前会自动执行 `pnpm db:migrate`，迁移可重复执行。
+- `ports` 只绑定 `127.0.0.1:3000`；对外仍由宿主机 Nginx 终止 TLS 并反代到 3000，配置见第 3 节。
+- 数据卷：`kirameku-data` → `/data`，其中 `db/` 放 SQLite，`uploads/` 放本地图片，`backups/` 放备份文件。
+- 构建阶段用临时数据库执行 `pnpm db:migrate` 和 `pnpm build`；生产库迁移只发生在容器启动时。
+- 镜像包含完整的 `pnpm start` 运行时和运维脚本，体积约 1.4 GB。Next 生产构建建议在本地或 CI 完成后再分发镜像，避免在内存很小的生产服务器上直接构建。
+
+### 5.2 升级
+
+```bash
+git pull --ff-only
+docker compose build
+docker compose up -d
+docker compose logs -f app
+```
+
+### 5.3 备份、恢复与维护命令
+
+```bash
+# 在线备份到 /data/backups
+docker compose exec app pnpm db:backup --prune
+
+# 查看备份文件
+docker compose exec app ls -lh /data/backups
+
+# 恢复：先停应用，禁用 entrypoint 迁移，再执行 restore
+docker compose stop app
+docker compose run --rm -e RUN_MIGRATIONS=0 app \
+  pnpm db:restore /data/backups/kirameku-....db --target /data/db/kirameku.db
+docker compose start app
+```
+
+- 一次性维护命令加 `-e RUN_MIGRATIONS=0`，避免 entrypoint 在 restore 前先改动数据库。
+- `docker compose down` 不会删除命名卷；只有 `docker compose down -v` 才会删除。生产环境不要随手加 `-v`。
+
+### 5.4 改用宿主机目录
+
+如果需要在宿主机直接看到数据库和上传文件，可把命名卷换成 bind mount，并让目录属主对应容器内的 `node` 用户（UID 1000）：
+
+```bash
+mkdir -p data/db data/uploads data/backups
+sudo chown -R 1000:1000 data
+```
+
+```yaml
+    volumes:
+      - ./data:/data
+```
+
+改动挂载前先停容器并备份；SQLite 使用 WAL，运行中不要直接 `cp` 数据库文件。
+
+## 6. 环境变量
 
 完整清单见 `Kirameku/.env.example`。关键项：
 
@@ -142,7 +213,7 @@ DATABASE_PATH=/data/kirameku.db BACKUP_DIR=/data/backups pnpm db:backup --prune
 
 数据库维护脚本不会自动加载 `.env.local`；用非默认路径时在命令前显式传 `DATABASE_PATH`。
 
-## 6. 备份与恢复
+## 7. 备份与恢复
 
 ```bash
 # 在线备份（WAL 安全），并保留 integrity_check
@@ -156,7 +227,7 @@ sudo systemctl start kirameku
 
 不要把 `kirameku.db`、`-wal`、`-shm` 直接复制到另一台机器当作备份；WAL 文件不一致会丢失最近写入。备份文件建议再同步到对象存储，并定期做一次恢复演练。
 
-## 7. 常见问题
+## 8. 常见问题
 
 ### Nginx 缓存导致页面引用旧 chunk / Mixed Content
 
@@ -186,7 +257,7 @@ sudo systemctl start kirameku
 - 管理员账号是否通过 `pnpm db:seed-admin` 创建；没有默认密码。
 - 反向代理是否传递了正确的 `Host`、`X-Forwarded-Proto`，以及 `FRONTEND_ORIGIN` 是否匹配。
 
-## 8. 旧架构清理记录
+## 9. 旧架构清理记录
 
 2026-10-22 已完成：
 

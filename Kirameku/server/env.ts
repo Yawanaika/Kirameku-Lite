@@ -27,7 +27,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  GITHUB_REDIRECT_URI: z.string().url().optional(),
+  GITHUB_REDIRECT_URI: optionalUrl,
   FRONTEND_ORIGIN: z.string().url().default("http://localhost:3000"),
   OSS_ACCESS_KEY_ID: optionalString,
   OSS_ACCESS_KEY_SECRET: optionalString,
