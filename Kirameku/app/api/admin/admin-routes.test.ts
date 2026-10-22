@@ -11,6 +11,7 @@ import {
 import { GITHUB_TOKEN_COOKIE } from "@/server/auth/constants";
 import { GET as getAlbum } from "./albums/[id]/route";
 import { GET as getVisitorsCount } from "./visitors/count/route";
+import { POST as previewMarkdown } from "./markdown/preview/route";
 
 /*
  * The admin guard reads `cookies()` from next/headers, so these route tests
@@ -43,6 +44,14 @@ let githubUserId: number;
 
 function request(pathname: string): Request {
   return new Request(`http://localhost:3000${pathname}`);
+}
+
+function jsonRequest(pathname: string, body: unknown): Request {
+  return new Request(`http://localhost:3000${pathname}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function params(id: string) {
@@ -187,5 +196,43 @@ describe("GET /api/admin/visitors/count", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ count: 1 });
+  });
+});
+
+describe("POST /api/admin/markdown/preview", () => {
+  it("requires an admin session", async () => {
+    const response = await previewMarkdown(
+      jsonRequest("/api/admin/markdown/preview", { content: "# Hi" }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("renders markdown through the sanitizing server pipeline", async () => {
+    await asAdmin();
+
+    const response = await previewMarkdown(
+      jsonRequest("/api/admin/markdown/preview", {
+        content: "# Hi\n\n<script>alert(1)</script>\n\n**bold**",
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.html).toContain("<h1>Hi</h1>");
+    expect(body.html).toContain("<strong>bold</strong>");
+    expect(body.html).not.toContain("<script");
+  });
+
+  it("rejects oversized content with 422", async () => {
+    await asAdmin();
+
+    const response = await previewMarkdown(
+      jsonRequest("/api/admin/markdown/preview", {
+        content: "a".repeat(200_001),
+      }),
+    );
+
+    expect(response.status).toBe(422);
   });
 });

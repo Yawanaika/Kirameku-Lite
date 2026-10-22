@@ -65,8 +65,8 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 
 1. ~~图片上传迁移到本地/对象存储，随后把相册照片 URL 输入替换为上传控件。~~ 已在 P3.1 完成。
 2. 引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。
-3. 文章编辑器接入 CodeMirror 和 Markdown 预览。
-4. 后台移动端导航、操作审计日志和更细的权限控制。
+3. ~~文章编辑器接入 CodeMirror 和 Markdown 预览。~~ 已在 P5.2 完成。
+4. 后台移动端导航已完成（P5.2）；操作审计日志和更细的权限控制仍开放。
 5. ~~为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。~~ 已在 P5.2 完成。
 6. 按 P3.2 的评估结果完成旧后端下线。
 
@@ -114,6 +114,15 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 - P3.1 记录中写的 `GET /uploads/[...path]` 当时实际并未落库，导致本地上传写入成功但读取 404；P5.1 已补齐并通过 smoke。
 - 新增 `/admin/account`（资料/改密），补齐后台最后一项账号入口。
 - 删除前检查 3、4、5 仍未完成：生产 SQLite 切流、PostgreSQL 备份可恢复、T+7 回滚窗口都需要运维确认后，才能删除 `Kirameku-backend/` 并清理 `postgres` devDependency。
-- 后续项 2、3、4（Radix/CodeMirror/移动端导航/审计）仍开放；两个后台 GET 的路由级测试已在 P5.2 补齐。
+- 后续项 2、4（Radix Dialog、操作审计/细粒度权限）仍开放；CodeMirror 编辑器、Markdown 预览、后台移动端导航已在 P5.2 完成。
+
+## P5.2 后台编辑体验（2026-10-22）
+
+- 文章编辑器正文从 `<Textarea>` 换成 CodeMirror 6（复用仓库已有的 `codemirror` / `@codemirror/lang-markdown` / `@codemirror/theme-one-dark`）。`components/admin/MarkdownEditor.tsx` 封装受控编辑器：视图只创建一次，外部加载文章时通过 dispatch 同步内容，不重建编辑器。
+- 新增编辑/分栏/预览三种视图；预览通过 `POST /api/admin/markdown/preview` 走服务端 `lib/markdown.ts`，与前台文章页使用同一套 `remark → rehype-sanitize → rehype-highlight` 管线，输入上限 200,000 字符。客户端不引入第二套 Markdown 渲染器，也不把原始 HTML 交给 `dangerouslySetInnerHTML`。
+- 预览请求 400ms 防抖并可中止，避免快速输入时堆积请求；管理员会话 + 同源检查。
+- 后台移动端导航：`AdminShell` 侧栏在 `lg` 以下隐藏，新增 `AdminMobileNav` 抽屉（Escape/遮罩关闭、路由切换自动收起、焦点还原、Tab 焦点环、锁定滚动、桌面断点自动关闭）；桌面侧栏改为 sticky 独立滚动。
+- 同轮补齐 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 与 Markdown 预览的路由级测试（见 P5 记录第 10 节）。
+- 验证：`/admin` SSR 含移动导航入口，`/admin/posts/new` SSR 含视图切换；未登录预览 401、管理员预览 200 且 `<script>` 被清除、代码块带 `hljs-*`、超长正文 422；27 个测试文件 / 145 个测试通过，生产 build 44 个静态页面。
 
 详见 [`docs/P5-加固验证记录.md`](./P5-加固验证记录.md)。

@@ -3,9 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Columns2,
+  Eye,
+  Loader2,
+  Pencil,
+  Save,
+  Trash2,
+} from "lucide-react";
 import AdminError from "./AdminError";
 import ImageUploader from "./ImageUploader";
+import MarkdownEditor from "./MarkdownEditor";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { useAdminData } from "./use-admin-data";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -47,6 +56,14 @@ const emptyForm: FormState = {
   isPinned: false,
 };
 
+const viewModes = [
+  { value: "editor", label: "编辑", icon: Pencil },
+  { value: "split", label: "分栏", icon: Columns2 },
+  { value: "preview", label: "预览", icon: Eye },
+] as const;
+
+type ViewMode = (typeof viewModes)[number]["value"];
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -77,6 +94,10 @@ export default function PostEditor({ postId }: PostEditorProps) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("editor");
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const { data: categories } = useAdminData<CategoryItem[]>(
     "/api/admin/categories",
@@ -120,6 +141,36 @@ export default function PostEditor({ postId }: PostEditorProps) {
           categories?.find((item) => item.name === categoryName)?.id ?? "",
         )
       : "");
+
+  useEffect(() => {
+    if (viewMode === "editor") return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewLoading(true);
+      adminRequest<{ html: string }>("/api/admin/markdown/preview", {
+        method: "POST",
+        body: JSON.stringify({ content: form.content }),
+        signal: controller.signal,
+      })
+        .then((data) => {
+          if (controller.signal.aborted) return;
+          setPreviewHtml(data.html);
+          setPreviewError(null);
+        })
+        .catch((reason: unknown) => {
+          if (controller.signal.aborted) return;
+          setPreviewError(describeAdminError(reason));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setPreviewLoading(false);
+        });
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [form.content, viewMode]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -278,19 +329,82 @@ export default function PostEditor({ postId }: PostEditorProps) {
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <Label htmlFor="post-content">正文（Markdown）</Label>
-              <span className="text-[11px] text-slate-600 tabular-nums">
-                {wordCount} 字符 · 约 {readingTime} 分钟
-              </span>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <Label htmlFor="post-content">正文（Markdown）</Label>
+                <span className="text-[11px] text-slate-600 tabular-nums">
+                  {wordCount} 字符 · 约 {readingTime} 分钟
+                </span>
+              </div>
+              <div
+                role="group"
+                aria-label="编辑视图"
+                className="flex items-center rounded-lg border border-white/10 bg-slate-950/40 p-0.5"
+              >
+                {viewModes.map((mode) => {
+                  const Icon = mode.icon;
+                  const active = viewMode === mode.value;
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      onClick={() => setViewMode(mode.value)}
+                      aria-pressed={active}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
+                        active
+                          ? "bg-white/10 text-white"
+                          : "text-slate-500 hover:text-slate-200"
+                      }`}
+                    >
+                      <Icon className="size-3.5" aria-hidden />
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <Textarea
-              id="post-content"
-              value={form.content}
-              onChange={(event) => update("content", event.target.value)}
-              placeholder="# 正文开始…"
-              className="min-h-[420px] font-mono text-[13px] leading-6"
-            />
+
+            <div
+              className={
+                viewMode === "split"
+                  ? "grid gap-3 xl:grid-cols-2"
+                  : undefined
+              }
+            >
+              <div className={viewMode === "preview" ? "hidden" : undefined}>
+                <MarkdownEditor
+                  id="post-content"
+                  value={form.content}
+                  onChange={(value) => update("content", value)}
+                />
+              </div>
+
+              {viewMode !== "editor" ? (
+                <div className="h-[420px] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-5">
+                  <div className="mb-3 flex items-center justify-between text-[11px] text-slate-600">
+                    <span>预览</span>
+                    {previewLoading ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        更新中…
+                      </span>
+                    ) : null}
+                  </div>
+                  {previewError ? (
+                    <AdminError message={previewError} />
+                  ) : previewHtml ? (
+                    <div
+                      className="prose prose-invert prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: previewHtml }}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-600">
+                      {previewLoading ? "正在渲染预览…" : "正文为空"}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </section>
         </div>
 

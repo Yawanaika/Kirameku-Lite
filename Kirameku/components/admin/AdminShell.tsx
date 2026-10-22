@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminMobileNav from "./AdminMobileNav";
 import AdminNav from "./AdminNav";
 import LogoutButton from "./LogoutButton";
 
@@ -17,7 +18,7 @@ export default function AdminShell({ admin, children }: AdminShellProps) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="border-b border-white/10 bg-slate-900/70 px-4 py-4 lg:min-h-screen lg:border-r lg:border-b-0 lg:px-5 lg:py-6">
+      <aside className="hidden border-r border-white/10 bg-slate-900/70 px-5 py-6 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto">
         <Link href="/admin" className="flex items-center gap-3 px-1">
           <span className="grid size-9 place-items-center rounded-xl bg-sky-400 text-sm font-black text-slate-950">
             K
@@ -35,13 +36,16 @@ export default function AdminShell({ admin, children }: AdminShellProps) {
 
       <div className="min-w-0">
         <header className="flex items-center justify-between border-b border-white/10 px-5 py-4 lg:px-8">
-          <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
-              Workspace
-            </p>
-            <p className="mt-0.5 text-sm text-slate-300">
-              你好，{displayName}
-            </p>
+          <div className="flex items-center gap-3">
+            <AdminMobileNav />
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
+                Workspace
+              </p>
+              <p className="mt-0.5 text-sm text-slate-300">
+                你好，{displayName}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Link
