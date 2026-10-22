@@ -1,145 +1,198 @@
-# Kirameku 部署踩坑记录
+# Kirameku 部署与运维记录
 
-> **2026-10-22 现状提示**
+> **2026-10-22 架构现状**
 >
-> 本文下方内容记录的是单体化重写之前的旧部署（Next 前台 + FastAPI:8000 + Vue 后台）。其中 `:8000` 反代、Vue 后台和 PostgreSQL 相关段落仅作历史参考，**不再是当前架构**。
+> 旧版 `Kirameku-backend/`（FastAPI + Vue 管理后台 + PostgreSQL）及 PostgreSQL → SQLite 一次性迁移脚本已经删除。当前生产只有一个 Node.js 进程、一个 SQLite 文件和一个 Nginx 入口。
 >
-> 当前架构：
->
-> - 只有一个上游：Next.js 进程（Node 22，`pnpm start`，默认 3000 端口），前台、`/admin`、`/api/*`、RSS 都由它提供。
-> - `next.config.mjs` 没有任何 `rewrites`，未知 `/api/*` 直接 404，不会转发到 FastAPI。
-> - 未配置 OSS 时图片写入 `UPLOAD_DIR`，由 `app/uploads/[...path]/route.ts` 读取；生产环境可用 Nginx `alias` 直接服务该目录以减轻 Node 压力。
-> - 数据库是单文件 SQLite（WAL），备份/恢复使用 `pnpm db:backup` / `pnpm db:restore`，不要直接 `cp` 正在使用的库。
->
-> 仍然适用的经验：Nginx 不要缓存 HTML、静态 chunk 需要长缓存并在发布时清理、上传目录要持久化。下文这些问题排查过程仍有参考价值。
+> 本文下方不再保留 `:8000` 反代、Vue 后台或 PostgreSQL 的部署步骤；这些内容只存在于 Git 历史和 `docs/` 的阶段记录中。
 
-## 问题：Nginx 缓存导致 Mixed Content 错误
+## 1. 当前架构
 
-### 症状
-
-部署到宝塔面板后，浏览器访问 `https://boke.hiromu.top` 出现大量混合内容错误：
-
-```
-Mixed Content: The page at 'https://boke.hiromu.top/' was loaded over HTTPS,
-but requested an insecure resource 'http://boke.hiromu.top:8000/api/posts/count?status=published'.
-This request has been blocked; the content must be served over HTTPS.
+```text
+浏览器
+  └── Nginx（HTTPS、静态缓存、上传大小限制）
+        └── Next.js 16（Node 22，默认 3000）
+              ├── 前台页面 / RSC / RSS / sitemap
+              ├── /admin 后台页面
+              ├── /api/* Route Handlers
+              ├── /uploads/* 本地图片读取（未配置 OSS 时）
+              └── SQLite（WAL，单文件）
 ```
 
-关键现象：
-- 编译产物里**完全没有** `http://boke.hiromu.top:8000` 或 `localhost:8000`
-- `curl https://boke.hiromu.top/api/health` 返回 `{"status":"ok"}`，Nginx 反代正常
-- 浏览器控制台 `fetch('/api/albums')` 能成功返回数据
-- 清除浏览器缓存、无痕模式、换浏览器都不行
-- 只有首页出问题，其他页面刷新后正常
+约束：
 
-### 根因
+- **只能跑一个写实例。** SQLite 是单写者，不能开多个 Node 实例同时写同一个数据库文件，也不能把数据库放在 NFS 上。
+- **不要直接 `cp` 正在使用的数据库。** 使用 `pnpm db:backup` / `pnpm db:restore`；恢复前先停应用。
+- **图片目录要持久化。** 未配置 OSS 时，上传文件写入 `UPLOAD_DIR`（默认 `./uploads`）；容器/重新部署不能把它清掉。
+- **不要再加 `/api` 反代。** `next.config.mjs` 没有 rewrites，未命中的 `/api/*`、`/uploads/*` 会直接 404；缺少接口时应该补 Route Handler，而不是转发到旧服务。
 
-**Nginx 缓存了旧的 HTML 页面。**
+## 2. 首次部署
 
-每次 `pnpm build` 后，Next.js 会生成新的 chunk 文件名（带 hash），比如：
-- 旧：`0.yx~-n01gczc.js`
-- 新：`0s4-wrpdah-.i.js`
+要求 Node.js 22、pnpm 12。
 
-旧 HTML 页面引用旧 chunk 文件名。重新部署后：
-1. 新的 `.next` 文件夹里是新 chunk 文件
-2. 但 Nginx 还在返回缓存的旧 HTML
-3. 浏览器加载旧 HTML → 请求旧 chunk 文件名 → 文件不存在 → 报错
+```bash
+cd Kirameku
+pnpm install --frozen-lockfile
 
-### 解决方案
+cp .env.example .env.local
+# 至少填写：
+#   AUTH_SECRET（≥32 字符，openssl rand -base64 48）
+#   DATABASE_PATH=/data/kirameku.db
+#   UPLOAD_DIR=/data/uploads
+# 可选：GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET / GITHUB_REDIRECT_URI
+# 可选：OSS_*（配置完整后图片写入 OSS）
 
-在 Nginx 配置的 `location /` 块中**禁用代理缓存**：
+pnpm db:migrate
+
+ADMIN_USERNAME=admin \
+ADMIN_PASSWORD='至少12位的密码' \
+pnpm db:seed-admin
+
+pnpm build
+DATABASE_PATH=/data/kirameku.db pnpm start
+```
+
+检查：
+
+```bash
+curl -s http://127.0.0.1:3000/api/health
+# {"ok":true,"db":"ok","migration":"0002_admin_audit_indexes.sql",...}
+```
+
+`/api/health` 会返回数据库状态、最新迁移、认证配置、uptime 和数据库大小；部署脚本应把它作为健康检查。
+
+## 3. Nginx 参考
 
 ```nginx
-location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+server {
+    listen 443 ssl http2;
+    server_name boke.hiromu.top;
 
-    # 关键：禁用 Nginx 代理缓存，否则部署后会返回旧 HTML
-    proxy_no_cache 1;
-    proxy_cache_bypass 1;
-    proxy_cache off;
-    add_header Cache-Control "no-cache, no-store, must-revalidate";
-    add_header Pragma "no-cache";
-    add_header Expires "0";
+    # 上传接口限制；应用侧也有 10MB 文件校验
+    client_max_body_size 12m;
 
-    proxy_connect_timeout 30s;
-    proxy_read_timeout 86400s;
-    proxy_send_timeout 30s;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
+    # 不要把 HTML 缓存到 Nginx/CDN；否则发布后可能引用旧 chunk
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Next 带 hash 的静态资源可以长缓存；交给浏览器/CDN 缓存即可
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:3000;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # 可选：本地上传目录直接由 Nginx 提供，减轻 Node 压力
+    # location /uploads/ {
+    #     alias /data/uploads/;
+    #     try_files $uri =404;
+    #     add_header X-Content-Type-Options nosniff;
+    # }
 }
 ```
 
-修改后重载 Nginx：
+如果使用 Nginx `alias` 直接服务 `/uploads/`，要确保目录只包含应用写入的图片，并保留 `X-Content-Type-Options: nosniff`。不配置时，Next 的 `app/uploads/[...path]/route.ts` 会兜底读取。
+
+## 4. 发布流程
+
 ```bash
-nginx -s reload
+cd Kirameku
+git pull --ff-only
+
+pnpm install --frozen-lockfile
+DATABASE_PATH=/data/kirameku.db pnpm db:migrate
+pnpm build
+
+# 重启 Node 进程（systemd / pm2 / 容器按实际环境）
+sudo systemctl restart kirameku
+
+curl -fsS https://boke.hiromu.top/api/health
 ```
 
----
+发布前建议先备份：
 
-## API 代理方案
-
-### 推荐方案：Next.js rewrites + Nginx 反代
-
-**不要用环境变量拼接 API 地址**，改用 `next.config.ts` 的 `rewrites`：
-
-```typescript
-// next.config.ts
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      { source: "/api/:path*", destination: "http://127.0.0.1:8000/api/:path*" },
-      { source: "/uploads/:path*", destination: "http://127.0.0.1:8000/uploads/:path*" },
-    ];
-  },
-  // ...
-};
+```bash
+DATABASE_PATH=/data/kirameku.db BACKUP_DIR=/data/backups pnpm db:backup --prune
 ```
 
-```typescript
-// siteConfig.ts
-apiBaseUrl: "",  // 硬编码空字符串，不用环境变量
+新增迁移只允许**追加** `server/db/migrations/*.sql`；迁移执行器会校验已应用文件的 SHA-256，改旧文件会导致启动/迁移失败。
+
+## 5. 环境变量
+
+完整清单见 `Kirameku/.env.example`。关键项：
+
+| 变量 | 说明 |
+|:---|:---|
+| `DATABASE_PATH` | SQLite 文件路径；生产放持久卷 |
+| `AUTH_SECRET` | 管理员 JWT 签名密钥，≥32 字符 |
+| `SITE_READ_ONLY` | `1` 时拒绝公开写接口，适合迁移/维护窗口 |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth 登录（访客评论/点赞） |
+| `GITHUB_REDIRECT_URI` | 必须与 GitHub OAuth App 回调地址一致 |
+| `FRONTEND_ORIGIN` | 同源校验使用；生产填正式 HTTPS 域名 |
+| `UPLOAD_DIR` | 未配置 OSS 时的本地图片目录 |
+| `OSS_*` | 配置完整后图片写入阿里云 OSS |
+| `VISITOR_RETENTION_DAYS` | 访客 IP 记录保留天数，默认 90 |
+
+数据库维护脚本不会自动加载 `.env.local`；用非默认路径时在命令前显式传 `DATABASE_PATH`。
+
+## 6. 备份与恢复
+
+```bash
+# 在线备份（WAL 安全），并保留 integrity_check
+DATABASE_PATH=/data/kirameku.db BACKUP_DIR=/data/backups pnpm db:backup --prune
+
+# 恢复：先停应用
+sudo systemctl stop kirameku
+pnpm db:restore /data/backups/kirameku-....db --target /data/kirameku.db
+sudo systemctl start kirameku
 ```
 
-**请求流程：**
+不要把 `kirameku.db`、`-wal`、`-shm` 直接复制到另一台机器当作备份；WAL 文件不一致会丢失最近写入。备份文件建议再同步到对象存储，并定期做一次恢复演练。
 
-- **开发环境**（`pnpm dev`）：
-  ```
-  浏览器 → fetch("/api/posts") → Next.js dev server → rewrites 代理 → http://127.0.0.1:8000
-  ```
+## 7. 常见问题
 
-- **生产环境**（服务器）：
-  ```
-  浏览器 → fetch("/api/posts") → Nginx location /api/ → proxy_pass http://127.0.0.1:8000
-  ```
-  （请求根本到不了 Next.js，Nginx 直接转发给后端）
+### Nginx 缓存导致页面引用旧 chunk / Mixed Content
 
-### 为什么不用环境变量
+旧架构曾出现 `http://boke.hiromu.top:8000/...` 的混合内容错误。现在已没有 8000 端口和 `/api` 反代；如果再次出现类似问题，按顺序检查：
 
-`process.env.NEXT_PUBLIC_API_URL` 在 Next.js 的 SSR/客户端构建中行为不一致：
-- 空字符串 `NEXT_PUBLIC_API_URL=` 可能被当作 `undefined`
-- `??` 和 `||` 对空字符串的处理不同
-- 服务端渲染和客户端渲染可能用不同的值
-- 打包后值被内联到 JS 中，无法运行时修改
+1. 页面 HTML 是否被 Nginx/CDN 强缓存，仍引用旧构建的 chunk。
+2. 环境变量或前端代码里是否残留 `http://`、`localhost:8000`、`127.0.0.1:8000`。
+3. 发布后清理 Nginx 缓存；确认 `location /` 不缓存 HTML，`/_next/static/` 才长缓存。
+4. 确认 `FRONTEND_ORIGIN`、`GITHUB_REDIRECT_URI` 使用正式 HTTPS 域名。
 
----
+### SQLite 写入失败 / `database is locked`
 
-## 服务器环境
+- 确认只有一个 Node 实例写同一个 `DATABASE_PATH`。
+- 不要把数据库文件放在 NFS、SMB 或跨容器共享卷上。
+- 检查是否有外部脚本长时间持有事务；维护脚本应在低峰运行。
+- 备份用 `pnpm db:backup`，不要在写入时 `cp`。
 
-- **服务器**：阿里云 8.138.17.253，1.8GB 内存
-- **面板**：宝塔面板
-- **前端**：Next.js 16，端口 3000
-- **后端**：FastAPI，端口 8000
-- **Nginx**：反向代理，`/api/` → 8000，`/` → 3000
-- **Node.js 启动命令**：`next start`（生产模式）
+### 上传图片 404
 
-### 注意事项
+- 未配置 OSS 时确认 `UPLOAD_DIR` 指向持久目录，且 Node 进程有读写权限。
+- 如果用 Nginx `alias` 直出，确认 `/uploads/` 的 alias 路径和 `UPLOAD_DIR` 一致。
+- 检查文件是否被部署脚本清掉；上传目录不能放在临时构建目录里。
 
-1. **Nginx 必须禁用缓存**，否则部署后会返回旧 HTML
-2. **服务器内存紧张**（1.8GB），Next.js 进程占 500MB+，可加 `NODE_OPTIONS=--max-old-space-size=512` 限制内存
-3. **宝塔面板的 Node 项目管理器**可能有自己的缓存机制，重启项目后确认进程 PID 更新
-4. 部署后用 `curl -s https://boke.hiromu.top/ | grep buildId` 确认返回的是最新构建
+### 后台登录失败
+
+- `AUTH_SECRET` 是否 ≥32 字符，且发布前后保持一致；修改会让现有管理员会话失效。
+- 管理员账号是否通过 `pnpm db:seed-admin` 创建；没有默认密码。
+- 反向代理是否传递了正确的 `Host`、`X-Forwarded-Proto`，以及 `FRONTEND_ORIGIN` 是否匹配。
+
+## 8. 旧架构清理记录
+
+2026-10-22 已完成：
+
+- 删除 `Kirameku-backend/`（FastAPI + Vue 后台 + `init_db.sql`）。
+- 删除 `Kirameku/scripts/migrate/`（PostgreSQL 结构审计与一次性导入）。
+- 移除 `postgres` devDependency 和 `migrate:audit` / `migrate:pg2sqlite` 脚本。
+- 移除文档和注释中的旧后端部署指引；`README.md`、`AGENTS.md`、`server/db/README.md` 以当前单进程架构为准。
+
+Git 历史仍保留旧代码和迁移脚本；如果未来需要查阅，只能从历史提交恢复，不要在生产重新引入第二套运行时。

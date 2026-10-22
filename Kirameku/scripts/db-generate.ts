@@ -13,8 +13,7 @@ if (!fs.existsSync(snapshot)) {
       "and has no Drizzle snapshot yet.",
   );
   console.error(
-    "Complete the production schema audit, create the baseline snapshot, then " +
-      "remove this guard.",
+    "Create a baseline snapshot from server/db/schema, then remove this guard.",
   );
   process.exit(1);
 }

@@ -277,7 +277,7 @@ function asString(value: unknown): string {
 }
 
 /**
- * Resolve an IP through the same two providers the legacy FastAPI service used.
+ * Resolve an IP through the same two providers the legacy service used.
  * Private/local addresses never leave the process. Failures degrade to an empty
  * object so visitor recording still succeeds.
  */

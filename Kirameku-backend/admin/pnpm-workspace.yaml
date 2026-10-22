@@ -1,5 +1,0 @@
-allowBuilds:
-  '@parcel/watcher': true
-  es5-ext: true
-  esbuild: true
-  typeit: true

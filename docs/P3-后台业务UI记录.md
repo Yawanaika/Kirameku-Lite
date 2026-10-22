@@ -4,7 +4,7 @@
 
 ## 本轮范围
 
-后台从「登录 + 仪表盘空壳」推进到 13 个业务模块全部有管理入口（图片上传控件除外）：
+后台从「登录 + 仪表盘空壳」推进到 14 个业务模块全部有管理入口（含后续新增的操作审计；图片上传控件除外）：
 
 | 页面 | 功能 |
 |:---|:---|
@@ -27,8 +27,9 @@
 | `/admin/albums/[id]` | 相册元数据编辑、照片 URL 添加/删除、方向/说明/排序 |
 | `/admin/site-config` | 站点配置 key/value CRUD、JSON 格式化、搜索 |
 | `/admin/visitors` | 访客记录分页、归属地/设备信息展示、单条删除、清空 |
+| `/admin/audit` | 后台写操作审计：操作人、动作、资源、请求路径、IP、时间；只读分页 |
 
-侧边栏已改为真实路由导航，并根据当前路径高亮；12 个业务入口全部可点击。
+侧边栏已改为真实路由导航，并根据当前路径高亮；13 个业务入口全部可点击（操作审计为后续新增）。
 
 ## 实现方式
 
@@ -66,7 +67,7 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 1. ~~图片上传迁移到本地/对象存储，随后把相册照片 URL 输入替换为上传控件。~~ 已在 P3.1 完成。
 2. ~~引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。~~ 已在 P5.3 引入 Radix Dialog、替换全部 19 处 `window.confirm`；TanStack Table / react-hook-form 未引入，现有手写表格状态规模可控。
 3. ~~文章编辑器接入 CodeMirror 和 Markdown 预览。~~ 已在 P5.2 完成。
-4. 后台移动端导航已完成（P5.2）；操作审计日志和更细的权限控制仍开放。
+4. 后台移动端导航已完成（P5.2）；操作审计日志已完成（P3.3）；更细的权限控制仍开放。
 5. ~~为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。~~ 已在 P5.2 完成。
 6. 按 P3.2 的评估结果完成旧后端下线。
 
@@ -88,7 +89,7 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 
 ## P3.2 旧后端下线评估（2026-10-22）
 
-结论：`Kirameku/` 运行时已经不依赖 `Kirameku-backend/`，但当前不建议直接删除；先完成代理清理、全站 smoke 和生产切流确认。
+结论：评估时 `Kirameku/` 运行时已经不依赖 `Kirameku-backend/`，但当时不建议直接删除；先完成代理清理、全站 smoke 和生产切流确认。2026-10-22 用户确认三项下线条件已满足，目录已删除，见 P3.4。
 
 已确认：
 
@@ -100,21 +101,21 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 
 删除前必须处理：
 
-1. [ ] 删除 `Kirameku/next.config.mjs` 中的两条 fallback rewrite（`/api/:path*`、`/uploads/:path*` → `127.0.0.1:8000`），并确认未命中的路径返回预期 404，而不是误代理。
-2. [ ] 跑一次全站 smoke：公开页面/API、后台登录与 CRUD、图片上传、RSS、sitemap、`/api/health`。
-3. [ ] 确认生产已切到 SQLite，PostgreSQL 备份可恢复，且已经超过 `T+7` 回滚窗口。
-4. [ ] 删除 `Kirameku-backend/`，同步更新 `README.md`、`AGENTS.md`、`DEPLOY_NOTES.md` 和迁移文档中的旧后端描述。
-5. [ ] 若确认不再需要 PostgreSQL → SQLite 迁移，再清理 `postgres` devDependency、`init_db.sql` 引用和迁移脚本说明；否则先保留迁移脚本。
+1. [x] 删除 `Kirameku/next.config.mjs` 中的两条 fallback rewrite（`/api/:path*`、`/uploads/:path*` → `127.0.0.1:8000`），并确认未命中的路径返回预期 404，而不是误代理。已在 P5.1 完成。
+2. [x] 跑一次全站 smoke：公开页面/API、后台登录与 CRUD、图片上传、RSS、sitemap、`/api/health`。已在 P5.1 完成。
+3. [x] 确认生产已切到 SQLite，PostgreSQL 备份可恢复，且已经超过 `T+7` 回滚窗口。2026-10-22 用户确认。
+4. [x] 删除 `Kirameku-backend/`，同步更新 `README.md`、`AGENTS.md`、`DEPLOY_NOTES.md` 和迁移文档中的旧后端描述。2026-10-22 已执行，见 P3.4。
+5. [x] 若确认不再需要 PostgreSQL → SQLite 迁移，再清理 `postgres` devDependency、`init_db.sql` 引用和迁移脚本说明；否则先保留迁移脚本。2026-10-22 已清理。
 
-注意：源码可以从 Git 历史恢复，但生产 PostgreSQL 数据、旧环境变量、旧 Nginx 配置和回滚窗口不能仅靠仓库历史恢复。
+注意：源码可以从 Git 历史恢复，但生产 PostgreSQL 数据、旧环境变量、旧 Nginx 配置和回滚窗口不能仅靠仓库历史恢复。本次删除前已完成用户确认和 SQLite 备份核对；Git 历史仅作为源码参考，不作为生产数据备份。
 
 ## P5.1 收尾进展（2026-10-22）
 
 - 删除前检查 1、2 已完成：`next.config.mjs` 的 `/api/*`、`/uploads/*` fallback rewrites 已移除，未命中路径返回 404；临时 SQLite + 管理员会话的全站 smoke 通过（公开页、后台 14 页、CRUD、上传、RSS/sitemap、限流、浏览量去重）。
 - P3.1 记录中写的 `GET /uploads/[...path]` 当时实际并未落库，导致本地上传写入成功但读取 404；P5.1 已补齐并通过 smoke。
 - 新增 `/admin/account`（资料/改密），补齐后台最后一项账号入口。
-- 删除前检查 3、4、5 仍未完成：生产 SQLite 切流、PostgreSQL 备份可恢复、T+7 回滚窗口都需要运维确认后，才能删除 `Kirameku-backend/` 并清理 `postgres` devDependency。
-- 后续项 4（操作审计/细粒度权限）仍开放；CodeMirror 编辑器、Markdown 预览、后台移动端导航已在 P5.2 完成，Radix 确认框已在 P5.3 完成。
+- 删除前检查 3、4、5 已于 2026-10-22 由用户确认满足，`Kirameku-backend/` 和 PostgreSQL 迁移脚本已删除，见 P3.4。
+- 后续项 4 的操作审计已完成（P3.3）；更细粒度权限控制仍开放；CodeMirror 编辑器、Markdown 预览、后台移动端导航已在 P5.2 完成，Radix 确认框已在 P5.3 完成。
 
 ## P5.2 后台编辑体验（2026-10-22）
 
@@ -134,3 +135,71 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 - 验证：14 个后台页面（含所有使用确认框的管理页）SSR 均 200；客户端 bundle 中已无 `window.confirm`；typecheck、27 个测试文件 / 145 个测试、生产 build 44 个静态页面通过。
 
 详见 [`docs/P5-加固验证记录.md`](./P5-加固验证记录.md)。
+
+## P3.3 后台操作审计（2026-10-22）
+
+后台写操作现在会自动落审计日志，不需要在每个 Route Handler 里手写记录：
+
+- `server/http/audit-context.ts` 用 Node `AsyncLocalStorage` 建立请求级上下文；`handle()` 在调用业务函数前创建上下文，`requireAdmin()` 验证成功后把当前管理员写入上下文。
+- `handle()` 在响应为 2xx 后调用 `server/http/audit.ts` 的 `recordAdminRequestAudit()`，只记录 `/api/admin/*` 的 `POST`/`PUT`/`PATCH`/`DELETE`；`GET`、失败响应和只读的 `/api/admin/markdown/preview` 不记录。
+- 动作由方法和路径推导：`create`、`update`、`delete`、`status`（`*/status`）、`upload`（上传）、`clear`（清空访客）、`update`（站点配置 upsert）；资源类型取路径第一段（如 `posts`、`albums`、`site-config`），目标 ID 优先取路径数字，其次取响应体的 `id`。
+- `detail` 保存 `{ method, path, status }`，`ip` 复用 `getClientIp()`；写日志失败只记录错误日志，不影响已经成功的业务响应。
+- 新增 `server/modules/audit/`（contracts/service/index）：`record()` 写入 `admin_audit_log`，`list()` 按时间倒序分页，左连接 `user` 显示操作人，支持 `action` / `targetType` 过滤，解析 `detail` 并容忍历史坏 JSON。
+- 新增 `GET /api/admin/audit`：要求管理员会话，查询参数 `page`、`size`（默认 30，最大 100）、`action`、`targetType`，返回 `{ items, total }`。
+- 新增 `/admin/audit` 页面和侧边栏/移动端导航入口；表格展示时间、操作人、动作、资源、请求路径和 IP，只读，不提供删除按钮（审计日志不应由后台随手修改）。
+- 新增迁移 `0002_admin_audit_indexes.sql`，为 `created_at`、`actor_id`、`action`、`target_type` 补索引。`admin_audit_log` 表在最初的 `0000_initial.sql` 中已经存在。
+- 自动审计覆盖所有现有后台写接口，包括文章/说说/项目/评论/留言/分类/标签/友链/收藏夹/相册/照片/站点配置/访客/账号/图片上传；新增后台写接口时只要继续使用 `handle()` + `requireAdmin()` 就会自动纳入。
+
+边界说明：
+
+- 审计记录的是“成功写操作”，不记录登录失败、401 和校验失败；这些仍由请求日志/限流日志覆盖。
+- `getClientIp()` 信任反向代理传入的 `X-Forwarded-For` / `X-Real-IP`，只用于展示，不作为安全边界。
+- 当前没有审计日志保留期/归档任务，也没有更细粒度的角色权限；所有管理员仍是同一权限级别。
+
+验证：
+
+```text
+pnpm typecheck                         通过
+pnpm test                              27 个文件 / 148 个测试通过（删除 manifest.test.ts 后）
+pnpm exec eslint <changed files>       0 error
+pnpm build                             通过（44 个静态页面，新增 /admin/audit 与 /api/admin/audit）
+audit route tests                      未登录 401；管理员创建分类后自动生成 create/categories 日志；
+                                       markdown preview 不产生日志
+production smoke                       临时 SQLite + 管理员登录：
+                                       POST /api/admin/categories → 200
+                                       GET /api/admin/audit?action=create&targetType=categories
+                                       → total=1，actor=smoke，target_id=1，detail.path=/api/admin/categories
+                                       /admin/audit → 200，SSR 含「操作审计」
+                                       /api/health → db=ok，migration=0002_admin_audit_indexes.sql
+```
+
+## P3.4 旧后端下线完成（2026-10-22）
+
+用户确认已满足三个下线条件：生产已切到 SQLite、PostgreSQL 备份可恢复、T+7 回滚窗口已过。本轮执行：
+
+- 删除 `Kirameku-backend/`（约 1.0 GB，614 个 Git 跟踪文件；FastAPI、Vue 管理后台、`init_db.sql`、旧环境配置）。
+- 删除 `Kirameku/scripts/migrate/`（`audit-pg-schema.ts`、`pg-to-sqlite.ts`、`manifest.ts`、`manifest.test.ts`）。
+- 从 `Kirameku/package.json` 移除 `postgres` devDependency 及 `migrate:audit` / `migrate:pg2sqlite` 脚本，并重新生成 `pnpm-lock.yaml` 的直接依赖关系。
+- `Kirameku/server/db/tables.ts` 移除仅供 PG 导入使用的 `IMPORT_ORDER` / `TABLE_BY_NAME` / `orderOf`，保留迁移测试使用的 `TABLES`。
+- 更新 `README.md`、`AGENTS.md`、`DEPLOY_NOTES.md`、`Kirameku/server/db/README.md`、`.env.example` 和活跃代码注释；`DEPLOY_NOTES.md` 改写为当前单进程部署指南。
+- 未修改已应用的 `0000_initial.sql` / `0001_seed_projects.sql`：迁移执行器会校验 SHA-256，且 `0001` 的 `FastAPI` 是项目技术栈种子数据，不是运行时依赖。历史文档中的 PostgreSQL 验证命令保留为历史记录，并标注迁移脚本已退役。
+- 新增说明：`docs/Live2D-新增与更新.md`。
+
+验证：
+
+```text
+pnpm typecheck                         通过
+pnpm test                              27 个文件 / 148 个测试通过
+pnpm exec eslint <changed files>       通过
+pnpm build                             通过（44 个静态页面）
+smoke                                  临时 SQLite + 管理员登录：
+                                       login=200，/admin/audit=200
+                                       POST /api/admin/categories → 审计 create/categories
+                                       target_id=1，detail.path=/api/admin/categories
+                                       /api/not-a-route → 404
+                                       /api/health → db=ok，migration=0002_admin_audit_indexes.sql
+```
+
+顺带修复：`/api/health` 在多个迁移于同一毫秒应用时，原先只按 `applied_at` 排序会随机返回 `0001`；现改为 `applied_at DESC, filename DESC`，稳定返回最新迁移。默认数据库 `Kirameku/data/kirameku.db` 未参与本轮 smoke，未修改。
+
+Live2D 的新增/更新方法见 [`docs/Live2D-新增与更新.md`](./Live2D-新增与更新.md)。

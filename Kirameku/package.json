@@ -17,9 +17,7 @@
     "db:backup": "tsx scripts/backup-db.ts",
     "db:restore": "tsx scripts/restore-db.ts",
     "db:prune-visitors": "tsx scripts/prune-visitors.ts",
-    "db:reconcile-counts": "tsx scripts/reconcile-counts.ts",
-    "migrate:audit": "tsx scripts/migrate/audit-pg-schema.ts",
-    "migrate:pg2sqlite": "tsx scripts/migrate/pg-to-sqlite.ts"
+    "db:reconcile-counts": "tsx scripts/reconcile-counts.ts"
   },
   "engines": {
     "node": ">=22.0.0 <25"
@@ -91,7 +89,6 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "postgres": "^3.4.9",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

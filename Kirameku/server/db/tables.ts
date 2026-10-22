@@ -26,31 +26,6 @@ export interface TableMeta {
   columns: ColumnMeta[];
 }
 
-/**
- * Foreign-key-safe import order. `admin_audit_log` is new and has no source
- * rows, so it is deliberately not part of the PostgreSQL import.
- */
-export const IMPORT_ORDER = [
-  "user",
-  "category",
-  "tag",
-  "post",
-  "post_tag",
-  "github_user",
-  "comment",
-  "message",
-  "chatter",
-  "chatter_comment",
-  "album",
-  "photo",
-  "project",
-  "friend_link",
-  "bookmark_category",
-  "bookmark_site",
-  "site_config",
-  "visitor",
-] as const;
-
 const jsonColumns: Record<string, readonly string[]> = {
   chatter: ["images"],
   project: ["tech_stack"],
@@ -65,11 +40,6 @@ function kindOf(column: SQLiteColumn, tableName: string): ColumnKind {
   if (column.dataType === "date") return "timestamp";
   if (column.dataType === "number") return "integer";
   return "text";
-}
-
-function orderOf(name: string): number {
-  const index = (IMPORT_ORDER as readonly string[]).indexOf(name);
-  return index === -1 ? IMPORT_ORDER.length : index;
 }
 
 export const TABLES: TableMeta[] = (Object.values(schema) as unknown[])
@@ -89,6 +59,4 @@ export const TABLES: TableMeta[] = (Object.values(schema) as unknown[])
       }),
     };
   })
-  .sort((a, b) => orderOf(a.name) - orderOf(b.name) || a.name.localeCompare(b.name));
-
-export const TABLE_BY_NAME = new Map(TABLES.map((table) => [table.name, table]));
+  .sort((a, b) => a.name.localeCompare(b.name));

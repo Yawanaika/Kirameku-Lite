@@ -25,7 +25,7 @@ export async function GET(request: Request) {
           | undefined;
         const migration = sqlite
           .prepare(
-            'SELECT "filename" FROM "__migrations" ORDER BY "applied_at" DESC LIMIT 1',
+            'SELECT "filename" FROM "__migrations" ORDER BY "applied_at" DESC, "filename" DESC LIMIT 1',
           )
           .get() as { filename: string } | undefined;
 

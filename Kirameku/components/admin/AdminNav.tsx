@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Link2,
   MessageSquare,
+  ScrollText,
   Settings,
   UserRound,
   Users,
@@ -30,6 +31,7 @@ const primaryItems = [
   { href: "/admin/albums", label: "相册", icon: Images },
   { href: "/admin/site-config", label: "站点配置", icon: Settings },
   { href: "/admin/visitors", label: "访客", icon: Users },
+  { href: "/admin/audit", label: "操作审计", icon: ScrollText },
   { href: "/admin/account", label: "账号", icon: UserRound },
 ];
 

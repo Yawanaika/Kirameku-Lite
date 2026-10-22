@@ -66,11 +66,8 @@ Browser → Nginx (443) → Next.js standalone (Node, :3000)
 │   ├── content/about.md
 │   ├── data/                      # SQLite 数据文件（gitignore）
 │   └── scripts/                   # 迁移、备份/恢复、访客清理、计数校正
-├── docs/                          # 重写方案与各阶段验证记录
-└── Kirameku-backend/              # 旧 FastAPI/Vue 栈，仅保留到生产切流回滚窗口结束
+└── docs/                          # 重写方案与各阶段验证记录
 ```
-
-> `Kirameku/` 运行时不再依赖 `Kirameku-backend/`，也没有指向 `127.0.0.1:8000` 的 rewrite。旧目录只作为回滚参考，确认生产切流且超过 T+7 窗口后删除。
 
 ## 功能模块
 
@@ -93,7 +90,7 @@ Browser → Nginx (443) → Next.js standalone (Node, :3000)
 
 ### 管理后台（`/admin`）
 
-仪表盘、文章、说说、项目、评论审核、留言审核、分类/标签、友链、收藏夹、相册、站点配置、访客、账号（资料/改密），以及图片上传。
+仪表盘、文章、说说、项目、评论审核、留言审核、分类/标签、友链、收藏夹、相册、站点配置、访客、操作审计、账号（资料/改密），以及图片上传。
 
 ## 快速开始
 
@@ -134,7 +131,6 @@ DATABASE_PATH=/data/kirameku.db pnpm start
 | `pnpm db:backup` / `pnpm db:restore` | 在线备份 / 恢复（恢复前先停应用） |
 | `pnpm db:prune-visitors` | 按 `VISITOR_RETENTION_DAYS` 清理访客记录 |
 | `pnpm db:reconcile-counts` | 校正分类/标签/说说/相册冗余计数 |
-| `pnpm migrate:audit` / `pnpm migrate:pg2sqlite` | 旧 PostgreSQL 结构审计 / 一次性数据导入 |
 
 ## 环境变量
 
@@ -169,7 +165,7 @@ VISITOR_RETENTION_DAYS=90
 - **收藏夹** — 平台标签、搜索过滤
 - **漂流瓶友链** — 可拖动的漂浮瓶子，点击查看详情
 - **时间河流** — 归档页的可视化时间线，拖动交互
-- **Live2D 看板娘** — 右下角可互动，连续点击 Logo 7 次触发彩蛋
+- **Live2D 看板娘** — 右下角可互动，连续点击 Logo 7 次触发彩蛋；新增/更新模型见 [`docs/Live2D-新增与更新.md`](docs/Live2D-新增与更新.md)
 - **移动端适配** — 响应式布局，移动端导航菜单
 
 ## License

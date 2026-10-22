@@ -3,7 +3,7 @@ import { integer } from "drizzle-orm/sqlite-core";
 /**
  * Timestamp columns are stored as UTC epoch milliseconds.
  *
- * The P0 schema mirrors the nullability of `Kirameku-backend/init_db.sql`
+ * The P0 schema mirrors the nullability of the legacy PostgreSQL schema
  * (many DEFAULT columns are nullable). `$defaultFn` only supplies a value for
  * application inserts; migrations always write the converted value explicitly.
  */

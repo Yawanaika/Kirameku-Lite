@@ -1,11 +1,16 @@
 import crypto from "node:crypto";
 import { ZodError } from "zod";
+import { recordAdminRequestAudit } from "./audit";
+import {
+  runWithAuditContext,
+  type RequestAuditContext,
+} from "./audit-context";
 import { AppError } from "./errors";
 import { logError, logRequest } from "./logger";
 
 export interface HandlerOptions {
   request?: Request;
-  /** Optional actor for audit logs (username or github login). */
+  /** Optional actor override for request logs (username or github login). */
   actor?: string;
 }
 
@@ -111,9 +116,10 @@ export async function handle(
   const requestId =
     request?.headers.get("x-request-id") || crypto.randomUUID();
   const startedAt = performance.now();
+  const auditContext: RequestAuditContext = {};
 
   try {
-    const result = await fn();
+    const result = await runWithAuditContext(auditContext, fn);
     const response =
       result instanceof Response
         ? result
@@ -122,13 +128,19 @@ export async function handle(
           : Response.json(result);
 
     response.headers.set("x-request-id", requestId);
+    await recordAdminRequestAudit({
+      request,
+      response,
+      actor: auditContext.actor,
+      result,
+    });
     logRequest({
       requestId,
       method: request?.method,
       path: request ? new URL(request.url).pathname : undefined,
       status: response.status,
       durationMs: Math.round(performance.now() - startedAt),
-      actor: options.actor,
+      actor: auditContext.actor?.username ?? options.actor,
     });
     return response;
   } catch (error) {
@@ -140,7 +152,7 @@ export async function handle(
       path: request ? new URL(request.url).pathname : undefined,
       status: result.status,
       durationMs: Math.round(performance.now() - startedAt),
-      actor: options.actor,
+      actor: auditContext.actor?.username ?? options.actor,
     });
     return result.response;
   }

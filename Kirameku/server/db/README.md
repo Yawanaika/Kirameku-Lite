@@ -1,6 +1,8 @@
 # SQLite / Drizzle
 
-SQLite / Drizzle foundation for the single-process rewrite (P0 + P1).
+SQLite / Drizzle foundation for the single-process application. The legacy
+PostgreSQL stack and its one-off import scripts were removed on 2026-10-22;
+this directory now owns the only database used by the app.
 
 ## Commands
 
@@ -24,55 +26,37 @@ DATABASE_PATH=./data/kirameku.db pnpm db:migrate
 # 3. Check the running app and latest migration
 curl -s http://localhost:3000/api/health
 
-# 4. Audit the production PostgreSQL schema against the SQLite metadata
-DATABASE_URL=postgresql://... pnpm migrate:audit
-
-# 5. Import a production PostgreSQL snapshot into a fresh SQLite target
-DATABASE_URL=postgresql://... \
-DATABASE_PATH=./data/kirameku.db \
-pnpm migrate:pg2sqlite --target ./data/kirameku.db
-
-# 6. Dry-run into a temporary DB (removed on success)
-DATABASE_URL=postgresql://... pnpm migrate:pg2sqlite --dry-run
-
-# 7. Online backup + integrity check
+# 4. Online backup + integrity check
 DATABASE_PATH=./data/kirameku.db BACKUP_DIR=./backups pnpm db:backup --prune
 
-# 8. Restore (stop the app first)
+# 5. Restore (stop the app first)
 pnpm db:restore ./backups/kirameku-....db --target ./data/kirameku.db
 ```
 
 `pnpm db:seed-admin` hashes with bcrypt (12 rounds) and rejects passwords
 shorter than 12 characters or longer than bcrypt's 72-byte limit.
 
-`pnpm migrate:pg2sqlite` writes `backups/migration-manifest.json` with
-`rowCount`, `maxId`, `contentHash`, `nullCounts` and `sqlite_sequence` for every
-imported table. It exits non-zero on any mismatch.
-
-Legacy timestamps are `timestamp without time zone` and are interpreted as
-`Asia/Shanghai` with `EXTRACT(EPOCH FROM (col AT TIME ZONE 'Asia/Shanghai'))`.
-Do not use `SET TIME ZONE` alone: `EXTRACT(EPOCH FROM timestamp)` ignores the
-session timezone. The importer rejects `timestamp with time zone` columns rather
-than silently applying the wrong conversion.
-
-`pnpm db:restore` verifies the backup's `integrity_check`, `foreign_key_check`
-and the SHA-256 in `<backup>.meta.json` before replacing the target. It keeps the
-old database and its `-wal` / `-shm` files as `.pre-restore-*`.
+`pnpm db:restore` verifies the backup's `integrity_check`,
+`foreign_key_check` and the SHA-256 in `<backup>.meta.json` before replacing
+the target. It keeps the old database and its `-wal` / `-shm` files as
+`.pre-restore-*`.
 
 ## Baseline note
 
-`server/db/migrations/0000_initial.sql` is the hand-written P0 baseline,
-because the production PostgreSQL schema must be audited before the final
-Drizzle snapshot is generated. `server/db/schema/*` is the typed source of
-truth for application code; `server/db/tables.ts` derives the migration
-metadata from it.
+`server/db/migrations/0000_initial.sql` is the hand-written P0 baseline. It
+mirrors the legacy PostgreSQL schema's table names, field names and
+nullability, using SQLite affinities. `server/db/schema/*` is the typed source
+of truth for application code; `server/db/tables.ts` derives table metadata
+from it for the migration tests.
 
-The hand-written baseline intentionally has no Drizzle snapshot yet, so
-`pnpm db:generate` must not be used until the production audit is complete and a
-snapshot has been created from the audited database. Until then, add numbered
-`*.sql` files under `server/db/migrations/` and let `server/db/migrate.ts` apply
-them. Do not edit an already applied migration: the runner stores its SHA-256
-and will refuse to run if the file changed.
+The baseline intentionally has no Drizzle snapshot yet, so `pnpm db:generate`
+stays guarded until a snapshot is created. Until then, add numbered `*.sql`
+files under `server/db/migrations/` and let `server/db/migrate.ts` apply them.
+
+Do not edit an already applied migration: the runner stores its SHA-256 and
+will refuse to run if the file changed. In particular, historical comments in
+`0000_initial.sql` and seed data in `0001_seed_projects.sql` are part of the
+immutable migration history and must not be rewritten.
 
 ## Conventions
 

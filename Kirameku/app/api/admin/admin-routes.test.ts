@@ -10,6 +10,8 @@ import {
 } from "@/server/auth/session";
 import { GITHUB_TOKEN_COOKIE } from "@/server/auth/constants";
 import { GET as getAlbum } from "./albums/[id]/route";
+import { GET as getAudit } from "./audit/route";
+import { POST as createCategory } from "./categories/route";
 import { GET as getVisitorsCount } from "./visitors/count/route";
 import { POST as previewMarkdown } from "./markdown/preview/route";
 
@@ -234,5 +236,63 @@ describe("POST /api/admin/markdown/preview", () => {
     );
 
     expect(response.status).toBe(422);
+  });
+});
+
+describe("admin audit log", () => {
+  it("requires an admin session", async () => {
+    const response = await getAudit(request("/api/admin/audit"));
+
+    expect(response.status).toBe(401);
+  });
+
+  it("records a successful admin write and lists it newest first", async () => {
+    await asAdmin();
+
+    const createdResponse = await createCategory(
+      jsonRequest("/api/admin/categories", {
+        name: "Audit category",
+        slug: "audit-category",
+      }),
+    );
+    expect(createdResponse.status).toBe(200);
+    const created = await createdResponse.json();
+
+    const response = await getAudit(
+      request("/api/admin/audit?action=create&targetType=categories"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.total).toBe(1);
+    expect(body.items[0]).toMatchObject({
+      actor_id: adminId,
+      actor_name: "admin",
+      action: "create",
+      target_type: "categories",
+      target_id: String(created.id),
+      detail: {
+        method: "POST",
+        path: "/api/admin/categories",
+        status: 200,
+      },
+    });
+  });
+
+  it("does not record read-only markdown previews", async () => {
+    await asAdmin();
+
+    const before = await getAudit(request("/api/admin/audit"));
+    const beforeBody = await before.json();
+
+    const preview = await previewMarkdown(
+      jsonRequest("/api/admin/markdown/preview", { content: "# Hi" }),
+    );
+    expect(preview.status).toBe(200);
+
+    const after = await getAudit(request("/api/admin/audit"));
+    const afterBody = await after.json();
+
+    expect(afterBody.total).toBe(beforeBody.total);
   });
 });

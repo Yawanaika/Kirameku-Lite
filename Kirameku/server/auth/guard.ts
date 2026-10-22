@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { user as userTable } from "@/server/db/schema";
+import { setAuditActor } from "@/server/http/audit-context";
 import { errors } from "@/server/http/errors";
 import { ADMIN_COOKIE } from "./constants";
 
@@ -44,5 +45,6 @@ export async function getAdminSession(): Promise<AdminUser | null> {
 export async function requireAdmin(): Promise<AdminUser> {
   const admin = await getAdminSession();
   if (!admin) throw errors.unauthorized();
+  setAuditActor({ id: admin.id, username: admin.username });
   return admin;
 }

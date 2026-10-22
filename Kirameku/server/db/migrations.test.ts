@@ -82,6 +82,7 @@ describe("SQLite baseline", () => {
     expect(migrations.map((row) => row.filename)).toEqual([
       "0000_initial.sql",
       "0001_seed_projects.sql",
+      "0002_admin_audit_indexes.sql",
     ]);
 
     const integrity = database.pragma("integrity_check") as Array<{
