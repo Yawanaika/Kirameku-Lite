@@ -101,7 +101,12 @@ fi
 if [ "${BACKUP_BEFORE_DEPLOY:-1}" = "1" ] && [ -n "$PREV_CONTAINER" ]; then
   if [ "$(docker inspect -f '{{.State.Running}}' "$PREV_CONTAINER" 2>/dev/null || echo false)" = "true" ]; then
     log "backing up SQLite"
-    if compose exec -T "$APP_SERVICE" pnpm db:backup --prune; then
+    # </dev/null is load-bearing: the workflow streams this script into
+    # `bash -s` over SSH, so the script itself arrives on stdin. `docker
+    # compose exec -T` forwards stdin to the container, which would swallow the
+    # rest of the script — bash then hits EOF and exits 0 right here, before the
+    # pull/recreate steps. Never let a compose exec read the deploy script.
+    if compose exec -T "$APP_SERVICE" pnpm db:backup --prune </dev/null; then
       log "backup done"
     else
       log "WARNING: backup failed, continuing anyway"
