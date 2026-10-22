@@ -1,4 +1,5 @@
 import { handle } from "@/server/http/handler";
+import { enforceIpRateLimit } from "@/server/http/rate-limit";
 import { errors } from "@/server/http/errors";
 import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
@@ -22,6 +23,7 @@ export async function POST(
     async () => {
       assertWritable();
       assertSameOrigin(request);
+      enforceIpRateLimit(request, "post-like", 30, 60_000);
       const { slug } = await params;
       return getPostsService().like(parsePostId(slug), true);
     },

@@ -52,3 +52,14 @@ export function likePost(postId: number, unlike = false) {
     method: "POST",
   });
 }
+
+/**
+ * Report one read of a published article. The server deduplicates by
+ * IP + article + day and tells us whether this request was counted.
+ */
+export function reportPostView(postId: number) {
+  return request<{ counted: boolean; views?: number }>(
+    `/api/posts/${postId}/view`,
+    { method: "POST" },
+  );
+}

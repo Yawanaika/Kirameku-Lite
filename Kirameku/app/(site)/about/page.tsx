@@ -1,12 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkRehype from "remark-rehype";
-import rehypeHighlight from "rehype-highlight";
-import rehypeStringify from "rehype-stringify";
-import "highlight.js/styles/atom-one-dark.css";
+import { renderMarkdown } from "@/lib/markdown";
 import { siteConfig } from "@/siteConfig";
 import FadeIn from "@/components/ui/FadeIn";
 
@@ -21,14 +16,7 @@ export default async function AboutPage() {
 
     if (data.cover) coverImage = data.cover;
 
-    const processedContent = await unified()
-      .use(remarkParse)
-      .use(remarkRehype, { allowDangerousHtml: true })
-      .use(rehypeHighlight)
-      .use(rehypeStringify, { allowDangerousHtml: true })
-      .process(content);
-
-    contentHtml = processedContent.toString();
+    contentHtml = await renderMarkdown(content);
   } catch (e) {
     console.error("读取 about.md 失败", e);
   }

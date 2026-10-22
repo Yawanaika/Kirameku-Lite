@@ -4,59 +4,19 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { marked } from "marked";
-import hljs from "highlight.js/lib/core";
-import typescript from "highlight.js/lib/languages/typescript";
-import javascript from "highlight.js/lib/languages/javascript";
-import python from "highlight.js/lib/languages/python";
-import bash from "highlight.js/lib/languages/bash";
-import shell from "highlight.js/lib/languages/shell";
-import json from "highlight.js/lib/languages/json";
-import css from "highlight.js/lib/languages/css";
-import xml from "highlight.js/lib/languages/xml";
-import nginx from "highlight.js/lib/languages/nginx";
-import sql from "highlight.js/lib/languages/sql";
-import dockerfile from "highlight.js/lib/languages/dockerfile";
-import makefile from "highlight.js/lib/languages/makefile";
-import plaintext from "highlight.js/lib/languages/plaintext";
-import { X } from "lucide-react";
-
-hljs.registerLanguage("typescript", typescript);
-hljs.registerLanguage("ts", typescript);
-hljs.registerLanguage("tsx", typescript);
-hljs.registerLanguage("javascript", javascript);
-hljs.registerLanguage("js", javascript);
-hljs.registerLanguage("python", python);
-hljs.registerLanguage("py", python);
-hljs.registerLanguage("bash", bash);
-hljs.registerLanguage("sh", bash);
-hljs.registerLanguage("shell", shell);
-hljs.registerLanguage("json", json);
-hljs.registerLanguage("css", css);
-hljs.registerLanguage("html", xml);
-hljs.registerLanguage("xml", xml);
-hljs.registerLanguage("svg", xml);
-hljs.registerLanguage("nginx", nginx);
-hljs.registerLanguage("sql", sql);
-hljs.registerLanguage("dockerfile", dockerfile);
-hljs.registerLanguage("makefile", makefile);
-hljs.registerLanguage("text", plaintext);
-hljs.registerLanguage("plaintext", plaintext);
-hljs.registerLanguage("console", shell);
-hljs.registerLanguage("ini", plaintext);
-
-marked.use({ async: false });
-import { ArrowLeft, Calendar, Clock, Eye, Heart } from "lucide-react";
-import { likePost, type PostDetail } from "@/app/api";
+import { ArrowLeft, Calendar, Clock, Eye, Heart, X } from "lucide-react";
+import { likePost, reportPostView, type PostDetail } from "@/app/api";
 import ReadingProgress from "@/components/ui/ReadingProgress";
 import PostComments from "@/components/posts/PostComments";
 
 export default function PostDetailClient({
   initialPost,
+  contentHtml,
 }: {
-  initialPost: PostDetail;
+  initialPost: Omit<PostDetail, "content">;
+  contentHtml: string;
 }) {
-  const [post, setPost] = useState<PostDetail>(initialPost);
+  const [post, setPost] = useState<Omit<PostDetail, "content">>(initialPost);
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const contentRef = useRef<HTMLDivElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -75,14 +35,35 @@ export default function PostDetailClient({
     }
   }, []);
 
-  // 代码高亮
+  // Report the view once per browser per article per day. The server also
+  // deduplicates by IP + article + date, so prefetch/prerender cannot inflate
+  // the counter.
   useEffect(() => {
-    requestAnimationFrame(() => {
-      document.querySelectorAll<HTMLElement>(".post-content pre code[class*=language-]").forEach((el) => {
-        hljs.highlightElement(el);
+    const key = "viewed_posts";
+    const day = new Date().toISOString().slice(0, 10);
+    let viewed: Record<string, string> = {};
+    try {
+      viewed = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<
+        string,
+        string
+      >;
+    } catch {
+      viewed = {};
+    }
+    if (viewed[post.slug] === day) return;
+
+    const next = { ...viewed, [post.slug]: day };
+    localStorage.setItem(key, JSON.stringify(next));
+
+    void reportPostView(post.id)
+      .then(({ counted, views }) => {
+        if (!counted || views === undefined) return;
+        setPost((prev) => ({ ...prev, views }));
+      })
+      .catch(() => {
+        // A failed view report must never break reading.
       });
-    });
-  }, [post]);
+  }, [post.slug, post.id]);
 
   async function handleLike() {
     const alreadyLiked = likedPosts.has(post.id);
@@ -325,7 +306,7 @@ export default function PostDetailClient({
             <div
               className="post-content prose prose-sm sm:prose-base md:prose-lg dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 leading-relaxed"
               onClick={handleContentClick}
-              dangerouslySetInnerHTML={{ __html: marked.parse(post.content) as string }}
+              dangerouslySetInnerHTML={{ __html: contentHtml }}
             />
           </div>
         </div>

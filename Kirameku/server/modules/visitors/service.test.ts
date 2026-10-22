@@ -172,4 +172,25 @@ describe("visitors service", () => {
     await expect(visitors.clear()).resolves.toEqual({ ok: true });
     await expect(visitors.count()).resolves.toBe(0);
   });
+
+  it("prunes records older than the retention window only", async () => {
+    insertVisitor({
+      ip: "203.0.113.3",
+      path: "/fresh",
+      createdAt: Date.now(),
+    });
+
+    const visitors = createVisitorsService(db);
+    await expect(visitors.pruneOlderThan(30)).resolves.toEqual({
+      deleted: 2,
+    });
+    await expect(visitors.count()).resolves.toBe(1);
+
+    const [remaining] = await visitors.list({ page: 1, size: 10 });
+    expect(remaining.path).toBe("/fresh");
+
+    await expect(visitors.pruneOlderThan(0)).rejects.toMatchObject({
+      status: 400,
+    });
+  });
 });

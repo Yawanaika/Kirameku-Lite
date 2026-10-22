@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, lt } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { visitor } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
@@ -445,6 +445,23 @@ export function createVisitorsService(
     async clear(): Promise<{ ok: true }> {
       await db.delete(visitor);
       return { ok: true };
+    },
+
+    /**
+     * Delete visitor rows older than the retention window. IP addresses are
+     * personal data, so the scheduled job must actually remove them rather than
+     * only hiding them in the UI.
+     */
+    async pruneOlderThan(days: number): Promise<{ deleted: number }> {
+      if (!Number.isSafeInteger(days) || days < 1) {
+        throw errors.badRequest("保留天数必须是正整数");
+      }
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const rows = await db
+        .delete(visitor)
+        .where(lt(visitor.createdAt, cutoff))
+        .returning({ id: visitor.id });
+      return { deleted: rows.length };
     },
   };
 }

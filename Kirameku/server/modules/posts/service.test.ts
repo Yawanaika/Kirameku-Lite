@@ -293,6 +293,19 @@ describe("posts service", () => {
     await expect(posts.like(4)).rejects.toBeInstanceOf(AppError);
   });
 
+  it("increments views atomically for published posts only", async () => {
+    await expect(posts.incrementView(1)).resolves.toEqual({ views: 8 });
+    await expect(posts.incrementView(1)).resolves.toEqual({ views: 9 });
+
+    const [row] = connection
+      .prepare('SELECT "views" FROM "post" WHERE "id" = ?')
+      .all(1) as Array<{ views: number }>;
+    expect(row.views).toBe(9);
+
+    await expect(posts.incrementView(4)).rejects.toBeInstanceOf(AppError);
+    await expect(posts.incrementView(999)).rejects.toBeInstanceOf(AppError);
+  });
+
   it("lists drafts and all statuses for the admin view", async () => {
     const all = await posts.list({ page: 1, size: 10 });
     const drafts = await posts.list({

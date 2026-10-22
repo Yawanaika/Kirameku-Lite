@@ -4,15 +4,13 @@
 
 **きらめく — 像星光一样闪烁**
 
-一个从零搭建的全栈个人博客系统，前端 Next.js，后端 FastAPI，附带 Vue 管理后台。
+一个单进程、单语言、单数据库的个人博客系统：Next.js 16 + React 19 + SQLite。
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)
-![Vue 3](https://img.shields.io/badge/Vue-3-42b883?logo=vue.js)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06b6d4?logo=tailwindcss)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)
+![SQLite](https://img.shields.io/badge/SQLite-3-003b57?logo=sqlite)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06b6d4?logo=tailwindcss)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
@@ -31,78 +29,48 @@
 
 ---
 
+## 架构
+
+```
+Browser → Nginx (443) → Next.js standalone (Node, :3000)
+                              ├── app/(site)/**     前台页面（RSC + 客户端岛屿）
+                              ├── app/(admin)/**    管理后台（/:3000/admin）
+                              ├── app/api/**        Route Handlers
+                              └── server/**         领域服务 + Drizzle + SQLite
+```
+
+- **一个部署单元**：前台、API、后台在同一个 Next.js 进程内，没有 `/api` 反向代理。
+- **一个数据库**：单文件 SQLite（WAL 模式），备份即文件；只能运行一个实例。
+- **一种语言**：应用代码、脚本和测试全部是 TypeScript。
+- **小说模块已下线**：`/novel/*`、`/reader3/*` 不再提供，旧路径返回 404。
+
 ## 项目结构
 
 ```
 .
-├── Kirameku/                      # 前端（Next.js App Router）
-│   ├── app/                       # 页面路由
-│   │   ├── novel/                 # 小说阅读系统（书架 → 搜索 → 目录 → 阅读）
-│   │   ├── bookmark/              # 收藏夹（站点导航）
-│   │   ├── posts/                 # 文章系统
-│   │   ├── moments/               # 说说
-│   │   ├── friends/               # 友链（漂流瓶主题）
-│   │   └── ...                    # 更多页面
-│   ├── components/                # UI 组件
-│   │   ├── layout/                # 导航栏、页脚
-│   │   ├── providers/             # 主题、上下文
-│   │   └── ui/                    # 通用组件
-│   └── siteConfig.ts              # 站点全局配置
-│
-└── Kirameku-backend/              # 后端（FastAPI）
-    ├── app/
-    │   ├── api/                   # RESTful API 接口
-    │   ├── models/                # SQLModel 数据模型
-    │   ├── schemas/               # Pydantic 请求/响应模型
-    │   └── services/              # 业务逻辑层
-    ├── admin/                     # 管理后台（Vue 3 + Element Plus）
-    └── init_db.sql                # 数据库初始化脚本
+├── Kirameku/                      # 单体应用
+│   ├── app/
+│   │   ├── (site)/                # 前台页面：首页/文章/说说/留言/相册/项目/友链/收藏/音乐/工具箱
+│   │   ├── (admin)/admin/         # 管理后台（登录页 + 受保护布局）
+│   │   ├── api/                   # 公开 API 与 /api/admin/* 管理 API
+│   │   ├── feed/                  # RSS
+│   │   └── uploads/               # 本地上传文件读取（OSS 未配置时）
+│   ├── components/                # 前台组件 + components/admin 后台组件
+│   ├── lib/                       # 客户端工具、Markdown 渲染
+│   ├── server/
+│   │   ├── db/                    # Drizzle schema、SQLite 连接、迁移
+│   │   ├── auth/                  # 管理员 JWT、GitHub OAuth、鉴权守卫
+│   │   ├── modules/               # 领域服务（posts/comments/visitors/...）
+│   │   ├── http/                  # 统一错误、日志、限流、CSRF 校验
+│   │   └── storage/               # 图片校验、OSS/本地存储
+│   ├── content/about.md
+│   ├── data/                      # SQLite 数据文件（gitignore）
+│   └── scripts/                   # 迁移、备份/恢复、访客清理、计数校正
+├── docs/                          # 重写方案与各阶段验证记录
+└── Kirameku-backend/              # 旧 FastAPI/Vue 栈，仅保留到生产切流回滚窗口结束
 ```
 
-## 技术栈
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**前端**
-- **Next.js 16** + **React 19** — App Router，SSR/SSG
-- **Tailwind CSS 4** — 原子化样式
-- **Framer Motion** — 页面过渡与微交互
-- **TypeScript** — 类型安全
-- **Live2D** — 看板娘，右下角可互动
-
-</td>
-<td width="50%" valign="top">
-
-**后端**
-- **FastAPI** — 高性能 Python Web 框架
-- **SQLModel** — ORM（SQLAlchemy + Pydantic）
-- **PostgreSQL** — 关系型数据库
-- **阿里云 OSS** — 图片对象存储
-- **JWT** — 身份认证
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**管理后台**
-- **Vue 3** + **Element Plus** — 后台 UI
-- **Pure Admin** — 管理后台模板
-- 内嵌于后端，无需单独部署
-
-</td>
-<td width="50%" valign="top">
-
-**阅读服务**
-- **reader-master** — Kotlin/Spring Boot
-- legado 书源兼容
-- 独立部署，端口 8085
-
-</td>
-</tr>
-</table>
+> `Kirameku/` 运行时不再依赖 `Kirameku-backend/`，也没有指向 `127.0.0.1:8000` 的 rewrite。旧目录只作为回滚参考，确认生产切流且超过 T+7 窗口后删除。
 
 ## 功能模块
 
@@ -111,98 +79,94 @@
 | 模块 | 路径 | 描述 |
 |:-----|:-----|:-----|
 | 首页 | `/` | 文章预览、说说、照片墙，一站式入口 |
-| 文章 | `/posts` | 分类筛选、标签、Markdown 渲染、代码高亮 |
+| 文章 | `/posts` | 分类筛选、标签、Markdown 渲染、服务端高亮、评论、点赞、浏览量 |
 | 说说 | `/moments` | 碎片化记录，类朋友圈时间线 |
-| 杂谈 | `/messages` | 轻量话题讨论区 |
-| 小说 | `/novel` | 书架 → 搜索 → 目录 → 阅读，完整阅读体验 |
-| 收藏夹 | `/bookmark` | 站点导航，分类管理，平台标签，自动获取 favicon |
-| 项目 | `/projects` | 个人项目展示，支持搜索，GitHub/Gitee 链接 |
+| 留言 | `/messages` | GitHub 登录后留言/回复 |
+| 收藏夹 | `/bookmark` | 站点导航，分类管理，平台标签 |
+| 项目 | `/projects` | 项目展示，数据来自 `project` 表 |
 | 友链 | `/friends` | 漂流瓶主题，可拖动交互 |
 | 照片墙 | `/photowall` | 相册瀑布流展示 |
-| 归档 | `/timeline` | 时间河流可视化，拖动浏览全部文章 |
-| 音乐 | `/music` | 云音乐播放器，支持歌单 |
+| 归档 | `/timeline` | 时间河流可视化 |
+| 音乐 | `/music` | 云音乐播放器 |
 | 关于 | `/about` | 关于博主 |
+| 工具箱 | `/garden/*` | 纯客户端小工具 |
 
-### 管理后台
+### 管理后台（`/admin`）
 
-文章、分类、标签、评论、留言、说说、相册、项目、友链、收藏夹、站点配置 — 全部可视化管理，支持图片压缩上传至阿里云 OSS。
+仪表盘、文章、说说、项目、评论审核、留言审核、分类/标签、友链、收藏夹、相册、站点配置、访客、账号（资料/改密），以及图片上传。
 
 ## 快速开始
 
-### 1. 后端
-
-```bash
-cd Kirameku-backend
-
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate          # Mac/Linux
-# venv\Scripts\activate           # Windows
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env，填入数据库、密钥、OSS 等配置
-
-# 初始化数据库
-psql -U postgres -d your_db -f init_db.sql
-
-# 打包管理后台
-cd admin && pnpm install && pnpm build && cd ..
-
-# 启动
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-API 文档：`http://localhost:8000/docs`
-管理后台：`http://localhost:8000/admin`
-
-### 2. 前端
+要求 Node.js 22 与 pnpm 12：
 
 ```bash
 cd Kirameku
+pnpm install --frozen-lockfile
 
-pnpm install
-pnpm dev                          # 开发模式 → http://localhost:3000
+# 配置环境变量：至少填入 AUTH_SECRET（≥32 字符）
+cp .env.example .env.local
 
-# 部署
-pnpm build && pnpm start
+# 建库（空库一键初始化）
+pnpm db:migrate
+
+# 创建管理员（不提供默认密码）
+ADMIN_PASSWORD='至少12位的密码' ADMIN_USERNAME=admin pnpm db:seed-admin
+
+pnpm dev          # http://localhost:3000
+                  # 后台 http://localhost:3000/admin
 ```
 
-### 3. 阅读服务（可选）
+生产构建：
 
 ```bash
-# reader-master 独立部署
-java -jar reader-master.jar
-# 默认端口 8085，前端通过 /reader3/ 路径代理访问
+pnpm build
+DATABASE_PATH=/data/kirameku.db pnpm start
 ```
+
+## 常用脚本
+
+| 命令 | 作用 |
+|:-----|:-----|
+| `pnpm dev` / `pnpm build` / `pnpm start` | 开发 / 构建 / 启动 |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test` | 代码检查 / 类型检查 / 单元与集成测试 |
+| `pnpm db:migrate` | 执行版本化 SQLite 迁移 |
+| `pnpm db:seed-admin` | 创建或重置管理员 |
+| `pnpm db:backup` / `pnpm db:restore` | 在线备份 / 恢复（恢复前先停应用） |
+| `pnpm db:prune-visitors` | 按 `VISITOR_RETENTION_DAYS` 清理访客记录 |
+| `pnpm db:reconcile-counts` | 校正分类/标签/说说/相册冗余计数 |
+| `pnpm migrate:audit` / `pnpm migrate:pg2sqlite` | 旧 PostgreSQL 结构审计 / 一次性数据导入 |
 
 ## 环境变量
 
-`Kirameku-backend/.env`：
+`Kirameku/.env.local`（完整清单见 `.env.example`）：
 
 ```env
-# 数据库
-DATABASE_URL=postgresql://user:password@host:5432/dbname
+DATABASE_PATH=./data/kirameku.db
+SITE_READ_ONLY=0
+AUTH_SECRET=          # openssl rand -base64 48
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_REDIRECT_URI=http://localhost:3000/api/auth/github/callback
 
-# JWT
-SECRET_KEY=your-secret-key
+# 图片上传：配置完整 OSS_* 后写入 OSS，否则写入 UPLOAD_DIR
+OSS_ACCESS_KEY_ID=
+OSS_ACCESS_KEY_SECRET=
+OSS_BUCKET_NAME=
+OSS_ENDPOINT=
+OSS_CUSTOM_DOMAIN=
+OSS_PREFIX=Boke/
+UPLOAD_DIR=./uploads
 
-# 阿里云 OSS
-OSS_ACCESS_KEY_ID=your-access-key-id
-OSS_ACCESS_KEY_SECRET=your-access-key-secret
-OSS_ENDPOINT=oss-cn-xxx.aliyuncs.com
-OSS_BUCKET=your-bucket-name
+VISITOR_RETENTION_DAYS=90
 ```
 
 ## 设计亮点
 
 - **Glassmorphism 风格** — 全站毛玻璃质感，亮色暗色双主题
 - **微交互动画** — Framer Motion 驱动，页面过渡、卡片悬停、果冻弹跳
-- **小说阅读系统** — 四级路由架构（书架/搜索/目录/阅读），SSE 流式搜索，阅读设置持久化
-- **收藏夹** — 自动获取站点 favicon，平台标签，搜索过滤
+- **服务端 Markdown** — 统一的 `unified` 管线，先清洗后高亮，前端不再加载 `marked`/`highlight.js`
+- **浏览量去重** — 客户端按天上报，服务端再按 IP + 文章 + 日期去重，预取不会刷量
+- **收藏夹** — 平台标签、搜索过滤
 - **漂流瓶友链** — 可拖动的漂浮瓶子，点击查看详情
 - **时间河流** — 归档页的可视化时间线，拖动交互
 - **Live2D 看板娘** — 右下角可互动，连续点击 Logo 7 次触发彩蛋
@@ -211,5 +175,3 @@ OSS_BUCKET=your-bucket-name
 ## License
 
 MIT
-
-

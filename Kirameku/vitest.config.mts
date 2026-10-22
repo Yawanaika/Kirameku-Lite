@@ -5,6 +5,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL(".", import.meta.url)),
+      // `server-only` throws when resolved through the browser condition that
+      // Vitest uses. Tests run in Node, so stub it out.
+      "server-only": fileURLToPath(
+        new URL("./tests/server-only-stub.ts", import.meta.url),
+      ),
     },
   },
   test: {

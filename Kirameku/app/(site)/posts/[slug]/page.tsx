@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { renderMarkdown } from "@/lib/markdown";
 import { AppError } from "@/server/http/errors";
 import { getPostsService } from "@/server/modules/posts";
 import { siteConfig } from "@/siteConfig";
@@ -65,5 +66,14 @@ export default async function PostDetailPage({ params }: PageProps) {
 
   if (!post) notFound();
 
-  return <PostDetailClient key={post.slug} initialPost={post} />;
+  const { content, ...initialPost } = post;
+  const contentHtml = await renderMarkdown(content);
+
+  return (
+    <PostDetailClient
+      key={post.slug}
+      initialPost={initialPost}
+      contentHtml={contentHtml}
+    />
+  );
 }

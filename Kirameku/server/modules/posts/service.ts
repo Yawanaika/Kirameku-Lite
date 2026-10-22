@@ -491,6 +491,23 @@ export function createPostsService(db: AppDatabase) {
       if (!row) throw errors.notFound("文章不存在");
       return { likes: row.likes ?? 0 };
     },
+
+    /**
+     * Atomic view increment. Called only from the client-side reporting route;
+     * reading an article (including SSR prefetch) must never call this.
+     */
+    async incrementView(id: number): Promise<{ views: number }> {
+      const [row] = await db
+        .update(post)
+        .set({
+          views: sql<number>`coalesce(${post.views}, 0) + 1`,
+        })
+        .where(and(eq(post.id, id), eq(post.status, "published")))
+        .returning({ views: post.views });
+
+      if (!row) throw errors.notFound("文章不存在");
+      return { views: row.views ?? 0 };
+    },
   };
 }
 

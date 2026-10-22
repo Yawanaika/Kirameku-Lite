@@ -107,3 +107,13 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 5. [ ] 若确认不再需要 PostgreSQL → SQLite 迁移，再清理 `postgres` devDependency、`init_db.sql` 引用和迁移脚本说明；否则先保留迁移脚本。
 
 注意：源码可以从 Git 历史恢复，但生产 PostgreSQL 数据、旧环境变量、旧 Nginx 配置和回滚窗口不能仅靠仓库历史恢复。
+
+## P5.1 收尾进展（2026-10-22）
+
+- 删除前检查 1、2 已完成：`next.config.mjs` 的 `/api/*`、`/uploads/*` fallback rewrites 已移除，未命中路径返回 404；临时 SQLite + 管理员会话的全站 smoke 通过（公开页、后台 14 页、CRUD、上传、RSS/sitemap、限流、浏览量去重）。
+- P3.1 记录中写的 `GET /uploads/[...path]` 当时实际并未落库，导致本地上传写入成功但读取 404；P5.1 已补齐并通过 smoke。
+- 新增 `/admin/account`（资料/改密），补齐后台最后一项账号入口。
+- 删除前检查 3、4、5 仍未完成：生产 SQLite 切流、PostgreSQL 备份可恢复、T+7 回滚窗口都需要运维确认后，才能删除 `Kirameku-backend/` 并清理 `postgres` devDependency。
+- 后续项 2、3、4、5（Radix/CodeMirror/移动端导航/审计/两个后台 GET 的路由级测试）仍开放。
+
+详见 [`docs/P5-加固验证记录.md`](./P5-加固验证记录.md)。

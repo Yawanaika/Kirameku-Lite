@@ -1,4 +1,5 @@
 import { errors } from "./errors";
+import { getClientIp } from "./ip";
 
 interface Bucket {
   count: number;
@@ -67,6 +68,35 @@ export function enforceRateLimit(
   const bucket = getBucket(key, windowMs);
   throwIfExceeded(bucket, limit);
   bucket.count += 1;
+}
+
+/**
+ * Route-level limit keyed by client IP. Used by public write endpoints so the
+ * same budget is shared between `/like` and `/unlike` variants.
+ */
+export function enforceIpRateLimit(
+  request: Request,
+  route: string,
+  limit: number,
+  windowMs: number,
+): void {
+  enforceRateLimit(`${route}:${getClientIp(request)}`, limit, windowMs);
+}
+
+/**
+ * Consume one unit of quota and report whether it was available. Unlike
+ * `enforceRateLimit` this never throws, so it can back idempotent writes such
+ * as "count this article view at most once per day per client".
+ */
+export function tryConsumeRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): boolean {
+  const bucket = getBucket(key, windowMs);
+  if (bucket.count >= limit) return false;
+  bucket.count += 1;
+  return true;
 }
 
 /** Test helper; not used by production code. */

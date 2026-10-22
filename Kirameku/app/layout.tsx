@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "highlight.js/styles/atom-one-dark.css";
 import { siteConfig } from "@/siteConfig";
 
 export const metadata: Metadata = {

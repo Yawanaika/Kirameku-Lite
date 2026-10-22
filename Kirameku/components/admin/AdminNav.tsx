@@ -12,6 +12,7 @@ import {
   Link2,
   MessageSquare,
   Settings,
+  UserRound,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const primaryItems = [
   { href: "/admin/albums", label: "相册", icon: Images },
   { href: "/admin/site-config", label: "站点配置", icon: Settings },
   { href: "/admin/visitors", label: "访客", icon: Users },
+  { href: "/admin/account", label: "账号", icon: UserRound },
 ];
 
 export default function AdminNav() {

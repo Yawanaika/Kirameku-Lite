@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AppError } from "./errors";
 import {
   assertRateLimit,
+  enforceIpRateLimit,
   enforceRateLimit,
   recordRateLimitFailure,
   resetRateLimits,
+  tryConsumeRateLimit,
 } from "./rate-limit";
 
 describe("rate limit", () => {
@@ -32,5 +34,26 @@ describe("rate limit", () => {
     expect(() => assertRateLimit("login:failed-only", 1, 60_000)).toThrow(
       AppError,
     );
+  });
+
+  it("reports idempotent quota consumption without throwing", () => {
+    expect(tryConsumeRateLimit("view:1", 1, 60_000)).toBe(true);
+    expect(tryConsumeRateLimit("view:1", 1, 60_000)).toBe(false);
+    expect(tryConsumeRateLimit("view:2", 1, 60_000)).toBe(true);
+  });
+
+  it("keys public write limits per forwarded client IP", () => {
+    const request = (ip: string) =>
+      new Request("http://localhost/api/comments", {
+        headers: { "x-forwarded-for": ip },
+      });
+
+    enforceIpRateLimit(request("1.2.3.4"), "comments:create", 1, 60_000);
+    expect(() =>
+      enforceIpRateLimit(request("1.2.3.4"), "comments:create", 1, 60_000),
+    ).toThrow(AppError);
+    expect(() =>
+      enforceIpRateLimit(request("5.6.7.8"), "comments:create", 1, 60_000),
+    ).not.toThrow();
   });
 });

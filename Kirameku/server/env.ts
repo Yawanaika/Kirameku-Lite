@@ -36,6 +36,8 @@ const envSchema = z.object({
   OSS_CUSTOM_DOMAIN: optionalUrl,
   OSS_PREFIX: optionalString,
   UPLOAD_DIR: optionalString,
+  /** Delete visitor records (including IPs) after this many days. */
+  VISITOR_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
 });
 
 const parsed = envSchema.safeParse(process.env);

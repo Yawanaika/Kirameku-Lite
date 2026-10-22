@@ -1,4 +1,5 @@
 import { handle } from "@/server/http/handler";
+import { enforceIpRateLimit } from "@/server/http/rate-limit";
 import { readJson } from "@/server/http/body";
 import { getClientIp } from "@/server/http/ip";
 import { assertSameOrigin } from "@/server/http/origin";
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     async () => {
       assertWritable();
       assertSameOrigin(request);
+      enforceIpRateLimit(request, "chatter-comments:create", 5, 10 * 60_000);
       const user = await requireGithubUser(request);
       const input = createChatterCommentInput.parse(await readJson(request));
 

@@ -11,23 +11,6 @@ const nextConfig = {
     root: path.resolve(__dirname),
   },
 
-  async rewrites() {
-    // Keep the legacy FastAPI proxy as a fallback: fallback rewrites run after
-    // filesystem and dynamic routes, so local /api/posts/[slug] handlers win.
-    return {
-      fallback: [
-        {
-          source: "/api/:path*",
-          destination: "http://127.0.0.1:8000/api/:path*",
-        },
-        {
-          source: "/uploads/:path*",
-          destination: "http://127.0.0.1:8000/uploads/:path*",
-        },
-      ],
-    };
-  },
-
   experimental: {
     optimizePackageImports: [
       "framer-motion",

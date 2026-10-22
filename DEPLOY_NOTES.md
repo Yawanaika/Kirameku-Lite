@@ -1,5 +1,18 @@
 # Kirameku 部署踩坑记录
 
+> **2026-10-22 现状提示**
+>
+> 本文下方内容记录的是单体化重写之前的旧部署（Next 前台 + FastAPI:8000 + Vue 后台）。其中 `:8000` 反代、Vue 后台和 PostgreSQL 相关段落仅作历史参考，**不再是当前架构**。
+>
+> 当前架构：
+>
+> - 只有一个上游：Next.js 进程（Node 22，`pnpm start`，默认 3000 端口），前台、`/admin`、`/api/*`、RSS 都由它提供。
+> - `next.config.mjs` 没有任何 `rewrites`，未知 `/api/*` 直接 404，不会转发到 FastAPI。
+> - 未配置 OSS 时图片写入 `UPLOAD_DIR`，由 `app/uploads/[...path]/route.ts` 读取；生产环境可用 Nginx `alias` 直接服务该目录以减轻 Node 压力。
+> - 数据库是单文件 SQLite（WAL），备份/恢复使用 `pnpm db:backup` / `pnpm db:restore`，不要直接 `cp` 正在使用的库。
+>
+> 仍然适用的经验：Nginx 不要缓存 HTML、静态 chunk 需要长缓存并在发布时清理、上传目录要持久化。下文这些问题排查过程仍有参考价值。
+
 ## 问题：Nginx 缓存导致 Mixed Content 错误
 
 ### 症状
