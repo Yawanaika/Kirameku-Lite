@@ -67,7 +67,7 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 2. 引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。
 3. 文章编辑器接入 CodeMirror 和 Markdown 预览。
 4. 后台移动端导航、操作审计日志和更细的权限控制。
-5. 为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。
+5. ~~为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。~~ 已在 P5.2 完成。
 6. 按 P3.2 的评估结果完成旧后端下线。
 
 ## P3.1 图片上传（2026-10-22）
@@ -114,6 +114,6 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 - P3.1 记录中写的 `GET /uploads/[...path]` 当时实际并未落库，导致本地上传写入成功但读取 404；P5.1 已补齐并通过 smoke。
 - 新增 `/admin/account`（资料/改密），补齐后台最后一项账号入口。
 - 删除前检查 3、4、5 仍未完成：生产 SQLite 切流、PostgreSQL 备份可恢复、T+7 回滚窗口都需要运维确认后，才能删除 `Kirameku-backend/` 并清理 `postgres` devDependency。
-- 后续项 2、3、4、5（Radix/CodeMirror/移动端导航/审计/两个后台 GET 的路由级测试）仍开放。
+- 后续项 2、3、4（Radix/CodeMirror/移动端导航/审计）仍开放；两个后台 GET 的路由级测试已在 P5.2 补齐。
 
 详见 [`docs/P5-加固验证记录.md`](./P5-加固验证记录.md)。
