@@ -1,0 +1,50 @@
+# Opt-in reverse proxy: run Caddy in this stack instead of behind your own.
+#
+# Use this only when the server has no other proxy occupying 80/443. If you
+# already run Caddy (or Nginx) — especially as a container in another compose
+# project — do NOT enable this file: it would fight for the same ports, and the
+# default docker-compose.yml already puts the app on the shared `kirameku-edge`
+# network for you.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#
+# Requires SITE_DOMAIN in .env (already in compose.env.example). Certificates
+# and ACME account material live in the `caddy-data` volume, so they survive
+# container re-creation.
+services:
+  app:
+    # The app is no longer reached from outside this project, so the stable
+    # alias is not needed here; keep it anyway to stay identical to the base file.
+    networks:
+      edge:
+        aliases:
+          - kirameku-app
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # Required: the public hostname Caddy should obtain a certificate for.
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is required for the bundled Caddy; set it in .env or drop -f docker-compose.caddy.yml}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:
+    external: true
+    name: ${SHARED_NETWORK:-kirameku-edge}

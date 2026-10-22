@@ -3,21 +3,46 @@
 # The image is built by GitHub Actions and published to GHCR; the server only
 # pulls it. Nothing here compiles code.
 #
-#   cp compose.env.example .env      # fill in AUTH_SECRET + SITE_DOMAIN
+#   cp compose.env.example .env      # fill in AUTH_SECRET (+ SHARED_NETWORK)
+#   docker network create kirameku-edge      # one time, see below
 #   docker compose pull
 #   docker compose up -d
 #
-# Caddy terminates TLS (automatic Let's Encrypt) and proxies to the app over the
-# internal network. The app itself is not published on the host at all.
+# REVERSE PROXY
+# -------------
+# This file runs the app only. It publishes no host port; the container is
+# reachable on the external `kirameku-edge` network as `kirameku-app:3000`, and
+# your own proxy attaches to that network. That is the default because the
+# server already runs a Caddy container in another compose project — a
+# container-based proxy cannot reach the host's 127.0.0.1.
+#
+#   # in the Caddy project's docker-compose.yml
+#   networks:
+#     kirameku:
+#       external: true
+#       name: kirameku-edge
+#   services:
+#     caddy:
+#       networks: [kirameku, ...]
+#
+#   # in that project's Caddyfile
+#   boke.example.com {
+#       encode zstd gzip
+#       request_body { max_size 12MB }
+#       reverse_proxy kirameku-app:3000
+#   }
+#
+# Two alternatives, both opt-in:
+#   * No proxy of your own — let this stack run Caddy:
+#       docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#   * Host-level proxy (systemd Caddy/Nginx on the host itself):
+#       docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
 #
 # SQLite, uploads and backups live in the `kirameku-data` volume and survive
 # image upgrades.
 #
 # Building locally instead of pulling:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
-#
-# Keeping an existing host-level Caddy/Nginx instead of the bundled one:
-#   docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
 name: kirameku
 
 services:
@@ -30,6 +55,13 @@ services:
     stop_grace_period: 30s
     expose:
       - "3000"
+    networks:
+      edge:
+        # Stable DNS name for proxies on the shared network. The compose service
+        # name ("app") is too generic and can collide with other projects that
+        # join the same network.
+        aliases:
+          - kirameku-app
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -54,33 +86,13 @@ services:
       VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-90}
     volumes:
       - kirameku-data:/data
-    networks:
-      - edge
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      # Required: the public hostname Caddy should obtain a certificate for.
-      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is required; set it to your public hostname}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    networks:
-      - edge
 
 volumes:
   kirameku-data:
-  caddy-data:
-  caddy-config:
 
 networks:
   edge:
+    # Created once with `docker network create kirameku-edge`. Owned by no
+    # project so `docker compose down` never pulls it out from under the proxy.
+    external: true
+    name: ${SHARED_NETWORK:-kirameku-edge}

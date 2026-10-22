@@ -1,7 +1,10 @@
-# Override for deployments that already run Caddy (or Nginx) on the host.
+# Override for a proxy that runs directly on the host (systemd Caddy, Nginx,
+# or a host-networked container).
 #
-# The bundled `caddy` service is simply not started; only `app` is brought up
-# and published on loopback so the host proxy can reach it:
+# Publishing the port is what a *host* proxy needs: it connects to
+# 127.0.0.1:3000. A proxy running as a container in another compose project
+# cannot do that — it must join the `kirameku-edge` network and use
+# `reverse_proxy kirameku-app:3000` instead (the default setup, no override).
 #
 #   docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
 #
@@ -10,8 +13,6 @@
 #   boke.example.com {
 #       encode zstd gzip
 #       request_body { max_size 12MB }
-#       @immutable path /_next/static/*
-#       header @immutable Cache-Control "public, max-age=31536000, immutable"
 #       reverse_proxy 127.0.0.1:3000
 #   }
 services:

@@ -18,6 +18,8 @@
 #   SERVICES               services to recreate (default: all services)
 #   APP_SERVICE            service to health-check (default: app)
 #   HEALTH_TIMEOUT         seconds to wait for `healthy` (default: 180)
+#   SHARED_NETWORK         external docker network the app joins so your proxy
+#                          can reach it (default: kirameku-edge)
 #   BACKUP_BEFORE_DEPLOY   1 = `pnpm db:backup --prune` before recreating (default: 1)
 #   PRUNE_IMAGES           1 = drop dangling images after a successful deploy (default: 1)
 #   PULL_GIT               1 = `git pull --ff-only` before deploying (default: 0)
@@ -41,6 +43,22 @@ done
 if [ "${PULL_GIT:-0}" = "1" ] && [ -d .git ]; then
   log "updating working tree"
   git pull --ff-only
+fi
+
+# --- shared proxy network ----------------------------------------------------
+# docker-compose.yml attaches the app to an *external* network so an existing
+# proxy — typically a Caddy container in another compose project — can reach it
+# as kirameku-app:3000. An external network must exist before `compose up`, and
+# creating it is idempotent, so do it here rather than making it a manual step.
+if [ -z "${SHARED_NETWORK:-}" ] && [ -f .env ]; then
+  # Read it from .env so the network created here is the one compose will join.
+  SHARED_NETWORK="$(sed -n 's/^SHARED_NETWORK=//p' .env | tail -n1 | tr -d '\r' | sed -e "s/^[\"' ]*//" -e "s/[\"' ]*$//")"
+fi
+SHARED_NETWORK="${SHARED_NETWORK:-kirameku-edge}"
+export SHARED_NETWORK
+if ! docker network inspect "$SHARED_NETWORK" >/dev/null 2>&1; then
+  log "creating docker network $SHARED_NETWORK"
+  docker network create "$SHARED_NETWORK" >/dev/null
 fi
 
 compose() {

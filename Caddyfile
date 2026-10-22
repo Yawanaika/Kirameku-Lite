@@ -1,6 +1,13 @@
-# Lets Caddy obtain and renew certificates for SITE_DOMAIN automatically.
+# Caddyfile for the *bundled* Caddy, used only when this stack runs its own
+# proxy:
 #
-# The container is started by docker-compose.yml with SITE_DOMAIN from .env.
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+#
+# If a Caddy already runs elsewhere (the common case), this file is unused —
+# that proxy joins the `kirameku-edge` network and proxies to
+# `kirameku-app:3000` from its own config. See DEPLOY_NOTES.md section 3.
+#
+# Lets Caddy obtain and renew certificates for SITE_DOMAIN automatically.
 # Certificates and ACME account material are stored in the `caddy-data` volume,
 # so they survive container re-creation.
 
@@ -23,5 +30,5 @@
 	# own Cache-Control for HTML and /uploads/*. Setting the header again in
 	# Caddy would emit a duplicate Cache-Control on every asset.
 
-	reverse_proxy app:3000
+	reverse_proxy kirameku-app:3000
 }

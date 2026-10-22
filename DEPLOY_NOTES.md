@@ -2,7 +2,7 @@
 
 > **2026-10-22 架构现状**
 >
-> 旧版 `Kirameku-backend/`（FastAPI + Vue 管理后台 + PostgreSQL）及 PostgreSQL → SQLite 一次性迁移脚本已经删除。当前生产只有一个 Node.js 进程、一个 SQLite 文件和一个 Caddy 入口。
+> 旧版 `Kirameku-backend/`（FastAPI + Vue 管理后台 + PostgreSQL）及 PostgreSQL → SQLite 一次性迁移脚本已经删除。当前生产只有一个 Node.js 进程和一个 SQLite 文件；入口 Caddy 跑在独立的 compose 项目里，通过共享 Docker 网络接入本项目。
 >
 > 镜像由 GitHub Actions 构建并推送到 GHCR，服务器上只做 `docker compose pull` + `up -d`，不编译任何代码。
 
@@ -10,8 +10,9 @@
 
 ```text
 浏览器
-  └── Caddy（HTTPS 自动证书、上传大小限制）        ← docker compose 服务，或宿主机 Caddy
-        └── Next.js 16 容器（Node 22，内部 3000）   ← 从 GHCR 拉取的镜像
+  └── Caddy                       ← 你自己的 compose 项目
+        │                           通过 kirameku-edge 网络反代 kirameku-app:3000
+        └── Next.js 16 容器       ← 从 GHCR 拉取的镜像，本项目，不发布宿主机端口
               ├── 前台页面 / RSC / RSS / sitemap
               ├── /admin 后台页面
               ├── /api/* Route Handlers
@@ -27,6 +28,7 @@ push to main
         ├── verify：typecheck → test → db:migrate → build
         ├── image ：buildx 构建 linux/amd64 + linux/arm64 → 推送 ghcr.io/<owner>/kirameku
         └── deploy：SSH 到服务器 → scripts/deploy-server.sh
+              ├── 确保共享网络 kirameku-edge 存在
               ├── 备份 SQLite（pnpm db:backup --prune）
               ├── docker compose pull
               ├── docker compose up -d
@@ -40,27 +42,28 @@ push to main
 - **图片目录要持久化。** 未配置 OSS 时，上传文件写入 `UPLOAD_DIR`（容器内 `/data/uploads`）；容器重建不能把它清掉。
 - **不要再加 `/api` 反代。** `next.config.mjs` 没有 rewrites，未命中的 `/api/*`、`/uploads/*` 会直接 404；缺少接口时应该补 Route Handler，而不是转发到旧服务。
 - **服务器不构建镜像。** 生产机上不要跑 `docker build`，镜像一律来自 CI（本地开发需要时用 `docker-compose.build.yml`）。
+- **本项目不发布宿主机端口。** 应用只在共享 Docker 网络上以 `kirameku-app:3000` 出现，由你自己的反代接入；见第 3 节。
 
 ## 2. 服务器一次性初始化
 
-要求：Docker Engine 24+ 与 Compose v2（`docker compose version` 可用），80/443 端口可从公网访问。
+要求：Docker Engine 24+ 与 Compose v2（`docker compose version` 可用），80/443 端口已经由你的反代占用（不需要再给本项目开）。
 
 ```bash
 sudo mkdir -p /srv/kirameku
 sudo chown "$USER":"$USER" /srv/kirameku
 cd /srv/kirameku
 
-# compose 文件、Caddyfile 与部署脚本都来自仓库
+# compose 文件与部署脚本都来自仓库
 git clone https://github.com/<owner>/Kirameku-HomePage.git .
 # 或只同步需要的文件：
-#   docker-compose.yml、Caddyfile、compose.env.example、scripts/deploy-server.sh
+#   docker-compose.yml、compose.env.example、scripts/deploy-server.sh
+#   （只有让本项目自带 Caddy 时才需要 Caddyfile 与 docker-compose.caddy.yml）
 
 cp compose.env.example .env
 # 必填：
-#   SITE_DOMAIN=boke.hiromu.top
 #   AUTH_SECRET=$(openssl rand -base64 48)
 #   FRONTEND_ORIGIN=https://boke.hiromu.top
-# 按需：CRON_SECRET / GITHUB_* / OSS_*
+# 按需：SHARED_NETWORK / CRON_SECRET / GITHUB_* / OSS_*
 
 docker compose pull
 docker compose up -d
@@ -70,15 +73,14 @@ docker compose exec app \
   env ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的密码' \
   pnpm db:seed-admin
 
+# 从反代那一侧验证（走你 Caddy 的公网域名）
 curl -fsS https://boke.hiromu.top/api/health
 ```
 
-防火墙只放行 SSH、80、443：
+不需要为本项目放行 80/443——端口由你已有的反代持有。`scripts/deploy-server.sh` 会自动创建共享网络（见第 3 节），手工首次启动前也可以先建：
 
 ```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow 443/udp   # HTTP/3，可选
+docker network create kirameku-edge
 ```
 
 访问 GHCR 有两种情况：
@@ -86,32 +88,81 @@ sudo ufw allow 443/udp   # HTTP/3，可选
 - **公开包**（推荐）：在 GitHub 仓库的 Packages 页面把 `kirameku` 包设为 public，服务器无需登录即可 `docker compose pull`。
 - **私有包**：GitHub Actions 的 deploy job 会用当次 workflow 的 `GITHUB_TOKEN` 临时 `docker login`（凭据写在临时 `DOCKER_CONFIG` 里，不会留在服务器上）。若希望服务器上也能手工拉取，先执行一次 `docker login ghcr.io -u <你的用户名>`（用带 `read:packages` 的 PAT）。
 
-## 3. Caddy
+## 3. 反向代理
 
-默认由 `docker-compose.yml` 自带一个 `caddy` 服务，配置在仓库根目录 `Caddyfile`：
+### 3.1 你的 Caddy 已经跑在另一个 compose 项目里（默认情况）
+
+容器里的 Caddy **访问不到宿主机的 `127.0.0.1`**，所以两边通过一个外部 Docker 网络对接：
+
+- 本项目 `docker-compose.yml` 把 `app` 接到外部网络 `${SHARED_NETWORK:-kirameku-edge}`，并给它一个固定别名 `kirameku-app`；
+- 你的 Caddy 容器也加入这个网络，`reverse_proxy` 直接写容器名。
+
+本项目侧不需要任何额外开关，`docker-compose.yml` 默认就是这个形态。网络由部署脚本保证存在，它不属于任何 compose 项目，所以 `docker compose down` 不会把它删掉、不会把 Caddy 的后端抽走。
+
+在 Caddy 项目的 `docker-compose.yml` 里加：
+
+```yaml
+services:
+  caddy:
+    networks:
+      - default
+      - kirameku
+
+networks:
+  kirameku:
+    external: true
+    name: kirameku-edge
+```
+
+在 Caddy 项目的 `Caddyfile` 里：
 
 ```caddyfile
-{$SITE_DOMAIN} {
+boke.hiromu.top {
 	encode zstd gzip
 	request_body {
 		max_size 12MB
 	}
-	@immutable path /_next/static/*
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
-	reverse_proxy app:3000
+	reverse_proxy kirameku-app:3000
 }
 ```
 
 要点：
 
-- 证书自动申请与续期，ACME 账号与证书存在 `caddy-data` 命名卷里，容器重建不会重新申请。
-- `reverse_proxy` 会自动带上 `X-Forwarded-For` / `X-Forwarded-Proto` / `X-Forwarded-Host`，应用的 `server/http/ip.ts` 与同源校验依赖这些头。
-- 只对 `/_next/static/*` 长缓存；HTML 与 API 保留应用自己发的 `Cache-Control`，避免发布后引用旧 chunk。
-- 想接收证书到期提醒，取消 `Caddyfile` 顶部的 `email` 段注释并在 `.env` 里设 `ACME_EMAIL`。
+- 写 `kirameku-app:3000` 而不是 `app:3000`。`app` 是过于通用的服务名，同一个网络里若有别的项目也这么叫会串。
+- **不要**改成 `127.0.0.1:3000`。在容器里那指向 Caddy 自己。
+- 证书与 ACME 账号属于你那个 Caddy 项目，本项目完全不碰。
+- `reverse_proxy` 会自动带 `X-Forwarded-For` / `X-Forwarded-Proto` / `X-Forwarded-Host`，应用的 `server/http/ip.ts` 与同源校验依赖这些头。
+- 不需要在这层加 `Cache-Control`：Next.js 自己已对 `/_next/static/*` 发 `immutable`、对 HTML 发 `s-maxage=60`，Caddy 再设一遍会叠加出两条同名头。
+- 如果 Caddy 项目也需要重启（例如加了网络），先起 app 再起 Caddy，或者接受 Caddy 启动瞬间 502。
 
-### 3.1 已经有宿主机 Caddy
+验收：
 
-如果宿主机上已经跑着 Caddy（或切回 Nginx），不要启动 compose 里的 `caddy` 服务，只起 `app` 并让它在 loopback 暴露端口：
+```bash
+docker network inspect kirameku-edge --format '{{range .Containers}}{{.Name}} {{end}}'
+# kirameku-app-1 proxyproject-caddy-1
+curl -fsS https://boke.hiromu.top/api/health
+```
+
+### 3.2 让本项目自带 Caddy
+
+服务器上没有别的反代时，用 overlay 把 Caddy 加进来（它需要独占 80/443）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+```
+
+`.env` 里要设 `SITE_DOMAIN`。配置在仓库根目录 `Caddyfile`，内容是上文那段 `reverse_proxy kirameku-app:3000`。证书与 ACME 账号存在 `caddy-data` 命名卷里，容器重建不会重新申请。
+
+用这种模式时，自动发布的仓库变量要跟着改：
+
+| 变量 | 值 |
+|:--|:--|
+| `DEPLOY_COMPOSE_FILE` | `docker-compose.yml docker-compose.caddy.yml` |
+| `DEPLOY_SERVICES` | 空（全部，包含 caddy） |
+
+### 3.3 反代装在宿主机上（不是容器）
+
+只有这种模式才需要把端口发布到 loopback：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
@@ -125,8 +176,6 @@ boke.hiromu.top {
 	request_body {
 		max_size 12MB
 	}
-	@immutable path /_next/static/*
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
 	reverse_proxy 127.0.0.1:3000
 }
 ```
@@ -148,11 +197,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-    }
-
-    location /_next/static/ {
-        proxy_pass http://127.0.0.1:3000;
-        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 }
 ```
@@ -192,9 +236,11 @@ Variables（同一页面的 Variables 标签）：
 | 名称 | 默认 | 说明 |
 |:--|:--|:--|
 | `DEPLOY_PATH` | `/srv/kirameku` | 服务器上的 compose 项目目录 |
-| `DEPLOY_COMPOSE_FILE` | `docker-compose.yml` | 多文件用空格分隔 |
+| `DEPLOY_COMPOSE_FILE` | `docker-compose.yml` | 多文件用空格分隔；反代模式见第 3 节 |
 | `DEPLOY_SERVICES` | 空（全部） | 走宿主机反代时填 `app` |
 | `DEPLOY_ENABLED` | 空 | 设为 `false` 只构建镜像、不部署 |
+
+共享网络名取自服务器 `.env` 里的 `SHARED_NETWORK`（默认 `kirameku-edge`），不需要设成仓库变量。
 
 生成部署密钥：
 
@@ -219,11 +265,12 @@ IMAGE_REF=ghcr.io/<owner>/kirameku:latest bash scripts/deploy-server.sh
 执行顺序：
 
 1. 校验 `.env` 与 compose 文件存在。
-2. 记录当前容器的镜像 ID（用于回滚）。
-3. `docker compose exec app pnpm db:backup --prune` 备份 SQLite（`BACKUP_BEFORE_DEPLOY=0` 可跳过）。
-4. `docker compose pull` → `docker compose up -d`。容器 entrypoint 会先跑 `pnpm db:migrate`。
-5. 轮询 `docker inspect` 的 healthcheck 状态（默认 180 秒）。
-6. 健康就结束并清理悬空镜像；不健康则打印日志，用上一个镜像 ID 重新 `up -d`，再检查一次健康。
+2. 确保共享网络（`SHARED_NETWORK`，默认 `kirameku-edge`）存在，不存在就创建。
+3. 记录当前容器的镜像 ID（用于回滚）。
+4. `docker compose exec app pnpm db:backup --prune` 备份 SQLite（`BACKUP_BEFORE_DEPLOY=0` 可跳过）。
+5. `docker compose pull` → `docker compose up -d`。容器 entrypoint 会先跑 `pnpm db:migrate`。
+6. 轮询 `docker inspect` 的 healthcheck 状态（默认 180 秒）。
+7. 健康就结束并清理悬空镜像；不健康则打印日志，用上一个镜像 ID `up -d --pull never --force-recreate`，再检查一次健康，最终仍以非 0 退出。
 
 ## 5. 日常发布与回滚
 
@@ -288,8 +335,9 @@ sudo chown -R 1000:1000 data
 
 | 变量 | 说明 |
 |:---|:---|
-| `SITE_DOMAIN` | 对外域名，Caddy 用它申请证书并建站点 |
 | `DATABASE_PATH` | SQLite 文件路径；容器内固定 `/data/db/kirameku.db` |
+| `SHARED_NETWORK` | 与反代共享的 Docker 网络，默认 `kirameku-edge`；部署脚本会自动创建 |
+| `SITE_DOMAIN` | 仅本项目自带 Caddy 时需要：Caddy 用它申请证书并建站点 |
 | `AUTH_SECRET` | 管理员 JWT 签名密钥，≥32 字符 |
 | `SITE_READ_ONLY` | `1` 时拒绝公开写接口，适合迁移/维护窗口 |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth 登录（访客评论/点赞） |
@@ -328,7 +376,7 @@ pnpm build
 DATABASE_PATH=/data/kirameku.db pnpm start
 ```
 
-此时 Caddy 需要用第 3.1 节的宿主机配置反代到 `127.0.0.1:3000`。检查：
+此时反代直接在本机，用第 3.3 节的宿主机配置反代到 `127.0.0.1:3000`（容器模式下要改用第 3.1 节的共享网络）。检查：
 
 ```bash
 curl -s http://127.0.0.1:3000/api/health
@@ -374,9 +422,34 @@ curl -s http://127.0.0.1:3000/api/health
 - 如果用反代 `alias` 直出，确认路径和 `UPLOAD_DIR` 一致。
 - 检查文件是否被部署脚本清掉；上传目录不能放在临时构建目录里。
 
+### Caddy 报 `dial tcp: lookup kirameku-app ... no such host` 或一直 502
+
+反代容器和应用不在同一个 Docker 网络里。逐层查：
+
+```bash
+# 1. 网络存在吗
+docker network ls | grep kirameku-edge
+
+# 2. 两边都在这个网络里吗（应同时出现 kirameku-app-1 和你的 caddy 容器）
+docker network inspect kirameku-edge --format '{{range .Containers}}{{.Name}} {{end}}'
+
+# 3. 应用在这个网络上用这个别名能解析吗
+docker compose -f <caddy项目的compose> exec caddy getent hosts kirameku-app
+
+# 4. 应用自己健康吗
+docker compose exec app wget -qO- http://127.0.0.1:3000/api/health
+```
+
+常见原因：
+
+- Caddy 项目的 compose 里加了 `networks:` 但没把 caddy 服务列进去，或忘了写 `external: true` / `name: kirameku-edge`（只写 key 名会变成 `<项目名>_kirameku-edge`，对不上）。
+- 应用侧 `SHARED_NETWORK` 和 Caddy 侧 `name:` 不一致。两边都用同一个值最省事。
+- 应用刚重建时，Caddy 需要重新解析后端 IP。Caddy v2 会对 `reverse_proxy` 的上游做动态解析，实测重新部署后**不需要**重启 Caddy 就能恢复 200；如果恰好撞上重连窗口，可能短暂 502，等几秒即可。
+- 本机 Docker Desktop / OrbStack 上如果两边的 daemon 不是同一个，网络天然不通——多机部署要用真实共享网络或改回 `127.0.0.1` 发布端口。
+
 ### 改了 Caddyfile 但不生效
 
-`docker-compose.yml` 把 `Caddyfile` 以**单文件** bind mount 方式挂进容器。这类挂载绑定的是 inode：如果你在宿主机上编辑保存时编辑器换了新文件（大多数编辑器保存时都是写临时文件再 rename），容器里那个路径就会指向一个已经不存在的 inode，表现为：
+`docker-compose.caddy.yml` 把 `Caddyfile` 以**单文件** bind mount 方式挂进容器（只在本项目自带 Caddy 时相关）。这类挂载绑定的是 inode：如果你在宿主机上编辑保存时编辑器换了新文件（大多数编辑器保存时都是写临时文件再 rename），容器里那个路径就会指向一个已经不存在的 inode，表现为：
 
 ```console
 $ docker compose exec caddy ls -la /etc/caddy
@@ -393,6 +466,8 @@ docker compose up -d --force-recreate caddy
 
 容器重建后文件就回来了，然后可以正常 `caddy reload`。**注意 `docker compose up -d` 不会因为文件内容变化而重建 caddy**，所以每次修改 `Caddyfile`（或从 git 拉到一个新版本）都要显式 `--force-recreate caddy`。
 
+条目名容易误导：这个坑只在 Caddy 跑在本项目里时存在。如果你的 Caddy 在独立项目里（第 3.1 节），改的是那个项目的 Caddyfile，`--force-recreate caddy` 也要在那边执行。
+
 ### 后台登录失败
 
 - `AUTH_SECRET` 是否 ≥32 字符，且发布前后保持一致；修改会让现有管理员会话失效。
@@ -408,5 +483,6 @@ docker compose up -d --force-recreate caddy
 - 移除 `postgres` devDependency 和 `migrate:audit` / `migrate:pg2sqlite` 脚本。
 - 移除文档和注释中的旧后端部署指引；`README.md`、`AGENTS.md`、`server/db/README.md` 以当前单进程架构为准。
 - 入口反代由 Nginx 切换为 Caddy；镜像改为 CI 构建 + GHCR 分发，服务器只拉取镜像。
+- 反代改为独立 compose 项目持有：本项目不再发布宿主机端口，应用通过外部网络 `kirameku-edge` 以 `kirameku-app:3000` 暴露给现有 Caddy；本项目自带 Caddy 改为 opt-in（`docker-compose.caddy.yml`）。
 
 Git 历史仍保留旧代码和迁移脚本；如果未来需要查阅，只能从历史提交恢复，不要在生产重新引入第二套运行时。

@@ -32,11 +32,13 @@
 ## 架构
 
 ```
-Browser → Caddy (443) → Next.js 16 (Node 22, :3000)
-                              ├── app/(site)/**     前台页面（RSC + 客户端岛屿）
-                              ├── app/(admin)/**    管理后台（/:3000/admin）
-                              ├── app/api/**        Route Handlers
-                              └── server/**         领域服务 + Drizzle + SQLite
+Browser
+  └── Caddy (443)                    独立 compose 项目，用 kirameku-edge 网络反代
+        └── kirameku-app:3000        Next.js 16 (Node 22)，本项目容器
+              ├── app/(site)/**      前台页面（RSC + 客户端岛屿）
+              ├── app/(admin)/**     管理后台（/admin）
+              ├── app/api/**         Route Handlers
+              └── server/**          领域服务 + Drizzle + SQLite
 ```
 
 - **一个部署单元**：前台、API、后台在同一个 Next.js 进程内，没有 `/api` 反向代理。
@@ -122,10 +124,11 @@ DATABASE_PATH=/data/kirameku.db pnpm start
 
 ### Docker Compose + 自动发布
 
-镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 自带 Caddy 服务，自动申请 HTTPS 证书；SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
+镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 只起应用：不发布宿主机端口，而是接入外部网络 `kirameku-edge`，以 `kirameku-app:3000` 暴露给已有的反代。SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
 
 ```bash
-cp compose.env.example .env      # 至少填写 SITE_DOMAIN 和 AUTH_SECRET
+docker network create kirameku-edge   # 一次性；部署脚本也会自动建
+cp compose.env.example .env      # 至少填写 AUTH_SECRET 和 FRONTEND_ORIGIN
 docker compose pull
 docker compose up -d
 docker compose exec app \
@@ -135,7 +138,11 @@ docker compose exec app \
 
 推送 `main` 后自动发布：`verify → 构建多架构镜像推送 GHCR → SSH 到服务器执行 scripts/deploy-server.sh`（备份数据库 → 拉镜像 → 重启 → 健康检查，不健康自动回滚）。
 
-- 想沿用宿主机已有的 Caddy/Nginx：`docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app`
+反代怎么接：
+
+- Caddy 在另一个 compose 项目里（常见）：让它加入 `kirameku-edge` 网络并 `reverse_proxy kirameku-app:3000`，本项目无需任何改动。
+- 本项目自带 Caddy（服务器上没有别的反代）：`docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d`
+- 反代装在宿主机上（systemd Caddy / Nginx）：`docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app`
 - 想在本机构建而不是拉镜像：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
 
 完整的服务器初始化、仓库 Secrets/Variables 配置和回滚步骤见 [DEPLOY_NOTES.md](./DEPLOY_NOTES.md#2-服务器一次性初始化)。

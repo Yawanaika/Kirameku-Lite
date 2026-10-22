@@ -134,3 +134,36 @@ docker compose --env-file .tmp/compose-test.env -f docker-compose.yml -f docker-
 - **没有真实 SSH 跳板**：`release.yml` 的 deploy job 用 `ssh -o BatchMode=yes` 执行，本机只验证了脚本本体；SSH 私钥、`known_hosts`、`DEPLOY_*` Secrets 需在仓库里配好后实跑一次。
 - **没有真实域名与 Let's Encrypt**：证书用的是 Caddy 内部 CA。首次真实签发依赖 80/443 可从公网访问且域名已解析。
 - 多架构 `--push` 受本机 driver 限制未验证（见 §6）。
+
+## 11. 反代形态修正：共享 Docker 网络（2026-10-22 追加）
+
+前一轮把反代设计成「本项目自带 caddy 服务，`expose: 3000` 后由它 `reverse_proxy app:3000`」。用户随后说明**生产上的 Caddy 已经跑在另一个 compose 项目里**——这种形态上线会直接 502，因为容器内的 Caddy 无法访问宿主机的 `127.0.0.1`，也看不到另一个 compose 项目的服务名。
+
+改为：本项目不发布任何宿主机端口，`app` 接入外部网络 `kirameku-edge`，并固定别名 `kirameku-app`；既有 Caddy 反代 `kirameku-app:3000`。自带 Caddy 降级为 opt-in 的 `docker-compose.caddy.yml`。
+
+用两个独立的模拟 compose 项目（`e2e/app` 跑本仓库的 `docker-compose.yml`，`e2e/proxy` 跑一个只含 caddy 的项目）完整验证：
+
+| 验证项 | 结果 |
+|:--|:--|
+| 网络不存在时跑部署脚本 | `[deploy] creating docker network kirameku-edge`，随后 healthy、`exit 0` |
+| 跨项目 DNS 解析 | Caddy 容器内 `kirameku-app` 可解析，反代 `GET /` → 200 |
+| 应用是否发布宿主机端口 | `docker port kirameku-app-1` 为空 |
+| 网络成员 | `e2eproxy-caddy-1 kirameku-app-1` |
+| 升级镜像后反代 | v1 → v2 部署后仍 200 |
+| 应用重建后 Caddy 是否需要重启 | **不需要**，重新部署后直接 200（Caddy v2 动态解析上游） |
+| `docker compose down` 应用项目 | 网络存活（成员只剩 Caddy），反代变 502 |
+| 重新部署 | 自动回到 200 |
+| 网络被删后重启 Caddy 项目 | 报网络不存在；先跑部署脚本重建网络，再起 Caddy 恢复 200 |
+| `-f docker-compose.caddy.yml` 组合 | 仍能起栈，`https://localhost/` 200、`http://localhost/` 308 |
+
+其它配套修正：
+
+- `compose.env.example` 用 `SHARED_NETWORK=kirameku-edge` 取代原来的必需项 `SITE_DOMAIN`（后者只在自带 Caddy 时必需），`docker-compose.caddy.yml` 里用 `${SITE_DOMAIN:?...}` 显式报错。
+- `scripts/deploy-server.sh` 增加「网络不存在则创建」，并支持从 `.env` 读 `SHARED_NETWORK`。
+- `verify.yml` 的 Compose 校验从 1 种组合扩到 4 种（base / caddy / host-proxy / build）。
+- 别名用 `kirameku-app` 而非服务名 `app`：`app` 太通用，同网络下其它项目重名会串。
+
+### 仍未覆盖
+
+- 真实的多项目网络环境（本机是同一个 daemon；跨主机部署不适用此方案，那种情况需要发布端口或使用 overlay 网络）。
+- 用户既有的 Caddy 项目尚未实际改配置，`reverse_proxy kirameku-app:3000` 这条只有模拟验证。

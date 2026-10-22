@@ -58,8 +58,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Every supported combination must render. The base file is the default
+      # (app on the shared kirameku-edge network, no published port); the two
+      # overlays switch to a bundled Caddy or a host-level proxy.
       - name: Validate Compose config
         env:
           AUTH_SECRET: ci-only-secret-0123456789abcdef0123456789abcdef
           SITE_DOMAIN: example.test
-        run: docker compose config -q
+        run: |
+          set -euo pipefail
+          docker compose config -q
+          docker compose -f docker-compose.yml -f docker-compose.caddy.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.build.yml config -q
