@@ -9,12 +9,12 @@ import {
   createComment,
   likeComment,
   type CommentItem,
-} from "@/app/api/comments";
+} from "@/lib/api/comments";
 import {
   getGithubUser,
   logoutGithubUser,
-} from "@/app/api/github-auth";
-import type { GitHubUser } from "@/app/api/types";
+} from "@/lib/api/github-auth";
+import type { GitHubUser } from "@/lib/api/types";
 
 function GithubIcon({ className }: { className?: string }) {
   return (

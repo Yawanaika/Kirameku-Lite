@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { MessageSquare, Heart } from "lucide-react";
-import { getChatters } from "@/app/api";
-import type { ChatterItem } from "@/app/api";
+import { getChatters } from "@/lib/api";
+import type { ChatterItem } from "@/lib/api";
 
 function ChatterImage({ src }: { src: string }) {
   const [isLandscape, setIsLandscape] = useState(true);

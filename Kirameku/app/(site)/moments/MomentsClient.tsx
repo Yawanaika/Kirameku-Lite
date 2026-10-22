@@ -12,10 +12,10 @@ import {
   getChatterComments, createChatterComment, likeChatter,
   likeChatterComment,
   type ChatterCommentItem,
-} from "@/app/api";
-import type { ChatterItem } from "@/app/api/chatters";
-import { getGithubUser, logoutGithubUser } from "@/app/api/github-auth";
-import type { GitHubUser } from "@/app/api/types";
+} from "@/lib/api";
+import type { ChatterItem } from "@/lib/api/chatters";
+import { getGithubUser, logoutGithubUser } from "@/lib/api/github-auth";
+import type { GitHubUser } from "@/lib/api/types";
 import { siteConfig } from "@/siteConfig";
 
 interface Moment {

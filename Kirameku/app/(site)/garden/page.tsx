@@ -14,10 +14,10 @@ import {
 import { siteConfig } from "@/siteConfig";
 import { postsData } from "@/data/posts";
 import { chattersData } from "@/data/chatters";
-import { getPosts, getPostsCount, type PostItem } from "@/app/api/posts";
-import { getChatters, getChattersCount, type ChatterItem } from "@/app/api/chatters";
-import { getMessages } from "@/app/api/messages";
-import { getAlbums } from "@/app/api/albums";
+import { getPosts, getPostsCount, type PostItem } from "@/lib/api/posts";
+import { getChatters, getChattersCount, type ChatterItem } from "@/lib/api/chatters";
+import { getMessages } from "@/lib/api/messages";
+import { getAlbums } from "@/lib/api/albums";
 
 /* ── helpers ── */
 function getDaysSince(dateStr: string) {

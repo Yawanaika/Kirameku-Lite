@@ -3,11 +3,13 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, Eye, Heart, X } from "lucide-react";
-import { likePost, reportPostView, type PostDetail } from "@/app/api";
+import { likePost, reportPostView, type PostDetail } from "@/lib/api";
 import ReadingProgress from "@/components/ui/ReadingProgress";
-import PostComments from "@/components/posts/PostComments";
+
+const PostComments = dynamic(() => import("@/components/posts/PostComments"), { ssr: false });
 
 export default function PostDetailClient({
   initialPost,
@@ -119,7 +121,7 @@ export default function PostDetailClient({
 
       {/* 文章卡片 */}
       <motion.article
-        initial={{ opacity: 0, y: 30 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="rounded-3xl shadow-2xl overflow-hidden bg-white/60 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/30 dark:border-white/10"

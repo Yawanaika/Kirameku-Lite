@@ -17,7 +17,8 @@
     "db:backup": "tsx scripts/backup-db.ts",
     "db:restore": "tsx scripts/restore-db.ts",
     "db:prune-visitors": "tsx scripts/prune-visitors.ts",
-    "db:reconcile-counts": "tsx scripts/reconcile-counts.ts"
+    "db:reconcile-counts": "tsx scripts/reconcile-counts.ts",
+    "perf:baseline": "tsx scripts/perf-baseline.ts"
   },
   "engines": {
     "node": ">=22.0.0 <25"

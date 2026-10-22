@@ -17,6 +17,7 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
       AUTH_SECRET: "test-secret-0123456789abcdef0123456789abcdef",
+      CRON_SECRET: "test-cron-secret-0123456789abcdef",
     },
   },
 });

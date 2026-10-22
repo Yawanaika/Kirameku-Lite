@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAlbums, getAlbumPhotos } from "@/app/api";
+import { getAlbums, getAlbumPhotos } from "@/lib/api";
 
 interface Photo {
   id: number;

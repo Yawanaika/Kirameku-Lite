@@ -70,7 +70,7 @@ export default function PostCard({ post, index }: PostCardProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 40 }}
+      initial={index < 3 ? false : { opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.08, ease: "easeOut" }}
     >
@@ -98,6 +98,7 @@ export default function PostCard({ post, index }: PostCardProps) {
                 src={post.cover || "/images/default-cover.jpg"}
                 alt={post.title}
                 fill
+                priority={index < 3}
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />

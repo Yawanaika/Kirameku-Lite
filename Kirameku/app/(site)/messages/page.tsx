@@ -30,12 +30,12 @@ import {
   createMessage,
   likeMessage,
   type MessageItem,
-} from "@/app/api/messages";
+} from "@/lib/api/messages";
 import {
   getGithubUser,
   logoutGithubUser,
-} from "@/app/api/github-auth";
-import type { GitHubUser } from "@/app/api/types";
+} from "@/lib/api/github-auth";
+import type { GitHubUser } from "@/lib/api/types";
 
 // 递归展平嵌套回复，附带"回复谁"信息
 function flattenReplies(

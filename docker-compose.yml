@@ -28,6 +28,7 @@ services:
       BACKUP_DIR: /data/backups
       # Required: generate with `openssl rand -base64 48` (>= 32 chars).
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required; copy compose.env.example to .env and fill it in}
+      CRON_SECRET: ${CRON_SECRET:-}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       SITE_READ_ONLY: ${SITE_READ_ONLY:-0}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import SearchBar from "@/components/ui/SearchBar";
 import ProfileCard from "@/components/home/ProfileCard";
 import FadeIn from "@/components/ui/FadeIn";
+import LazyMount from "@/components/ui/LazyMount";
 
 const CloudPlayer = dynamic(() => import("@/components/music/CloudPlayer"), { ssr: false });
 const LyricBar = dynamic(() => import("@/components/music/LyricBar"), { ssr: false });
@@ -33,7 +34,7 @@ export default function HomeClient({
 
       <main className="flex flex-col gap-4 md:gap-6 w-full">
         {/* 第一行：个人信息 + 播放器 */}
-        <FadeIn delay={0.1}>
+        <FadeIn delay={0.1} immediate>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 w-full items-stretch">
             <div className="md:col-span-8 flex w-full">
               <ProfileCard
@@ -51,7 +52,9 @@ export default function HomeClient({
         {/* 歌词栏 */}
         <FadeIn delay={0.15}>
           <div className="w-full">
-            <LyricBar />
+            <LazyMount minHeight={48}>
+              <LyricBar />
+            </LazyMount>
           </div>
         </FadeIn>
 
@@ -59,16 +62,24 @@ export default function HomeClient({
         <FadeIn delay={0.2}>
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 w-full items-stretch">
             <div className="md:col-span-4 h-full">
-              <PhotoWallPreview />
+              <LazyMount className="h-full" minHeight={320}>
+                <PhotoWallPreview />
+              </LazyMount>
             </div>
             <div className="md:col-span-8 flex flex-col gap-4 md:gap-6 h-full">
-              <LatestPostsCarousel />
+              <LazyMount minHeight={240}>
+                <LatestPostsCarousel />
+              </LazyMount>
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 flex-1 md:min-h-[220px] items-stretch">
                 <div className="md:col-span-8 h-full">
-                  <LatestChatterCarousel />
+                  <LazyMount className="h-full" minHeight={220}>
+                    <LatestChatterCarousel />
+                  </LazyMount>
                 </div>
                 <div className="md:col-span-4 h-full flex">
-                  <DogDiary />
+                  <LazyMount className="h-full" minHeight={220}>
+                    <DogDiary />
+                  </LazyMount>
                 </div>
               </div>
             </div>
@@ -78,7 +89,9 @@ export default function HomeClient({
         {/* 底部数据面板 */}
         <FadeIn delay={0.25}>
           <div className="w-full">
-            <SiteDashboard />
+            <LazyMount minHeight={240}>
+              <SiteDashboard />
+            </LazyMount>
           </div>
         </FadeIn>
       </main>

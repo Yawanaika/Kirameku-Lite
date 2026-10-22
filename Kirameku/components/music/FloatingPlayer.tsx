@@ -88,7 +88,11 @@ export default function FloatingPlayer() {
           <div className="flex items-center gap-1.5 h-12 pl-1 pr-1.5 rounded-full bg-white/80 dark:bg-slate-900/90 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-2xl select-none">
             {/* Cover */}
             <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-sm cursor-grab active:cursor-grabbing">
-              <img src={currentSong.cover} alt="" className="w-full h-full object-cover pointer-events-none" draggable={false} />
+              <div
+                aria-hidden="true"
+                className="w-full h-full pointer-events-none bg-cover bg-center"
+                style={{ backgroundImage: `url("${currentSong.cover}")` }}
+              />
             </div>
 
             {/* Info */}
@@ -198,7 +202,11 @@ export default function FloatingPlayer() {
           onClick={() => { if (!didDrag.current) setExpanded(true); }}
           className="w-12 h-12 rounded-full bg-white/50 dark:bg-slate-800/60 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-xl flex items-center justify-center select-none overflow-hidden cursor-pointer hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200"
         >
-          <img src={currentSong.cover} alt="" className="w-full h-full object-cover rounded-full pointer-events-none" draggable={false} />
+          <div
+            aria-hidden="true"
+            className="w-full h-full rounded-full pointer-events-none bg-cover bg-center"
+            style={{ backgroundImage: `url("${currentSong.cover}")` }}
+          />
           {isPlaying && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
               <div className="flex items-end gap-[2px] h-3">

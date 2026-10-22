@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Loader2 } from "lucide-react";
 import PostCard, { type PostOut } from "@/components/posts/PostCard";
-import { getPosts, type CategoryItem } from "@/app/api";
+import { getPosts, type CategoryItem } from "@/lib/api";
 
 const PAGE_SIZE = 12;
 
@@ -80,7 +80,7 @@ export default function PostsClient({
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-12">
       {/* 页头 */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="mb-6 md:mb-10"
@@ -134,7 +134,7 @@ export default function PostsClient({
         <AnimatePresence mode="wait">
           <motion.div
             key={activeCategory ?? "all"}
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}

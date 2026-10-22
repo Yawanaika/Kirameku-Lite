@@ -15,6 +15,7 @@ import SeasonalEffect from "@/components/ui/SeasonalEffect";
 import KiraSparkle from "@/components/ui/KiraSparkle";
 import WelcomeScreen from "@/components/layout/WelcomeScreen";
 import VisitorTracker from "@/components/layout/VisitorTracker";
+import { WELCOME_SESSION_KEY } from "@/lib/welcome";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -27,9 +28,20 @@ export default function SiteLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ThemeProvider>
-      <EffectProvider>
-        <WelcomeScreen />
+    <>
+      {/*
+        阻塞式引导脚本：在首次绘制前确定「欢迎屏是否已看」与「明暗主题」，
+        这样服务端 HTML 不必猜测客户端状态，也就不会产生水合不匹配
+        （主题相关的图标改用 CSS 切换，见 Navbar）。
+      */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `try{var s=sessionStorage.getItem(${JSON.stringify(WELCOME_SESSION_KEY)});if(s){document.documentElement.classList.add("welcome-seen")}else{sessionStorage.setItem(${JSON.stringify(WELCOME_SESSION_KEY)},"1")}}catch(e){}try{var t=localStorage.getItem("theme");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.classList.toggle("dark",t==="dark");document.documentElement.dataset.theme=t;}catch(e){}`,
+        }}
+      />
+      <ThemeProvider>
+        <EffectProvider>
+          {process.env.WELCOME_DISABLED === "1" ? null : <WelcomeScreen />}
         <BackgroundProvider>
           <MusicProvider>
             <ToastProvider>
@@ -51,6 +63,7 @@ export default function SiteLayout({
           </MusicProvider>
         </BackgroundProvider>
       </EffectProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </>
   );
 }

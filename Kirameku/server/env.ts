@@ -25,6 +25,8 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().min(1).default("./data/kirameku.db"),
   SITE_READ_ONLY: flag,
   AUTH_SECRET: z.string().optional(),
+  /** Protects /api/internal/* maintenance endpoints; disabled when unset. */
+  CRON_SECRET: optionalString,
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GITHUB_REDIRECT_URI: optionalUrl,

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { getGithubUser } from "@/app/api/github-auth";
+import { getGithubUser } from "@/lib/api/github-auth";
 
 function safeRedirect(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { BookOpen, Clock, Eye, Heart } from "lucide-react";
-import { getPosts, type PostItem } from "@/app/api";
+import { getPosts, type PostItem } from "@/lib/api";
 
 function relativeDate(dateStr: string | null): string {
   if (!dateStr) return "";

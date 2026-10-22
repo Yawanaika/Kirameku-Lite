@@ -2,11 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "@/components/providers/ThemeProvider";
-
-import SettingsPanel from "@/components/ui/SettingsPanel";
 import {
   Home,
   BookOpen,
@@ -26,6 +25,8 @@ import {
   Bookmark,
 } from "lucide-react";
 
+const SettingsPanel = dynamic(() => import("@/components/ui/SettingsPanel"), { ssr: false });
+
 const navLinks = [
   { href: "/", label: "首页", icon: Home },
   { href: "/posts", label: "文章", icon: BookOpen },
@@ -42,7 +43,7 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { theme, toggleTheme } = useTheme();
+  const { toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -246,13 +247,14 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleTheme}
+                title="切换明暗主题"
+                aria-label="切换明暗主题"
                 className="p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors"
               >
-                {theme === "dark" ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
+                {/* 明暗两个图标都渲染、由 CSS 决定显示哪个：
+                    服务端无需知道客户端主题，避免水合前后图标不一致。 */}
+                <Sun className="hidden dark:block w-5 h-5" />
+                <Moon className="block dark:hidden w-5 h-5" />
               </button>
 
               {/* Settings Button */}

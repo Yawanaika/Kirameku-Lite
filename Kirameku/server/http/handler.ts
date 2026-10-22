@@ -7,6 +7,7 @@ import {
 } from "./audit-context";
 import { AppError } from "./errors";
 import { logError, logRequest } from "./logger";
+import { recordRequest, recordSqliteBusy } from "./metrics";
 
 export interface HandlerOptions {
   request?: Request;
@@ -60,6 +61,7 @@ function errorResponse(
       ? String((error as { code?: unknown }).code ?? "")
       : "";
   if (sqliteCode === "SQLITE_BUSY" || sqliteCode === "SQLITE_LOCKED") {
+    recordSqliteBusy();
     return {
       status: 503,
       response: Response.json(
@@ -134,24 +136,28 @@ export async function handle(
       actor: auditContext.actor,
       result,
     });
+    const durationMs = performance.now() - startedAt;
+    recordRequest(response.status, durationMs);
     logRequest({
       requestId,
       method: request?.method,
       path: request ? new URL(request.url).pathname : undefined,
       status: response.status,
-      durationMs: Math.round(performance.now() - startedAt),
+      durationMs: Math.round(durationMs),
       actor: auditContext.actor?.username ?? options.actor,
     });
     return response;
   } catch (error) {
     const result = errorResponse(error, requestId);
     result.response.headers.set("x-request-id", requestId);
+    const durationMs = performance.now() - startedAt;
+    recordRequest(result.status, durationMs);
     logRequest({
       requestId,
       method: request?.method,
       path: request ? new URL(request.url).pathname : undefined,
       status: result.status,
-      durationMs: Math.round(performance.now() - startedAt),
+      durationMs: Math.round(durationMs),
       actor: auditContext.actor?.username ?? options.actor,
     });
     return result.response;
