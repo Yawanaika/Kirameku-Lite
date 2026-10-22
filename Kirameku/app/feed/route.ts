@@ -6,10 +6,17 @@ import type {
   PostDetail,
   PostItem,
 } from "@/server/modules/posts/contracts";
+import { env } from "@/server/env";
+import { getShareConfig, getSiteUrl } from "@/server/site";
 
-export const revalidate = 3600;
+// The channel <link> and <atom:link> are configuration, so this route must be
+// rendered per request rather than prerendered with build-time placeholders.
+export const dynamic = "force-dynamic";
 
-const FEED_AUTHOR = `guh982719@gmail.com (${siteConfig.authorName})`;
+function feedAuthor(): string {
+  const email = env.SITE_CONTACT_EMAIL;
+  return email ? `${email} (${siteConfig.authorName})` : siteConfig.authorName;
+}
 
 export async function GET() {
   try {
@@ -35,20 +42,23 @@ export async function GET() {
               ? detailResults[i].value
               : null;
 
-          return generateItem(post, detail);
+          return generateItem(post, detail, siteUrl);
         })
       )
     ).join("\n");
 
+    const siteUrl = getSiteUrl();
+    const share = getShareConfig();
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>${escapeXml(siteConfig.title)}</title>
-    <link>${siteConfig.url}</link>
-    <description>${escapeXml(siteConfig.bio)}</description>
+    <title>${escapeXml(share.title)}</title>
+    <link>${siteUrl}</link>
+    <description>${escapeXml(share.description)}</description>
     <language>zh-CN</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${siteConfig.url}/feed" rel="self" type="application/rss+xml"/>
+    <atom:link href="${siteUrl}/feed" rel="self" type="application/rss+xml"/>
     <generator>Next.js</generator>
 ${items}
   </channel>
@@ -67,9 +77,10 @@ ${items}
 
 async function generateItem(
   post: PostItem,
-  detail: PostDetail | null
+  detail: PostDetail | null,
+  siteUrl: string
 ): Promise<string> {
-  const postUrl = `${siteConfig.url}/posts/${post.slug}`;
+  const postUrl = `${siteUrl}/posts/${post.slug}`;
   const pubDate = post.published_at
     ? new Date(post.published_at).toUTCString()
     : new Date(post.created_at).toUTCString();
@@ -95,7 +106,7 @@ async function generateItem(
       <description><![CDATA[${post.description || ""}]]></description>
       <content:encoded><![CDATA[${contentHtml}]]></content:encoded>
       <pubDate>${pubDate}</pubDate>
-      <author>${escapeXml(FEED_AUTHOR)}</author>${categories ? `\n${categories}` : ""}
+      <author>${escapeXml(feedAuthor())}</author>${categories ? `\n${categories}` : ""}
     </item>`;
 }
 

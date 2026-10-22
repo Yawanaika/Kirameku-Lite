@@ -1,8 +1,12 @@
 import type { MetadataRoute } from "next";
-import { siteConfig } from "@/siteConfig";
+import { getSiteUrl } from "@/server/site";
 import { getPostsService } from "@/server/modules/posts";
 
-export const revalidate = 3600;
+// Rendered per request on purpose: the absolute URLs come from SITE_URL /
+// FRONTEND_ORIGIN, and a build-time prerender would bake the build placeholder
+// (http://localhost:3000) into every <loc> for a whole revalidate window.
+// The query is a single small SELECT, so the cost is negligible.
+export const dynamic = "force-dynamic";
 
 const STATIC_ROUTES: Array<{
   path: string;
@@ -24,7 +28,7 @@ const STATIC_ROUTES: Array<{
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = siteConfig.url.replace(/\/+$/, "");
+  const base = getSiteUrl();
   const now = new Date();
 
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({

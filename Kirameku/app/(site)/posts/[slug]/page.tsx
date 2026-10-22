@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { renderMarkdown } from "@/lib/markdown";
 import { AppError } from "@/server/http/errors";
 import { getPostsService } from "@/server/modules/posts";
-import { siteConfig } from "@/siteConfig";
+import { getShareConfig, shareImageUrl, siteUrl } from "@/server/site";
 import PostDetailClient from "./PostDetailClient";
 
 export const revalidate = 60;
@@ -24,26 +24,32 @@ export async function generateMetadata({
 
   try {
     const post = await getPost(slug);
-    const description = post.description || siteConfig.bio;
-    const url = `${siteConfig.url}/posts/${post.slug}`;
+    const url = siteUrl(`/posts/${post.slug}`);
+    // Fall back to the configured site share card for description and image so
+    // a post without a cover still produces a complete preview.
+    const share = getShareConfig({
+      title: post.title,
+      description: post.description,
+      image: post.cover ? shareImageUrl(post.cover) : undefined,
+    });
 
     return {
       title: post.title,
-      description,
+      description: share.description,
       alternates: { canonical: url },
       openGraph: {
         type: "article",
-        title: post.title,
-        description,
+        title: share.title,
+        description: share.description,
         url,
         publishedTime: post.published_at ?? undefined,
-        images: post.cover ? [{ url: post.cover }] : undefined,
+        images: share.image ? [{ url: share.image }] : undefined,
       },
       twitter: {
-        card: "summary_large_image",
-        title: post.title,
-        description,
-        images: post.cover || undefined,
+        card: share.card,
+        title: share.title,
+        description: share.description,
+        images: share.image ?? undefined,
       },
     };
   } catch {

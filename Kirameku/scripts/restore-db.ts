@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { openDatabase } from "../server/db/open";
@@ -56,11 +57,61 @@ function verifyDatabase(file: string): void {
   }
 }
 
+/** Uploads archived alongside this database by scripts/backup-db.ts, if any. */
+function uploadsArchiveFor(backupPath: string): string | null {
+  const base = path.basename(backupPath).replace(/\.db$/, "");
+  const candidate = path.join(path.dirname(backupPath), `${base}-uploads.tar.gz`);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+function verifyUploadsChecksum(backupPath: string, archive: string): void {
+  const metadataPath = `${backupPath}.meta.json`;
+  if (!fs.existsSync(metadataPath)) return;
+
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as {
+    uploads?: { file?: string; sha256?: string } | null;
+  };
+  const expected = metadata.uploads;
+  if (!expected?.sha256) return;
+  if (expected.file && expected.file !== path.basename(archive)) {
+    console.warn(
+      `uploads: metadata describes ${expected.file}, restoring ${path.basename(archive)}`,
+    );
+  }
+
+  const actual = crypto
+    .createHash("sha256")
+    .update(fs.readFileSync(archive))
+    .digest("hex");
+  if (actual !== expected.sha256) {
+    throw new Error(
+      `checksum mismatch for ${archive}: expected ${expected.sha256}, got ${actual}`,
+    );
+  }
+  console.log(`uploads checksum: ${actual}`);
+}
+
+function restoreUploads(archive: string, uploadsDir: string): void {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  const result = spawnSync("tar", ["-xzf", archive, "-C", uploadsDir], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `uploads extract failed: ${
+        result.error?.message ??
+        `tar exited with ${result.status}: ${String(result.stderr ?? "").trim()}`
+      }`,
+    );
+  }
+  console.log(`restored uploads into: ${uploadsDir}`);
+}
+
 function main() {
   const backupArg = process.argv[2];
   if (!backupArg || backupArg.startsWith("--")) {
     throw new Error(
-      "Usage: pnpm db:restore <backup.db> [--target ./data/kirameku.db]",
+      "Usage: pnpm db:restore <backup.db> [--target ./data/kirameku.db] [--with-uploads] [--uploads-dir ./uploads]",
     );
   }
 
@@ -98,6 +149,25 @@ function main() {
   for (const file of moved) {
     console.log(`previous file moved to: ${file}`);
   }
+
+  const uploadsArchive = uploadsArchiveFor(backupPath);
+  if (!uploadsArchive) {
+    console.log("uploads: no archive next to this backup, skipped");
+    return;
+  }
+
+  if (!process.argv.includes("--with-uploads")) {
+    console.log(
+      `uploads: archive available at ${uploadsArchive} (pass --with-uploads to restore it)`,
+    );
+    return;
+  }
+
+  const uploadsDir = path.resolve(
+    flagValue("--uploads-dir") || process.env.UPLOAD_DIR || "./uploads",
+  );
+  verifyUploadsChecksum(backupPath, uploadsArchive);
+  restoreUploads(uploadsArchive, uploadsDir);
 }
 
 try {

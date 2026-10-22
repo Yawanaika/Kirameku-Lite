@@ -124,7 +124,7 @@ DATABASE_PATH=/data/kirameku.db pnpm start
 
 ### Docker Compose + 自动发布
 
-镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 只起应用：不发布宿主机端口，而是接入外部网络 `kirameku-edge`，以 `kirameku-app:3000` 暴露给已有的反代。
+镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku-lite`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 只起应用：不发布宿主机端口，而是接入外部网络 `kirameku-edge`，以 `kirameku-app:3000` 暴露给已有的反代。
 
 数据落在宿主机的普通目录里（bind mount，不是命名卷），备份能与数据库分开存放：
 
@@ -146,7 +146,7 @@ docker compose exec app \
   pnpm db:seed-admin
 ```
 
-推送 `main` 后自动发布：`verify → 构建多架构镜像推送 GHCR → SSH 到服务器执行 scripts/deploy-server.sh`（备份数据库 → 拉镜像 → 重启 → 健康检查，不健康自动回滚）。
+推送 `main` 后自动发布：`verify → 构建多架构镜像推送 GHCR → SSH 到服务器执行 scripts/deploy-server.sh`（备份数据库 → 拉镜像 → 重启 → 健康检查，不健康自动回滚）。发布会顺带装/刷新每日 systemd timer（`scripts/maintenance.sh`：备份 + 访客清理 + 计数校正）并给 app 容器配 100 MB × 3 的日志轮转；两者都能在 `.env` 里调，详见 [DEPLOY_NOTES.md](./DEPLOY_NOTES.md#63-定时维护systemd-timer)。
 
 反代怎么接：
 
@@ -165,7 +165,8 @@ docker compose exec app \
 | `pnpm lint` / `pnpm typecheck` / `pnpm test` | 代码检查 / 类型检查 / 单元与集成测试 |
 | `pnpm db:migrate` | 执行版本化 SQLite 迁移 |
 | `pnpm db:seed-admin` | 创建或重置管理员 |
-| `pnpm db:backup` / `pnpm db:restore` | 在线备份 / 恢复（恢复前先停应用） |
+| `pnpm db:backup` / `pnpm db:restore` | 在线备份（数据库 + uploads 归档） / 恢复（恢复前先停应用） |
+| `bash scripts/maintenance.sh` | 每日维护：备份 + 访客清理 + 计数校正（部署时自动装 systemd timer） |
 | `pnpm db:prune-visitors` | 按 `VISITOR_RETENTION_DAYS` 清理访客记录 |
 | `pnpm db:reconcile-counts` | 校正分类/标签/说说/相册冗余计数 |
 

@@ -3,12 +3,18 @@
 export const siteConfig = {
   // 网站标题与博主信息
   title: "Starhiroの小站",
+  // 兜底值：站点 URL 优先取 SITE_URL，其次 FRONTEND_ORIGIN（见 server/site.ts）。
+  // 只有两者都没配置时才会用到这里，正常部署不需要改这一行。
   url: "https://boke.hiromu.top",
   authorName: "Starhiro",
   bio: "项目开源在 GitHub,点击下面的GitHub图标跳转,欢迎 star 和 fork！(◕‿◕)",
 
   // 头像设置
   avatarUrl: "/images/hong.jpg",
+
+  // 分享卡片（Open Graph / Twitter）兜底值；可用 SITE_SHARE_* 环境变量覆盖
+  shareImage: "/images/hong.jpg",
+  shareCard: "summary_large_image" as const,
 
   // 背景设置
   useGradient: false,

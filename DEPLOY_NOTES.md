@@ -295,21 +295,37 @@ IMAGE_REF=ghcr.io/<owner>/kirameku:sha-abc1234 \
 
 ## 6. 备份、恢复与维护命令
 
+一次备份产出一个**组**，三个文件同前缀：
+
+| 文件 | 内容 |
+|:---|:---|
+| `kirameku-<时间戳>.db` | SQLite 一致性快照（用 backup API，不是 `cp`） |
+| `kirameku-<时间戳>.db.meta.json` | 行数、完整性检查结果、uploads 归档的 sha256 与文件数 |
+| `kirameku-<时间戳>-uploads.tar.gz` | `UPLOAD_DIR` 的归档；配了 OSS 时为空，`--no-uploads` 可跳过 |
+
 ```bash
-# 在线备份到 /data/backups
+# 在线备份到 /data/backups（含 uploads 归档），并按保留策略清理旧组
 docker compose exec app pnpm db:backup --prune
+
+# 只要数据库、不要图（配了 OSS 时用）
+docker compose exec app pnpm db:backup --prune --no-uploads
 
 # 查看备份文件
 docker compose exec app ls -lh /data/backups
 
-# 恢复：先停应用，禁用 entrypoint 迁移，再执行 restore
+# 恢复数据库（先停应用，禁用 entrypoint 迁移）
 docker compose stop app
 docker compose run --rm -e RUN_MIGRATIONS=0 app \
   pnpm db:restore /data/backups/kirameku-....db --target /data/db/kirameku.db
+# 同一组里的图片一起恢复（校验 meta 里的 sha256 后才解包）
+docker compose run --rm -e RUN_MIGRATIONS=0 app \
+  pnpm db:restore /data/backups/kirameku-....db --target /data/db/kirameku.db --with-uploads
 docker compose start app
 ```
 
 - 一次性维护命令加 `-e RUN_MIGRATIONS=0`，避免 entrypoint 在 restore 前先改动数据库。
+- 保留策略：最近 14 天每天留一组，再往前每 ISO 周留一组（最多 8 周）。`--prune` 成组删除，不会留下半套文件。
+- uploads 归档失败不会让 `db:backup` 以非 0 退出（部署脚本把非 0 当成「完全没有备份」），失败原因写在 `.db.meta.json` 的 `uploadsError` 里。
 - 备份文件建议再同步到对象存储，并定期做一次恢复演练。
 
 ### 6.1 数据目录（bind mount）
@@ -354,6 +370,78 @@ docker compose up -d
 起来后用 `/api/health` 确认 `db: ok`，再核对文章数和管理员能登录。确认无误后再删旧卷（`docker volume rm kirameku_kirameku-data`）；**删之前先留一份 `pnpm db:backup` 产物**。
 
 SQLite 使用 WAL，运行中不要直接 `cp` 数据库文件；要取一致性副本就用 `pnpm db:backup`。
+
+### 6.3 定时维护（systemd timer）
+
+备份、访客 IP 清理、计数校正都不再依赖「有人发版」：`scripts/deploy-server.sh` 每次成功发布会安装/刷新一个 systemd timer，每天跑一次 `scripts/maintenance.sh`。
+
+脚本做三件事，任何一步失败都会让这次运行以非 0 退出并写进日志：
+
+1. `pnpm db:backup --prune`（数据库 + uploads 归档 + 保留策略）；
+2. `pnpm db:prune-visitors`（按 `VISITOR_RETENTION_DAYS` 清理访客 IP）；
+3. `pnpm db:reconcile-counts`（校正文章/项目的计数冗余字段）。
+
+```bash
+# 看 timer 状态与下次触发时间
+systemctl list-timers kirameku-maintenance.timer
+systemctl status kirameku-maintenance.service --no-pager
+
+# 看维护日志（按大小自动滚动到 maintenance.log.1）
+tail -n 50 logs/maintenance.log
+
+# 立刻手动跑一次（与 timer 共用 flock，不会并发）
+bash scripts/maintenance.sh
+```
+
+时间与开关都在 `.env` 里：`MAINTENANCE_TIMER=0` 关掉，`MAINTENANCE_SCHEDULE=*-*-* 05:00:00` 改时间（改完重新发布一次让它重写 unit，或手动 `systemctl daemon-reload`）。
+
+服务器没有免密 sudo 时，部署日志会打 `WARNING: passwordless sudo unavailable; skipping maintenance timer install` 并继续发布。这种情况下用 cron 顶上：
+
+```cron
+30 4 * * * cd /home/ubuntu/services/Kirameku-Lite && DEPLOY_PATH=$PWD bash scripts/maintenance.sh
+```
+
+### 6.4 容器日志上限
+
+`docker-compose.yml` 给 app 服务配了 json-file 轮转，默认单文件 100 MB、保留 3 份（上限约 300 MB），不配置的话日志会一直涨到磁盘满：
+
+```yaml
+logging:
+  driver: json-file
+  options:
+    max-size: ${KIRAMEKU_LOG_MAX_SIZE:-100m}
+    max-file: "${KIRAMEKU_LOG_MAX_FILE:-3}"
+```
+
+改完 `docker compose up -d` 会重建容器，新参数生效。查看：
+
+日志由 Docker 的日志驱动保存（不在容器文件系统里），所以只看得到有限的历史：
+
+```bash
+docker compose logs --tail 200 app
+docker compose logs --since 1h app | grep -i error
+```
+
+### 6.5 可观测入口
+
+| 入口 | 用途 |
+|:---|:---|
+| `GET /api/health` | 存活 + 数据库 + 迁移版本，反代/容器 healthcheck 用它 |
+| `GET /api/internal/metrics` | 进程、请求、数据库、备份、磁盘快照；需要 `CRON_SECRET` |
+| `logs/maintenance.log` | 每日维护输出 |
+| `systemctl list-timers kirameku-maintenance.timer` | 定时任务是否还活着 |
+
+metrics 默认对外 404，只有在 `.env` 里配了 `CRON_SECRET` 才存在，且要带令牌访问：
+
+```bash
+curl -sH "Authorization: Bearer $CRON_SECRET" https://blog.yawanaika.com/api/internal/metrics | jq
+```
+
+返回里和运维直接相关的是 `backups` 与 `disk`：
+
+- `backups.latest_age_s`：最近一次备份至今的秒数，超过 26 小时就说明 timer 没跑成；
+- `backups.uploads_archives`：带图片归档的备份组数，配了 OSS 时它是 0；
+- `disk.available_bytes`：数据盘剩余空间（磁盘告警留到下一步做）。
 
 ## 7. 环境变量
 

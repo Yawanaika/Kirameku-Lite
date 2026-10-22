@@ -91,6 +91,16 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required; copy compose.env.example to .env and fill it in}
       CRON_SECRET: ${CRON_SECRET:-}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      # Canonical public URL for sitemap/robots/RSS/share cards. Empty falls back
+      # to FRONTEND_ORIGIN, so a normal deployment only sets FRONTEND_ORIGIN.
+      SITE_URL: ${SITE_URL:-}
+      # Share card (Open Graph / Twitter) content. Empty values fall back to
+      # siteConfig.ts, so nothing here is required.
+      SITE_SHARE_TITLE: ${SITE_SHARE_TITLE:-}
+      SITE_SHARE_DESCRIPTION: ${SITE_SHARE_DESCRIPTION:-}
+      SITE_SHARE_IMAGE: ${SITE_SHARE_IMAGE:-}
+      SITE_SHARE_CARD: ${SITE_SHARE_CARD:-}
+      SITE_CONTACT_EMAIL: ${SITE_CONTACT_EMAIL:-}
       SITE_READ_ONLY: ${SITE_READ_ONLY:-0}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
@@ -107,6 +117,13 @@ services:
       # A separate bind mount so backups can be shipped elsewhere (rsync, another
       # disk) without dragging the live database along.
       - ${KIRAMEKU_BACKUP_DIR:-./backup}:/data/backups
+    # Without this Docker keeps an unbounded json-file log and the disk quietly
+    # fills up. Both values are configuration items; 100m x 3 keeps ~300 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${KIRAMEKU_LOG_MAX_SIZE:-100m}
+        max-file: "${KIRAMEKU_LOG_MAX_FILE:-3}"
 
 networks:
   edge:

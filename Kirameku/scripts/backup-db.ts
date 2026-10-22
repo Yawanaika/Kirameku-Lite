@@ -1,24 +1,69 @@
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { openDatabase } from "../server/db/open";
 
-interface BackupFile {
-  file: string;
+/**
+ * A backup is a *group* of files that share one timestamp:
+ *
+ *   kirameku-<ts>.db               SQLite snapshot
+ *   kirameku-<ts>.db.meta.json     checksum + integrity metadata
+ *   kirameku-<ts>-uploads.tar.gz   uploaded images (skipped when there are none)
+ *
+ * Retention works on groups so a pruned backup never leaves a stray .db or tar
+ * behind, and a restore can find the matching uploads archive by name.
+ */
+interface BackupGroup {
+  stamp: string;
   date: Date;
+  files: string[];
 }
+
+const STAMP_PATTERN =
+  /^(kirameku-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)(?:\.db|\.db\.meta\.json|-uploads\.tar\.gz)$/;
 
 function backupTimestamp(date: Date): string {
   return date.toISOString().replace(/[:.]/g, "-");
 }
 
-function parseBackupFile(file: string): Date | null {
-  const match = /^kirameku-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.db$/.exec(
-    file,
-  );
+function parseStamp(file: string): { stamp: string; date: Date } | null {
+  const match = STAMP_PATTERN.exec(file);
   if (!match) return null;
-  const [, day, hour, minute, second, millisecond] = match;
-  return new Date(`${day}T${hour}:${minute}:${second}.${millisecond}Z`);
+
+  const stamp = match[1];
+  const raw = stamp.slice("kirameku-".length);
+  const day = raw.slice(0, 10);
+  const hour = raw.slice(11, 13);
+  const minute = raw.slice(14, 16);
+  const second = raw.slice(17, 19);
+  const millisecond = raw.slice(20, 23);
+  const date = new Date(`${day}T${hour}:${minute}:${second}.${millisecond}Z`);
+  return Number.isNaN(date.getTime()) ? null : { stamp, date };
+}
+
+function listGroups(directory: string): BackupGroup[] {
+  const groups = new Map<string, BackupGroup>();
+
+  for (const file of fs.readdirSync(directory)) {
+    const parsed = parseStamp(file);
+    if (!parsed) continue;
+
+    const existing = groups.get(parsed.stamp);
+    if (existing) {
+      existing.files.push(file);
+    } else {
+      groups.set(parsed.stamp, {
+        stamp: parsed.stamp,
+        date: parsed.date,
+        files: [file],
+      });
+    }
+  }
+
+  return [...groups.values()].sort(
+    (left, right) => right.date.getTime() - left.date.getTime(),
+  );
 }
 
 function isoWeekKey(date: Date): string {
@@ -27,53 +72,127 @@ function isoWeekKey(date: Date): string {
   );
   const day = value.getUTCDay() || 7;
   value.setUTCDate(value.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const yearStart = Date.UTC(value.getUTCFullYear(), 0, 1);
   const week = Math.ceil(
-    ((value.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+    ((value.getTime() - yearStart) / 86_400_000 + 1) / 7,
   );
   return `${value.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-function listBackups(directory: string): BackupFile[] {
-  return fs
-    .readdirSync(directory)
-    .map((file) => ({ file, date: parseBackupFile(file) }))
-    .filter((entry): entry is BackupFile => entry.date !== null)
-    .sort((left, right) => right.date.getTime() - left.date.getTime());
-}
-
+/**
+ * Keep every backup from the last 14 days, then one per ISO week for the eight
+ * most recent weeks. Everything else is deleted as a whole group.
+ */
 function pruneBackups(directory: string): number {
-  const backups = listBackups(directory);
+  const groups = listGroups(directory);
   const dailyCutoff = Date.now() - 14 * 86_400_000;
   const keep = new Set<string>();
 
-  for (const backup of backups) {
-    if (backup.date.getTime() >= dailyCutoff) keep.add(backup.file);
+  for (const group of groups) {
+    if (group.date.getTime() >= dailyCutoff) keep.add(group.stamp);
   }
 
-  const weekly = new Map<string, BackupFile>();
-  for (const backup of backups) {
-    if (backup.date.getTime() >= dailyCutoff) continue;
-    const key = isoWeekKey(backup.date);
-    if (!weekly.has(key)) weekly.set(key, backup);
+  const weekly = new Map<string, BackupGroup>();
+  for (const group of groups) {
+    if (group.date.getTime() >= dailyCutoff) continue;
+    const key = isoWeekKey(group.date);
+    if (!weekly.has(key)) weekly.set(key, group);
   }
 
-  for (const backup of [...weekly.values()]
+  for (const group of [...weekly.values()]
     .sort((left, right) => right.date.getTime() - left.date.getTime())
     .slice(0, 8)) {
-    keep.add(backup.file);
+    keep.add(group.stamp);
   }
 
   let removed = 0;
-  for (const backup of backups) {
-    if (keep.has(backup.file)) continue;
-    fs.rmSync(path.join(directory, backup.file), { force: true });
-    fs.rmSync(path.join(directory, `${backup.file}.meta.json`), {
-      force: true,
-    });
-    removed++;
+  for (const group of groups) {
+    if (keep.has(group.stamp)) continue;
+    for (const file of group.files) {
+      fs.rmSync(path.join(directory, file), { force: true });
+      removed++;
+    }
   }
   return removed;
+}
+
+function sha256File(file: string): string {
+  const hash = crypto.createHash("sha256");
+  const descriptor = fs.openSync(file, "r");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  try {
+    let read = 0;
+    while ((read = fs.readSync(descriptor, buffer, 0, buffer.length, null)) > 0) {
+      hash.update(buffer.subarray(0, read));
+    }
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  return hash.digest("hex");
+}
+
+function tarFailure(result: ReturnType<typeof spawnSync>): string {
+  if (result.error) return result.error.message;
+  return `tar exited with ${result.status ?? "unknown"}: ${String(result.stderr ?? "").trim()}`;
+}
+
+interface UploadsBackup {
+  file: string;
+  size: number;
+  sha256: string;
+  entries: number;
+}
+
+/**
+ * Archive UPLOAD_DIR into the same timestamped group as the database. Uploads
+ * are not in SQLite, so a database-only backup restores a site whose images all
+ * 404. Returns null when there is nothing to archive.
+ */
+function backupUploads(
+  uploadDir: string,
+  destination: string,
+): UploadsBackup | null {
+  if (!fs.existsSync(uploadDir)) {
+    console.log(`uploads: no directory at ${uploadDir}, skipped`);
+    return null;
+  }
+
+  if (fs.readdirSync(uploadDir).length === 0) {
+    console.log("uploads: directory is empty, skipped");
+    return null;
+  }
+
+  const created = spawnSync(
+    "tar",
+    ["-czf", destination, "-C", uploadDir, "."],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+  if (created.status !== 0) {
+    throw new Error(`uploads backup failed: ${tarFailure(created)}`);
+  }
+
+  const listed = spawnSync("tar", ["-tzf", destination], {
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (listed.status !== 0) {
+    throw new Error(
+      `uploads backup verification failed: ${tarFailure(listed)}`,
+    );
+  }
+
+  const entries = String(listed.stdout ?? "")
+    .split("\n")
+    .filter((line) => line.length > 0 && line !== "./" && line !== ".").length;
+
+  fs.chmodSync(destination, 0o600);
+
+  return {
+    file: path.basename(destination),
+    size: fs.statSync(destination).size,
+    sha256: sha256File(destination),
+    entries,
+  };
 }
 
 async function main() {
@@ -88,10 +207,8 @@ async function main() {
   fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
 
   const createdAt = new Date();
-  const destination = path.join(
-    backupDir,
-    `kirameku-${backupTimestamp(createdAt)}.db`,
-  );
+  const stamp = `kirameku-${backupTimestamp(createdAt)}`;
+  const destination = path.join(backupDir, `${stamp}.db`);
 
   const source = openDatabase(sourcePath, {
     readonly: true,
@@ -146,10 +263,32 @@ async function main() {
   }
 
   const size = fs.statSync(destination).size;
-  const sha256 = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(destination))
-    .digest("hex");
+  const sha256 = sha256File(destination);
+
+  // Uploads are archived after the database so a slow upload tree never delays
+  // the artifact that matters most. A failure here is reported but does not
+  // invalidate the database backup (deploy-server.sh reads a non-zero exit as
+  // "no backup at all" and would give up the safety net).
+  let uploads: UploadsBackup | null = null;
+  let uploadsError: string | null = null;
+
+  if (process.argv.includes("--no-uploads")) {
+    console.log("uploads: skipped (--no-uploads)");
+  } else {
+    const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads");
+    try {
+      uploads = backupUploads(
+        uploadDir,
+        path.join(backupDir, `${stamp}-uploads.tar.gz`),
+      );
+    } catch (error) {
+      uploadsError = error instanceof Error ? error.message : String(error);
+      console.error(`uploads: FAILED - ${uploadsError}`);
+      fs.rmSync(path.join(backupDir, `${stamp}-uploads.tar.gz`), {
+        force: true,
+      });
+    }
+  }
 
   const metadata = {
     file: path.basename(destination),
@@ -159,6 +298,8 @@ async function main() {
     migration,
     integrityOk,
     foreignKeyViolations,
+    uploads,
+    uploadsError,
   };
 
   fs.writeFileSync(
@@ -173,6 +314,12 @@ async function main() {
   console.log(`migration: ${migration ?? "unknown"}`);
   console.log(`integrity_check: ${integrityOk ? "ok" : "FAILED"}`);
   console.log(`foreign_key_check: ${foreignKeyViolations} violation(s)`);
+  if (uploads) {
+    console.log(
+      `uploads: ${uploads.entries} entr(y/ies), ${uploads.size} bytes`,
+    );
+    console.log(`uploads sha256: ${uploads.sha256}`);
+  }
 
   if (!integrityOk || foreignKeyViolations > 0) {
     process.exitCode = 1;
@@ -181,7 +328,7 @@ async function main() {
 
   if (process.argv.includes("--prune")) {
     const removed = pruneBackups(backupDir);
-    console.log(`pruned ${removed} old backup(s)`);
+    console.log(`pruned ${removed} old backup file(s)`);
   }
 }
 
