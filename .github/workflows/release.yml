@@ -1,0 +1,169 @@
+name: Release
+
+# Builds the production image, pushes it to GitHub Container Registry and then
+# asks the server to pull the new tag and restart.
+#
+# Repository configuration:
+#   Secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+#            DEPLOY_KNOWN_HOSTS (optional but recommended), DEPLOY_PORT (optional, 22)
+#   Vars:    DEPLOY_PATH (server-side compose project directory, default /srv/kirameku)
+#            DEPLOY_ENABLED ("false" disables the deploy job, images still publish)
+#
+# The server never builds anything: it only runs `docker compose pull` plus
+# `docker compose up -d` through scripts/deploy-server.sh.
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/verify.yml
+
+  image:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    needs: verify
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kirameku" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=sha,prefix=sha-,format=short
+          labels: |
+            org.opencontainers.image.title=kirameku
+            org.opencontainers.image.description=Single-process Next.js blog with SQLite
+
+      # Published for both CPU architectures so the same workflow works on an
+      # amd64 host and on the arm64 Oracle VPS. Drop arm64 if you only ever
+      # deploy to x86_64: it roughly doubles the build time.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Kirameku
+          file: ./Kirameku/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Summary
+        run: |
+          {
+            echo "### Image published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    needs: image
+    # Only the default branch rolls out automatically. Release tags are built
+    # and published but stay parked until a human triggers a deploy.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      vars.DEPLOY_ENABLED != 'false'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image reference
+        id: image
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kirameku:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Install deploy key
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          set -eu
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "${KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      # The script is streamed over stdin together with the registry
+      # credentials, so the GHCR token never shows up in the remote process
+      # list or in the SSH command line.
+      - name: Pull image and restart on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/srv/kirameku' }}
+          DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE || 'docker-compose.yml' }}
+          DEPLOY_SERVICES: ${{ vars.DEPLOY_SERVICES || '' }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -eu
+          assign() {
+            case "$2" in
+              *"'"*) printf 'value for %s must not contain a single quote\n' "$1" >&2; exit 1 ;;
+            esac
+            printf "%s='%s'\n" "$1" "$2"
+          }
+          {
+            assign DEPLOY_PATH "$DEPLOY_PATH"
+            assign IMAGE_REF "$IMAGE_REF"
+            assign COMPOSE_FILE "$DEPLOY_COMPOSE_FILE"
+            assign SERVICES "$DEPLOY_SERVICES"
+            assign GHCR_USER "$GHCR_USER"
+            assign GHCR_TOKEN "$GHCR_TOKEN"
+            cat scripts/deploy-server.sh
+          } | ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" \
+                -o BatchMode=yes -o StrictHostKeyChecking=yes \
+                "$DEPLOY_USER@$DEPLOY_HOST" "bash -s"

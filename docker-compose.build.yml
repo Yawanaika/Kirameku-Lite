@@ -1,0 +1,12 @@
+# Local build override — for development or for a server that has no registry
+# access. Production should pull the image published by GitHub Actions instead.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  app:
+    build:
+      context: ./Kirameku
+      dockerfile: Dockerfile
+    image: ${KIRAMEKU_IMAGE:-kirameku:local}
+    # Never try to pull the registry tag when we are explicitly building.
+    pull_policy: build

@@ -32,7 +32,7 @@
 ## 架构
 
 ```
-Browser → Nginx (443) → Next.js 16 (Node 22, :3000)
+Browser → Caddy (443) → Next.js 16 (Node 22, :3000)
                               ├── app/(site)/**     前台页面（RSC + 客户端岛屿）
                               ├── app/(admin)/**    管理后台（/:3000/admin）
                               ├── app/api/**        Route Handlers
@@ -120,19 +120,25 @@ pnpm build
 DATABASE_PATH=/data/kirameku.db pnpm start
 ```
 
-### Docker Compose（可选）
+### Docker Compose + 自动发布
 
-仓库根目录已经提供 `docker-compose.yml` 和 `Kirameku/Dockerfile`，镜像里只运行一个 Node 进程，SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
+镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 自带 Caddy 服务，自动申请 HTTPS 证书；SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
 
 ```bash
-cp compose.env.example .env      # 至少填写 AUTH_SECRET
-docker compose up -d --build
+cp compose.env.example .env      # 至少填写 SITE_DOMAIN 和 AUTH_SECRET
+docker compose pull
+docker compose up -d
 docker compose exec app \
   env ADMIN_USERNAME=admin ADMIN_PASSWORD='至少12位的密码' \
   pnpm db:seed-admin
 ```
 
-容器默认监听 `127.0.0.1:3000`，对外仍由宿主机 Nginx 终止 TLS。升级、备份、恢复和 bind mount 说明见 [DEPLOY_NOTES.md](./DEPLOY_NOTES.md#5-docker-compose-部署可选)。
+推送 `main` 后自动发布：`verify → 构建多架构镜像推送 GHCR → SSH 到服务器执行 scripts/deploy-server.sh`（备份数据库 → 拉镜像 → 重启 → 健康检查，不健康自动回滚）。
+
+- 想沿用宿主机已有的 Caddy/Nginx：`docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app`
+- 想在本机构建而不是拉镜像：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
+
+完整的服务器初始化、仓库 Secrets/Variables 配置和回滚步骤见 [DEPLOY_NOTES.md](./DEPLOY_NOTES.md#2-服务器一次性初始化)。
 
 ## 常用脚本
 

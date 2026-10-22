@@ -1,6 +1,7 @@
 /**
- * Resolve the client IP behind the project's reverse proxy. Only trust headers
- * set by our own Nginx; do not expose this value as a security boundary.
+ * Resolve the client IP behind the project's reverse proxy (Caddy by default).
+ * Only trust headers set by our own proxy; do not expose this value as a
+ * security boundary.
  */
 export function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");

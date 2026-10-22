@@ -1,24 +1,35 @@
 # Docker Compose deployment for the single-process Kirameku app.
 #
-#   cp compose.env.example .env
-#   # fill in AUTH_SECRET and the optional OAuth/OSS values
-#   docker compose up -d --build
+# The image is built by GitHub Actions and published to GHCR; the server only
+# pulls it. Nothing here compiles code.
 #
-# The app listens on 127.0.0.1:3000 so the host Nginx can keep terminating TLS.
-# SQLite, uploads and backups live in named volumes and survive image upgrades.
+#   cp compose.env.example .env      # fill in AUTH_SECRET + SITE_DOMAIN
+#   docker compose pull
+#   docker compose up -d
+#
+# Caddy terminates TLS (automatic Let's Encrypt) and proxies to the app over the
+# internal network. The app itself is not published on the host at all.
+#
+# SQLite, uploads and backups live in the `kirameku-data` volume and survive
+# image upgrades.
+#
+# Building locally instead of pulling:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Keeping an existing host-level Caddy/Nginx instead of the bundled one:
+#   docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
 name: kirameku
 
 services:
   app:
-    build:
-      context: ./Kirameku
-      dockerfile: Dockerfile
-    image: kirameku:local
+    image: ${KIRAMEKU_IMAGE:-ghcr.io/yawanaika/kirameku:latest}
+    # `docker compose up -d` should always pick up a freshly pushed :latest.
+    pull_policy: always
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
-    ports:
-      - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -43,6 +54,33 @@ services:
       VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-90}
     volumes:
       - kirameku-data:/data
+    networks:
+      - edge
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # Required: the public hostname Caddy should obtain a certificate for.
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN is required; set it to your public hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
 
 volumes:
   kirameku-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:

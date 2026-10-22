@@ -1,0 +1,20 @@
+# Override for deployments that already run Caddy (or Nginx) on the host.
+#
+# The bundled `caddy` service is simply not started; only `app` is brought up
+# and published on loopback so the host proxy can reach it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
+#
+# Host Caddy equivalent of the bundled Caddyfile:
+#
+#   boke.example.com {
+#       encode zstd gzip
+#       request_body { max_size 12MB }
+#       @immutable path /_next/static/*
+#       header @immutable Cache-Control "public, max-age=31536000, immutable"
+#       reverse_proxy 127.0.0.1:3000
+#   }
+services:
+  app:
+    ports:
+      - "127.0.0.1:3000:3000"
