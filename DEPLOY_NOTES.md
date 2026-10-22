@@ -17,7 +17,7 @@
               ├── /admin 后台页面
               ├── /api/* Route Handlers
               ├── /uploads/* 本地图片读取（未配置 OSS 时）
-              └── SQLite（WAL，单文件，命名卷 kirameku-data）
+              └── SQLite（WAL，单文件，宿主机 ./data/db/kirameku.db）
 ```
 
 发布链路：
@@ -310,24 +310,50 @@ docker compose start app
 ```
 
 - 一次性维护命令加 `-e RUN_MIGRATIONS=0`，避免 entrypoint 在 restore 前先改动数据库。
-- `docker compose down` 不会删除命名卷；只有 `docker compose down -v` 才会删除。生产环境不要随手加 `-v`。
 - 备份文件建议再同步到对象存储，并定期做一次恢复演练。
 
-### 6.1 改用宿主机目录
+### 6.1 数据目录（bind mount）
 
-如果需要在宿主机直接看到数据库和上传文件，可把命名卷换成 bind mount，并让目录属主对应容器内的 `node` 用户（UID 1000）：
+数据不放在命名卷里，而是直接挂在宿主机目录，容器内的 `/data` 被拆成两个挂载点：
+
+| 宿主机 | 容器内 | 内容 |
+|:---|:---|:---|
+| `./data/db/kirameku.db` | `/data/db/kirameku.db` | SQLite（含 `-wal` / `-shm`） |
+| `./data/uploads/` | `/data/uploads` | 本地图片（未配 OSS 时） |
+| `./backup/` | `/data/backups` | `pnpm db:backup` 的输出 |
+
+相对路径以 compose 项目目录为基准；用 `.env` 的 `KIRAMEKU_DATA_DIR` / `KIRAMEKU_BACKUP_DIR` 可以改到别处（例如独立数据盘）。备份独立成一个挂载点，是为了能单独 rsync 走、不带上正在使用的数据库。
+
+容器内进程以 `node`（UID 1000）运行，而 Docker 在 bind mount 的宿主机目录缺失时会用 **root** 创建它——这样容器起得来但写不进数据库。所以这三个目录必须先存在且属主是 1000：
 
 ```bash
-mkdir -p data/db data/uploads data/backups
-sudo chown -R 1000:1000 data
+mkdir -p data/db data/uploads backup
+sudo chown -R 1000:1000 data backup
 ```
 
-```yaml
-    volumes:
-      - ./data:/data
+`scripts/deploy-server.sh` 每次发布都会以 root 身份进容器补一遍 `mkdir` + `chown`，自动发布路径不需要手工介入；上面的命令只用于手工首次启动。
+
+因为不再依赖命名卷，`docker compose down -v` 也不会删掉数据。反过来，删数据就是普通文件操作，误删没有 `-v` 这道保险，备份目录请勿当成临时目录清理。
+
+### 6.2 从命名卷迁移到宿主机目录
+
+早期部署用的是 `kirameku-data` 命名卷。迁移必须在停机状态下用容器把文件复制到宿主机目录，`cp` 活的 SQLite 文件会得到损坏的库：
+
+```bash
+docker compose stop app
+mkdir -p data/db data/uploads backup
+# 用一次性容器把卷内容灌进新建的宿主目录，-a 保留属主
+docker run --rm \
+  -v kirameku_kirameku-data:/from:ro \
+  -v "$PWD/data:/to-data" -v "$PWD/backup:/to-backup" \
+  alpine sh -c 'cp -a /from/db /from/uploads /to-data/ && cp -a /from/backups/. /to-backup/'
+sudo chown -R 1000:1000 data backup
+docker compose up -d
 ```
 
-改动挂载前先停容器并备份；SQLite 使用 WAL，运行中不要直接 `cp` 数据库文件。
+起来后用 `/api/health` 确认 `db: ok`，再核对文章数和管理员能登录。确认无误后再删旧卷（`docker volume rm kirameku_kirameku-data`）；**删之前先留一份 `pnpm db:backup` 产物**。
+
+SQLite 使用 WAL，运行中不要直接 `cp` 数据库文件；要取一致性副本就用 `pnpm db:backup`。
 
 ## 7. 环境变量
 

@@ -124,7 +124,17 @@ DATABASE_PATH=/data/kirameku.db pnpm start
 
 ### Docker Compose + 自动发布
 
-镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 只起应用：不发布宿主机端口，而是接入外部网络 `kirameku-edge`，以 `kirameku-app:3000` 暴露给已有的反代。SQLite、上传文件和备份统一放在 `kirameku-data` 命名卷的 `/data` 下：
+镜像由 GitHub Actions 构建并推送到 GHCR（`ghcr.io/<owner>/kirameku`），服务器只拉取镜像，不编译代码。`docker-compose.yml` 只起应用：不发布宿主机端口，而是接入外部网络 `kirameku-edge`，以 `kirameku-app:3000` 暴露给已有的反代。
+
+数据落在宿主机的普通目录里（bind mount，不是命名卷），备份能与数据库分开存放：
+
+| 宿主机（相对 compose 项目目录） | 容器内 |
+|:---|:---|
+| `./data/db/kirameku.db` | `/data/db/kirameku.db` |
+| `./data/uploads/` | `/data/uploads` |
+| `./backup/` | `/data/backups` |
+
+路径可用 `.env` 的 `KIRAMEKU_DATA_DIR` / `KIRAMEKU_BACKUP_DIR` 改。这几个目录的属主必须是容器内的 `node`（UID 1000）：部署脚本每次发布会自动修正，手动首次启动时先 `mkdir -p data/db data/uploads backup && sudo chown -R 1000:1000 data backup`。
 
 ```bash
 docker network create kirameku-edge   # 一次性；部署脚本也会自动建

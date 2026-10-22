@@ -38,8 +38,26 @@
 #   * Host-level proxy (systemd Caddy/Nginx on the host itself):
 #       docker compose -f docker-compose.yml -f docker-compose.host-proxy.yml up -d app
 #
-# SQLite, uploads and backups live in the `kirameku-data` volume and survive
-# image upgrades.
+# DATA / BACKUPS
+# --------------
+# SQLite, uploads and backups are bind-mounted from the host, not kept in a
+# named volume, so they are visible in a plain directory, easy to copy off the
+# box, and survive both image upgrades and `docker compose down -v`:
+#
+#   ./data/db/kirameku.db     -> /data/db/kirameku.db
+#   ./data/uploads/           -> /data/uploads
+#   ./backup/                 -> /data/backups
+#
+# Both paths are resolved relative to this compose project directory; set
+# KIRAMEKU_DATA_DIR / KIRAMEKU_BACKUP_DIR in .env to move them elsewhere.
+#
+# The container runs as UID 1000 (`node`), and Docker creates missing bind-mount
+# host directories as root — so the directories must exist and be owned by 1000
+# before the first start, otherwise the app cannot write. scripts/deploy-server.sh
+# fixes that automatically; for a manual first start:
+#
+#   mkdir -p data/db data/uploads backup
+#   sudo chown -R 1000:1000 data backup
 #
 # Building locally instead of pulling:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
@@ -85,10 +103,10 @@ services:
       OSS_PREFIX: ${OSS_PREFIX:-}
       VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-90}
     volumes:
-      - kirameku-data:/data
-
-volumes:
-  kirameku-data:
+      - ${KIRAMEKU_DATA_DIR:-./data}:/data
+      # A separate bind mount so backups can be shipped elsewhere (rsync, another
+      # disk) without dragging the live database along.
+      - ${KIRAMEKU_BACKUP_DIR:-./backup}:/data/backups
 
 networks:
   edge:

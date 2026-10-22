@@ -21,6 +21,8 @@
 #   SHARED_NETWORK         external docker network the app joins so your proxy
 #                          can reach it (default: kirameku-edge)
 #   BACKUP_BEFORE_DEPLOY   1 = `pnpm db:backup --prune` before recreating (default: 1)
+#   APP_UID                UID the app runs as, used to own the bind-mounted data
+#                          directories (default: 1000)
 #   PRUNE_IMAGES           1 = drop dangling images after a successful deploy (default: 1)
 #   PULL_GIT               1 = `git pull --ff-only` before deploying (default: 0)
 #   GHCR_USER / GHCR_TOKEN optional; when set, docker logs in with a throwaway
@@ -134,7 +136,27 @@ if ! compose pull "$APP_SERVICE"; then
   DEPLOY_FAILED="could not pull the new image"
 fi
 
+# --- host data directories ---------------------------------------------------
+# docker-compose.yml bind-mounts the data and backup directories into the
+# container, and the app runs as UID 1000. Docker creates a *missing* bind-mount
+# host directory as root, which the app then cannot write to — the container
+# would come up and immediately fail on the database. So create and own them
+# before `compose up` touches them. Running through `compose run` keeps the host
+# paths defined in exactly one place (docker-compose.yml + .env) instead of
+# duplicating the KIRAMEKU_DATA_DIR / KIRAMEKU_BACKUP_DIR defaults here.
+prepare_data_dirs() {
+  local uid="${APP_UID:-1000}"
+  if compose run --rm -T --no-deps --user 0 --entrypoint sh "$APP_SERVICE" -c \
+      "mkdir -p /data/db /data/uploads /data/backups && chown \"$uid:$uid\" /data/db /data/uploads /data/backups" \
+      </dev/null >/dev/null 2>&1; then
+    log "data directories ready"
+  else
+    log "WARNING: could not prepare the bind-mounted data directories; check that KIRAMEKU_DATA_DIR and KIRAMEKU_BACKUP_DIR point at directories writable by UID $uid"
+  fi
+}
+
 if [ -z "$DEPLOY_FAILED" ]; then
+  prepare_data_dirs
   log "recreating containers"
   if [ -n "${SERVICES:-}" ]; then
     compose up -d --no-deps $SERVICES || DEPLOY_FAILED="docker compose up failed"
