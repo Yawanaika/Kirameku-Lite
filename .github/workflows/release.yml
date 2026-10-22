@@ -41,7 +41,11 @@ jobs:
 
       - name: Resolve image name
         id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kirameku" >> "$GITHUB_OUTPUT"
+        # Derive the package name from the repository itself, so the image is
+        # always pushed to a package this repository owns. A hardcoded name
+        # (/kirameku) collides with the package published by the old fork,
+        # which this repository has no write access to (write_package denied).
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -113,7 +117,7 @@ jobs:
 
       - name: Resolve image reference
         id: image
-        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kirameku:latest" >> "$GITHUB_OUTPUT"
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Install deploy key
         env:

@@ -47,7 +47,7 @@ name: kirameku
 
 services:
   app:
-    image: ${KIRAMEKU_IMAGE:-ghcr.io/yawanaika/kirameku:latest}
+    image: ${KIRAMEKU_IMAGE:-ghcr.io/yawanaika/kirameku-lite:latest}
     # `docker compose up -d` should always pick up a freshly pushed :latest.
     pull_policy: always
     restart: unless-stopped
