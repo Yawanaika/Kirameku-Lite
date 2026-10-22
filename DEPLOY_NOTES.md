@@ -54,7 +54,7 @@ sudo chown "$USER":"$USER" /srv/kirameku
 cd /srv/kirameku
 
 # compose 文件与部署脚本都来自仓库
-git clone https://github.com/<owner>/Kirameku-HomePage.git .
+git clone https://github.com/<owner>/Kirameku-Lite.git .
 # 或只同步需要的文件：
 #   docker-compose.yml、compose.env.example、scripts/deploy-server.sh
 #   （只有让本项目自带 Caddy 时才需要 Caddyfile 与 docker-compose.caddy.yml）

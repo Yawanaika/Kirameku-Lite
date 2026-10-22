@@ -2,6 +2,8 @@
 node_modules/
 .pnp
 .pnp.*
+# pnpm 在仓库根落地的内容寻址存储（视 pnpm 配置可能生成）
+.pnpm-store/
 
 # 构建产物
 .next/
@@ -47,8 +49,11 @@ next-env.d.ts
 # Vercel
 .vercel
 
-# 上传文件
-uploads/
+# 上传文件（只忽略运行时写入的目录）
+# 注意：Kirameku/app/uploads/ 是 `GET /uploads/*` 的 Route Handler，不是上传产物，
+# 必须保持可提交，否则上传的图片在生产环境会 404。
+/uploads/
+/Kirameku/uploads/
 
 # Docker 部署数据（docker-compose.yml 的 bind mount）
 /data/

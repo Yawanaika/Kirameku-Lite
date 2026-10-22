@@ -7,7 +7,9 @@ node_modules
 data/*.db
 data/*.db-*
 backups
-uploads
+# Runtime upload directory only. `app/uploads/` is the GET /uploads/* Route
+# Handler and must stay in the build context, otherwise uploaded images 404.
+/uploads/
 coverage
 *.log
 *.tsbuildinfo
