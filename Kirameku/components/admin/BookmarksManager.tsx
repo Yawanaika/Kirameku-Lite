@@ -12,6 +12,7 @@ import {
 import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { useAdminData } from "./use-admin-data";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ function splitPlatforms(value: string): string[] {
 }
 
 export default function BookmarksManager() {
+  const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("categories");
 
   const [categoryForm, setCategoryForm] =
@@ -180,7 +182,7 @@ export default function BookmarksManager() {
 
   async function removeCategory(item: BookmarkCategoryItem) {
     if (
-      !window.confirm(
+      !await confirm(
         `确定删除收藏分类「${item.name}」？分类下的站点也会一并删除。`,
       )
     ) {
@@ -262,7 +264,7 @@ export default function BookmarksManager() {
   }
 
   async function removeSite(item: BookmarkSiteItem) {
-    if (!window.confirm(`确定删除收藏站点「${item.name}」？`)) return;
+    if (!await confirm(`确定删除收藏站点「${item.name}」？`)) return;
     setBusyId(item.id);
     setActionError(null);
     try {

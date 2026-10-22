@@ -5,6 +5,7 @@ import { Braces, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -29,6 +30,7 @@ function valuePreview(value: string): string {
 }
 
 export default function SiteConfigManager() {
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -123,7 +125,7 @@ export default function SiteConfigManager() {
   }
 
   async function remove(item: SiteConfigAdminItem) {
-    if (!window.confirm(`确定删除配置「${item.key}」？`)) return;
+    if (!await confirm(`确定删除配置「${item.key}」？`)) return;
     setBusyKey(item.key);
     setActionError(null);
     try {

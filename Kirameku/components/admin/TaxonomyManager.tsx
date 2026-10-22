@@ -5,6 +5,7 @@ import { Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { useAdminData } from "./use-admin-data";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ function slugify(value: string): string {
 }
 
 export default function TaxonomyManager() {
+  const confirm = useConfirm();
   const [categoryForm, setCategoryForm] =
     useState<CategoryFormState>(emptyCategory);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(
@@ -125,7 +127,7 @@ export default function TaxonomyManager() {
   }
 
   async function removeCategory(item: CategoryItem) {
-    if (!window.confirm(`确定删除分类「${item.name}」？文章会变为未分类。`)) {
+    if (!await confirm(`确定删除分类「${item.name}」？文章会变为未分类。`)) {
       return;
     }
     setCategoryError(null);
@@ -182,7 +184,7 @@ export default function TaxonomyManager() {
 
   async function removeTag(item: TagItem) {
     if (
-      !window.confirm(
+      !await confirm(
         `确定删除标签「${item.name}」？文章与标签的关联会一并删除。`,
       )
     ) {

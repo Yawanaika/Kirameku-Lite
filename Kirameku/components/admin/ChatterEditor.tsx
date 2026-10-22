@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ const emptyForm: FormState = {
 };
 
 export default function ChatterEditor({ chatterId }: ChatterEditorProps) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(Boolean(chatterId));
@@ -104,7 +106,7 @@ export default function ChatterEditor({ chatterId }: ChatterEditorProps) {
 
   async function remove() {
     if (!chatterId) return;
-    if (!window.confirm("确定删除这条说说？关联评论会一并删除。")) return;
+    if (!await confirm("确定删除这条说说？关联评论会一并删除。")) return;
     setDeleting(true);
     setError(null);
     try {

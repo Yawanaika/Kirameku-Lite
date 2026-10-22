@@ -14,6 +14,7 @@ import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -43,6 +44,7 @@ const emptyForm: FormState = {
 };
 
 export default function FriendLinksManager() {
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -127,7 +129,7 @@ export default function FriendLinksManager() {
   }
 
   async function remove(item: FriendLinkItem) {
-    if (!window.confirm(`确定删除友链「${item.name}」？`)) return;
+    if (!await confirm(`确定删除友链「${item.name}」？`)) return;
     setMutatingId(item.id);
     setActionError(null);
     try {

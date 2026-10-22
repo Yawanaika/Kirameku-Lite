@@ -8,6 +8,7 @@ import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import AdminPagination from "./AdminPagination";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminQuery, adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -31,6 +32,7 @@ import type {
 const pageSize = 20;
 
 export default function PostsManager() {
+  const confirm = useConfirm();
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
@@ -86,7 +88,7 @@ export default function PostsManager() {
   }
 
   async function removePost(post: PostItem) {
-    if (!window.confirm(`确定删除文章「${post.title}」？此操作不可撤销。`)) {
+    if (!await confirm(`确定删除文章「${post.title}」？此操作不可撤销。`)) {
       return;
     }
     setMutatingId(post.id);

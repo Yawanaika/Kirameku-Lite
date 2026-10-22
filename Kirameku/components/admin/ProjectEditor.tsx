@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
 import ImageUploader from "./ImageUploader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +64,7 @@ function slugify(value: string): string {
 }
 
 export default function ProjectEditor({ projectId }: ProjectEditorProps) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [slugTouched, setSlugTouched] = useState(Boolean(projectId));
@@ -170,7 +172,7 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
 
   async function remove() {
     if (!projectId) return;
-    if (!window.confirm("确定删除这个项目？此操作不可撤销。")) return;
+    if (!await confirm("确定删除这个项目？此操作不可撤销。")) return;
     setDeleting(true);
     setError(null);
     try {

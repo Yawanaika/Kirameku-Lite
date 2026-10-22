@@ -37,8 +37,8 @@
 - `components/admin/admin-api.ts` 统一处理 JSON 请求、错误消息和 422 字段错误；401 时跳转登录页。
 - `components/admin/use-admin-data.ts` 统一处理列表加载、错误、刷新和 AbortController 取消请求；加载状态与请求 path/version 绑定，避免 effect 内同步 setState。
 - `components/admin/AdminNav.tsx` 使用 `usePathname()` 高亮当前模块。
-- 新增 `lib/utils.ts` 和 `components/ui/*`：`Button`、`Input`、`Textarea`、`Select`、`Label`、`Badge`、`Card`、`Table`。组件按 shadcn 的 `cn` + CVA 结构组织，当前使用原生表单控件，尚未引入 Radix Dialog/Select。
-- 删除操作使用浏览器确认框；文章/说说/评论/留言/项目/相册/收藏分类的删除语义与后台 API 一致，评论/留言删除会级联回复，相册删除会级联照片，收藏分类删除会级联站点。
+- 新增 `lib/utils.ts` 和 `components/ui/*`：`Button`、`Input`、`Textarea`、`Select`、`Label`、`Badge`、`Card`、`Table`。组件按 shadcn 的 `cn` + CVA 结构组织；表单仍使用原生控件，Radix Dialog 已在 P5.3 引入用于确认框。
+- 删除操作原使用浏览器确认框，P5.3 已替换为 Radix Dialog；文章/说说/评论/留言/项目/相册/收藏分类的删除语义与后台 API 一致，评论/留言删除会级联回复，相册删除会级联照片，收藏分类删除会级联站点。
 - 文章编辑器当前使用 Markdown 文本域，暂未接入 CodeMirror；字数按正文 `length` 实时计算，阅读时间为 `max(1, floor(wordCount / 300))`。
 - 相册详情新增 `GET /api/admin/albums/[id]` 返回 `{ album, photos }`；访客新增 `GET /api/admin/visitors/count` 返回总数。两者都要求管理员会话。
 
@@ -64,7 +64,7 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 ## 后续
 
 1. ~~图片上传迁移到本地/对象存储，随后把相册照片 URL 输入替换为上传控件。~~ 已在 P3.1 完成。
-2. 引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。
+2. ~~引入 Radix Dialog/Select、TanStack Table 或 react-hook-form（按实际复杂度决定），替换浏览器确认框和手写表格状态。~~ 已在 P5.3 引入 Radix Dialog、替换全部 19 处 `window.confirm`；TanStack Table / react-hook-form 未引入，现有手写表格状态规模可控。
 3. ~~文章编辑器接入 CodeMirror 和 Markdown 预览。~~ 已在 P5.2 完成。
 4. 后台移动端导航已完成（P5.2）；操作审计日志和更细的权限控制仍开放。
 5. ~~为新增的 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 补充路由级测试。~~ 已在 P5.2 完成。
@@ -114,15 +114,23 @@ API smoke                categories/tags/friend-links/bookmarks/albums/photos/
 - P3.1 记录中写的 `GET /uploads/[...path]` 当时实际并未落库，导致本地上传写入成功但读取 404；P5.1 已补齐并通过 smoke。
 - 新增 `/admin/account`（资料/改密），补齐后台最后一项账号入口。
 - 删除前检查 3、4、5 仍未完成：生产 SQLite 切流、PostgreSQL 备份可恢复、T+7 回滚窗口都需要运维确认后，才能删除 `Kirameku-backend/` 并清理 `postgres` devDependency。
-- 后续项 2、4（Radix Dialog、操作审计/细粒度权限）仍开放；CodeMirror 编辑器、Markdown 预览、后台移动端导航已在 P5.2 完成。
+- 后续项 4（操作审计/细粒度权限）仍开放；CodeMirror 编辑器、Markdown 预览、后台移动端导航已在 P5.2 完成，Radix 确认框已在 P5.3 完成。
 
 ## P5.2 后台编辑体验（2026-10-22）
 
 - 文章编辑器正文从 `<Textarea>` 换成 CodeMirror 6（复用仓库已有的 `codemirror` / `@codemirror/lang-markdown` / `@codemirror/theme-one-dark`）。`components/admin/MarkdownEditor.tsx` 封装受控编辑器：视图只创建一次，外部加载文章时通过 dispatch 同步内容，不重建编辑器。
-- 新增编辑/分栏/预览三种视图；预览通过 `POST /api/admin/markdown/preview` 走服务端 `lib/markdown.ts`，与前台文章页使用同一套 `remark → rehype-sanitize → rehype-highlight` 管线，输入上限 200,000 字符。客户端不引入第二套 Markdown 渲染器，也不把原始 HTML 交给 `dangerouslySetInnerHTML`。
+- 新增编辑/分栏/预览三种视图；预览通过 `POST /api/admin/markdown/preview` 走服务端 `lib/markdown.ts`，与前台文章页使用同一套 `remark → rehype-sanitize → rehype-highlight` 管线，输入上限 200,000 字符。客户端不引入第二套 Markdown 渲染器；注入预览的 HTML 只来自服务端清洗结果，与前台文章页的渲染方式一致。
 - 预览请求 400ms 防抖并可中止，避免快速输入时堆积请求；管理员会话 + 同源检查。
 - 后台移动端导航：`AdminShell` 侧栏在 `lg` 以下隐藏，新增 `AdminMobileNav` 抽屉（Escape/遮罩关闭、路由切换自动收起、焦点还原、Tab 焦点环、锁定滚动、桌面断点自动关闭）；桌面侧栏改为 sticky 独立滚动。
 - 同轮补齐 `GET /api/admin/albums/[id]`、`GET /api/admin/visitors/count` 与 Markdown 预览的路由级测试（见 P5 记录第 10 节）。
 - 验证：`/admin` SSR 含移动导航入口，`/admin/posts/new` SSR 含视图切换；未登录预览 401、管理员预览 200 且 `<script>` 被清除、代码块带 `hljs-*`、超长正文 422；27 个测试文件 / 145 个测试通过，生产 build 44 个静态页面。
+
+## P5.3 确认框迁移到 Radix Dialog（2026-10-22）
+
+- 新增 `@radix-ui/react-dialog` 1.3.1 及 `components/ui/dialog.tsx`（Portal、Overlay、Content、Title、Description）。
+- 新增 `components/admin/ConfirmProvider.tsx`：`useConfirm()` 返回 `Promise<boolean>`，替代 `window.confirm`；`AdminShell` 用 Provider 包裹所有后台页面。
+- 替换 15 个后台组件中的 19 处浏览器确认框；删除/清空操作的文案和级联语义保持不变，确认按钮使用 destructive 样式。
+- 可访问性由 Radix 提供：焦点陷阱、Escape/遮罩关闭、`role="dialog"` 与 aria 关联；同时只允许一个确认框，重复请求会先取消前一个。
+- 验证：14 个后台页面（含所有使用确认框的管理页）SSR 均 200；客户端 bundle 中已无 `window.confirm`；typecheck、27 个测试文件 / 145 个测试、生产 build 44 个静态页面通过。
 
 详见 [`docs/P5-加固验证记录.md`](./P5-加固验证记录.md)。

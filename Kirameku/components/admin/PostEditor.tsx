@@ -15,6 +15,7 @@ import {
 import AdminError from "./AdminError";
 import ImageUploader from "./ImageUploader";
 import MarkdownEditor from "./MarkdownEditor";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { useAdminData } from "./use-admin-data";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -86,6 +87,7 @@ function splitTags(value: string): string[] {
 }
 
 export default function PostEditor({ postId }: PostEditorProps) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [categoryName, setCategoryName] = useState("");
@@ -220,7 +222,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
 
   async function remove() {
     if (!postId) return;
-    if (!window.confirm("确定删除这篇文章？此操作不可撤销。")) return;
+    if (!await confirm("确定删除这篇文章？此操作不可撤销。")) return;
     setDeleting(true);
     setError(null);
     try {

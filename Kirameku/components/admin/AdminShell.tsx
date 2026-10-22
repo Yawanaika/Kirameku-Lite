@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AdminMobileNav from "./AdminMobileNav";
 import AdminNav from "./AdminNav";
+import { ConfirmProvider } from "./ConfirmProvider";
 import LogoutButton from "./LogoutButton";
 
 interface AdminShellProps {
@@ -17,7 +18,8 @@ export default function AdminShell({ admin, children }: AdminShellProps) {
   const displayName = admin.nickname || admin.username;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+    <ConfirmProvider>
+      <div className="min-h-screen bg-slate-950 text-slate-100 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden border-r border-white/10 bg-slate-900/70 px-5 py-6 lg:sticky lg:top-0 lg:block lg:h-screen lg:overflow-y-auto">
         <Link href="/admin" className="flex items-center gap-3 px-1">
           <span className="grid size-9 place-items-center rounded-xl bg-sky-400 text-sm font-black text-slate-950">
@@ -60,6 +62,7 @@ export default function AdminShell({ admin, children }: AdminShellProps) {
 
         <main className="p-5 lg:p-8">{children}</main>
       </div>
-    </div>
+      </div>
+    </ConfirmProvider>
   );
 }

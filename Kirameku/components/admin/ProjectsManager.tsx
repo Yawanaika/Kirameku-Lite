@@ -7,6 +7,7 @@ import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -23,6 +24,7 @@ import {
 import type { ProjectItem } from "@/server/modules/projects/contracts";
 
 export default function ProjectsManager() {
+  const confirm = useConfirm();
   const [mutatingId, setMutatingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const {
@@ -49,7 +51,7 @@ export default function ProjectsManager() {
   }
 
   async function removeProject(project: ProjectItem) {
-    if (!window.confirm(`确定删除项目「${project.name}」？`)) return;
+    if (!await confirm(`确定删除项目「${project.name}」？`)) return;
     setMutatingId(project.id);
     setActionError(null);
     try {

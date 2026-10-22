@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ImagePlus, Save, Trash2 } from "lucide-react";
 import AdminError from "./AdminError";
 import ImageUploader from "./ImageUploader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const emptyPhoto: PhotoFormState = {
 };
 
 export default function AlbumEditor({ albumId }: { albumId: number }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [album, setAlbum] = useState<AlbumItem | null>(null);
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -123,7 +125,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
   }
 
   async function removeAlbum() {
-    if (!window.confirm("确定删除这个相册？照片记录也会一并删除。")) return;
+    if (!await confirm("确定删除这个相册？照片记录也会一并删除。")) return;
     setDeleting(true);
     setError(null);
     try {
@@ -165,7 +167,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
   }
 
   async function removePhoto(photo: PhotoItem) {
-    if (!window.confirm("确定删除这张照片记录？")) return;
+    if (!await confirm("确定删除这张照片记录？")) return;
     setPhotoDeletingId(photo.id);
     setPhotoError(null);
     try {

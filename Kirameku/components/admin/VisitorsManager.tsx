@@ -6,6 +6,7 @@ import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import AdminPagination from "./AdminPagination";
+import { useConfirm } from "./ConfirmProvider";
 import { adminQuery, adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -24,6 +25,7 @@ import type { VisitorItem } from "@/server/modules/visitors/contracts";
 const pageSize = 20;
 
 export default function VisitorsManager() {
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -41,7 +43,7 @@ export default function VisitorsManager() {
   }>("/api/admin/visitors/count");
 
   async function remove(item: VisitorItem) {
-    if (!window.confirm(`确定删除访客记录 ${item.ip}？`)) return;
+    if (!await confirm(`确定删除访客记录 ${item.ip}？`)) return;
     setBusyId(item.id);
     setActionError(null);
     try {
@@ -62,7 +64,7 @@ export default function VisitorsManager() {
   }
 
   async function clearAll() {
-    if (!window.confirm("确定清空全部访客记录？此操作不可撤销。")) return;
+    if (!await confirm("确定清空全部访客记录？此操作不可撤销。")) return;
     setClearing(true);
     setActionError(null);
     try {

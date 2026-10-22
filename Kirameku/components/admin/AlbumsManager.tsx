@@ -7,6 +7,7 @@ import { Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import AdminEmptyState from "./AdminEmptyState";
 import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
+import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -32,6 +33,7 @@ const emptyForm: FormState = {
 };
 
 export default function AlbumsManager() {
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -95,7 +97,7 @@ export default function AlbumsManager() {
 
   async function remove(item: AlbumItem) {
     if (
-      !window.confirm(
+      !await confirm(
         `确定删除相册「${item.title}」？相册内的照片记录也会一并删除。`,
       )
     ) {

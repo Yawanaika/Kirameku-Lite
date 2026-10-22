@@ -8,6 +8,7 @@ import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import AdminPagination from "./AdminPagination";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminQuery, adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -147,6 +148,7 @@ function CommentNode({
 }
 
 export default function CommentsManager() {
+  const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("post");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -190,7 +192,7 @@ export default function CommentsManager() {
   }
 
   async function removeComment(comment: AdminComment) {
-    if (!window.confirm("确定删除这条评论？所有回复会一并删除。")) return;
+    if (!await confirm("确定删除这条评论？所有回复会一并删除。")) return;
     const pathPrefix =
       tab === "post"
         ? `/api/admin/comments/${comment.id}`

@@ -8,6 +8,7 @@ import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import AdminPagination from "./AdminPagination";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminQuery, adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -27,6 +28,7 @@ import type { ChatterItem } from "@/server/modules/chatters/contracts";
 const pageSize = 20;
 
 export default function ChattersManager() {
+  const confirm = useConfirm();
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [mutatingId, setMutatingId] = useState<number | null>(null);
@@ -67,7 +69,7 @@ export default function ChattersManager() {
 
   async function removeChatter(chatter: ChatterItem) {
     if (
-      !window.confirm(
+      !await confirm(
         "确定删除这条说说？关联的说说评论会一并删除，此操作不可撤销。",
       )
     ) {

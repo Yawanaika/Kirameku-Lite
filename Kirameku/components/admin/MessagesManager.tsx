@@ -8,6 +8,7 @@ import AdminError from "./AdminError";
 import AdminPageHeader from "./AdminPageHeader";
 import AdminPagination from "./AdminPagination";
 import StatusBadge from "./StatusBadge";
+import { useConfirm } from "./ConfirmProvider";
 import { adminQuery, adminRequest, describeAdminError } from "./admin-api";
 import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
@@ -136,6 +137,7 @@ function MessageNode({
 }
 
 export default function MessagesManager() {
+  const confirm = useConfirm();
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -173,7 +175,7 @@ export default function MessagesManager() {
   }
 
   async function removeMessage(message: MessageItem) {
-    if (!window.confirm("确定删除这条留言？所有回复会一并删除。")) return;
+    if (!await confirm("确定删除这条留言？所有回复会一并删除。")) return;
     setBusyId(message.id);
     setActionError(null);
     try {
