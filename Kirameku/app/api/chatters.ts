@@ -49,11 +49,6 @@ export function getChatterComments(chatterId: number) {
   );
 }
 
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("github_token") || "";
-}
-
 export function createChatterComment(data: {
   chatter_id: number;
   parent_id?: number;
@@ -62,9 +57,6 @@ export function createChatterComment(data: {
   return request<ChatterCommentItem>("/api/chatters/comments", {
     method: "POST",
     body: JSON.stringify(data),
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
   });
 }
 

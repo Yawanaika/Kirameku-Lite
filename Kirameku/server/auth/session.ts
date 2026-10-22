@@ -3,6 +3,7 @@ import { env, getAuthSecret } from "@/server/env";
 import {
   ADMIN_COOKIE,
   ADMIN_TTL_SECONDS,
+  GITHUB_TOKEN_COOKIE,
   GITHUB_TOKEN_TTL_SECONDS,
 } from "./constants";
 
@@ -11,6 +12,7 @@ export {
   ADMIN_TTL_SECONDS,
   GITHUB_STATE_COOKIE,
   GITHUB_STATE_TTL_SECONDS,
+  GITHUB_TOKEN_COOKIE,
   GITHUB_TOKEN_TTL_SECONDS,
 } from "./constants";
 
@@ -121,6 +123,30 @@ export function adminCookie(token: string): string {
 export function clearAdminCookie(): string {
   const parts = [
     `${ADMIN_COOKIE}=`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ];
+  if (env.NODE_ENV === "production") parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function githubCookie(token: string): string {
+  const parts = [
+    `${GITHUB_TOKEN_COOKIE}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${GITHUB_TOKEN_TTL_SECONDS}`,
+  ];
+  if (env.NODE_ENV === "production") parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function clearGithubCookie(): string {
+  const parts = [
+    `${GITHUB_TOKEN_COOKIE}=`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",

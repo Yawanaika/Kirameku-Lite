@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { githubUser } from "@/server/db/schema";
 import { env } from "@/server/env";
-import { signGithubToken, verifyGithubToken } from "@/server/auth/session";
+import {
+  GITHUB_TOKEN_COOKIE,
+  signGithubToken,
+  verifyGithubToken,
+} from "@/server/auth/session";
+import { readCookie } from "@/server/auth/cookies";
 import { errors } from "@/server/http/errors";
 import type { GithubPublicUser } from "./contracts";
 
@@ -169,7 +174,7 @@ export function createGithubAuthService(
       return {
         token,
         user: toPublicUser(row),
-        redirectUrl: `${frontendOrigin}/auth/callback?token=${encodeURIComponent(token)}`,
+        redirectUrl: `${frontendOrigin}/auth/callback`,
       };
     },
 
@@ -180,9 +185,7 @@ export function createGithubAuthService(
     },
 
     async userFromRequest(request: Request): Promise<GithubUserRow | null> {
-      const authorization = request.headers.get("authorization");
-      if (!authorization?.startsWith("Bearer ")) return null;
-      const token = authorization.slice("Bearer ".length).trim();
+      const token = readCookie(request, GITHUB_TOKEN_COOKIE);
       if (!token) return null;
       return userFromToken(token);
     },

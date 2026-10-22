@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -30,9 +29,12 @@ import {
   getMessages,
   createMessage,
   likeMessage,
-  getGithubUser,
   type MessageItem,
 } from "@/app/api/messages";
+import {
+  getGithubUser,
+  logoutGithubUser,
+} from "@/app/api/github-auth";
 import type { GitHubUser } from "@/app/api/types";
 
 // 递归展平嵌套回复，附带"回复谁"信息
@@ -71,9 +73,6 @@ function relativeTime(dateStr: string): string {
 }
 
 function MessagesContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<GitHubUser | null>(() => {
@@ -101,34 +100,19 @@ function MessagesContent() {
   );
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 处理 GitHub 登录回调
+  // 校验 httpOnly Cookie 中的 GitHub 登录态
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (token) {
-      localStorage.setItem("github_token", token);
-      getGithubUser(token).then((u) => {
+    localStorage.removeItem("github_token");
+    getGithubUser()
+      .then((u) => {
         setUser(u);
         localStorage.setItem("github_user", JSON.stringify(u));
+      })
+      .catch(() => {
+        localStorage.removeItem("github_user");
+        setUser(null);
       });
-      // 清除 URL 中的 token
-      router.replace("/messages");
-    } else {
-      // 验证已有 token 是否还有效
-      const savedToken = localStorage.getItem("github_token");
-      if (savedToken) {
-        getGithubUser(savedToken)
-          .then((u) => {
-            setUser(u);
-            localStorage.setItem("github_user", JSON.stringify(u));
-          })
-          .catch(() => {
-            localStorage.removeItem("github_token");
-            localStorage.removeItem("github_user");
-            setUser(null);
-          });
-      }
-    }
-  }, [searchParams, router]);
+  }, []);
 
   // 加载留言
   useEffect(() => {
@@ -154,8 +138,8 @@ function MessagesContent() {
     window.location.href = "/api/auth/github/login";
   }
 
-  function handleLogout() {
-    localStorage.removeItem("github_token");
+  async function handleLogout() {
+    await logoutGithubUser().catch(() => {});
     localStorage.removeItem("github_user");
     setUser(null);
   }
@@ -655,15 +639,5 @@ function ReplyCard({
 }
 
 export default function MessagesPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-[60vh] items-center justify-center text-sm text-slate-400">
-          加载留言中…
-        </div>
-      }
-    >
-      <MessagesContent />
-    </Suspense>
-  );
+  return <MessagesContent />;
 }

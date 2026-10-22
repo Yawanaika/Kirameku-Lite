@@ -3,6 +3,7 @@ import {
   GITHUB_STATE_COOKIE,
   GITHUB_STATE_TTL_SECONDS,
 } from "./constants";
+import { readCookie } from "./cookies";
 
 function cookieParts(value: string, maxAge: number): string {
   const parts = [
@@ -25,20 +26,5 @@ export function clearGithubStateCookie(): string {
 }
 
 export function readGithubStateCookie(request: Request): string | null {
-  const header = request.headers.get("cookie");
-  if (!header) return null;
-
-  for (const part of header.split(";")) {
-    const separator = part.indexOf("=");
-    if (separator === -1) continue;
-    const key = part.slice(0, separator).trim();
-    if (key !== GITHUB_STATE_COOKIE) continue;
-    const raw = part.slice(separator + 1).trim();
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  return readCookie(request, GITHUB_STATE_COOKIE);
 }

@@ -10,6 +10,10 @@ import {
   likeComment,
   type CommentItem,
 } from "@/app/api/comments";
+import {
+  getGithubUser,
+  logoutGithubUser,
+} from "@/app/api/github-auth";
 import type { GitHubUser } from "@/app/api/types";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -78,20 +82,16 @@ export default function PostComments({ postId }: { postId: number }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("github_token");
-    if (savedToken && !user) {
-      import("@/app/api/messages").then(({ getGithubUser }) => {
-        getGithubUser(savedToken)
-          .then((u) => {
-            setUser(u as unknown as GitHubUser);
-            localStorage.setItem("github_user", JSON.stringify(u));
-          })
-          .catch(() => {
-            localStorage.removeItem("github_token");
-            localStorage.removeItem("github_user");
-          });
+    localStorage.removeItem("github_token");
+    getGithubUser()
+      .then((u) => {
+        setUser(u);
+        localStorage.setItem("github_user", JSON.stringify(u));
+      })
+      .catch(() => {
+        localStorage.removeItem("github_user");
+        setUser(null);
       });
-    }
   }, []);
 
   useEffect(() => {
@@ -115,8 +115,8 @@ export default function PostComments({ postId }: { postId: number }) {
     window.location.href = "/api/auth/github/login";
   }
 
-  function handleLogout() {
-    localStorage.removeItem("github_token");
+  async function handleLogout() {
+    await logoutGithubUser().catch(() => {});
     localStorage.removeItem("github_user");
     setUser(null);
   }

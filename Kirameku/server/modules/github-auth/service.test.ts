@@ -80,11 +80,10 @@ describe("github auth service", () => {
       avatar: "https://avatars.example/octocat.png",
       bio: "octocat bio",
     });
-    expect(result.redirectUrl).toContain(
-      "http://localhost:3000/auth/callback?token=",
-    );
+    expect(result.redirectUrl).toBe("http://localhost:3000/auth/callback");
+    expect(result.redirectUrl).not.toContain("token");
 
-    const token = decodeURIComponent(result.redirectUrl.split("token=")[1]);
+    const token = result.token;
     expect(await verifyGithubToken(token)).toMatchObject({
       sub: String(result.user.id),
       aud: "github",
@@ -103,20 +102,25 @@ describe("github auth service", () => {
     expect(count.value).toBe(1);
   });
 
-  it("reads a GitHub user from a bearer token and rejects invalid tokens", async () => {
+  it("reads a GitHub user from the session cookie and ignores bearer tokens", async () => {
     const result = await service().handleCallback("code-1");
-    const token = decodeURIComponent(result.redirectUrl.split("token=")[1]);
 
     const request = new Request("http://localhost:3000/api/auth/github/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Cookie: `kir_gh=${encodeURIComponent(result.token)}` },
     });
     await expect(service().userFromRequest(request)).resolves.toMatchObject({
       id: result.user.id,
       login: "octocat",
     });
 
+    const bearerOnly = new Request(
+      "http://localhost:3000/api/auth/github/me",
+      { headers: { Authorization: `Bearer ${result.token}` } },
+    );
+    await expect(service().userFromRequest(bearerOnly)).resolves.toBeNull();
+
     const invalid = new Request("http://localhost:3000/api/auth/github/me", {
-      headers: { Authorization: "Bearer invalid" },
+      headers: { Cookie: "kir_gh=invalid" },
     });
     await expect(service().userFromRequest(invalid)).resolves.toBeNull();
   });

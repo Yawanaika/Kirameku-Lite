@@ -2,6 +2,9 @@ import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import { getAuthSecret } from "@/server/env";
 import {
+  GITHUB_TOKEN_TTL_SECONDS,
+  clearGithubCookie,
+  githubCookie,
   signAdminToken,
   signGithubToken,
   verifyAdminToken,
@@ -59,5 +62,23 @@ describe("github session", () => {
 
     expect(await verifyGithubToken(adminToken)).toBeNull();
     expect(await verifyAdminToken(githubToken)).toBeNull();
+  });
+
+  it("stores the github token in an httpOnly cookie", () => {
+    const cookie = githubCookie("token-value");
+
+    expect(cookie).toContain("kir_gh=token-value");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain(`Max-Age=${GITHUB_TOKEN_TTL_SECONDS}`);
+  });
+
+  it("clears the github cookie with Max-Age=0", () => {
+    const cookie = clearGithubCookie();
+
+    expect(cookie).toContain("kir_gh=");
+    expect(cookie).toContain("Max-Age=0");
+    expect(cookie).toContain("HttpOnly");
   });
 });

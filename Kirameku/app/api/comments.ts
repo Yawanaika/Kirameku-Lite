@@ -25,9 +25,6 @@ export function createComment(data: {
   return request<CommentItem>("/api/comments", {
     method: "POST",
     body: JSON.stringify(data),
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
   });
 }
 
@@ -36,9 +33,4 @@ export function likeComment(commentId: number, unlike = false) {
     `/api/comments/${commentId}/${unlike ? "unlike" : "like"}`,
     { method: "POST" }
   );
-}
-
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("github_token") || "";
 }

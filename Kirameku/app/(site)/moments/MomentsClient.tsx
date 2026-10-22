@@ -14,7 +14,7 @@ import {
   type ChatterCommentItem,
 } from "@/app/api";
 import type { ChatterItem } from "@/app/api/chatters";
-import { getGithubUser } from "@/app/api/messages";
+import { getGithubUser, logoutGithubUser } from "@/app/api/github-auth";
 import type { GitHubUser } from "@/app/api/types";
 import { siteConfig } from "@/siteConfig";
 
@@ -173,7 +173,7 @@ export default function MomentsClient({
     } catch {}
   }, []);
 
-  // 恢复 GitHub 登录状态
+  // 恢复 GitHub 登录状态（Cookie 校验，缓存仅用于首屏展示）
   useEffect(() => {
     const savedUser = localStorage.getItem("github_user");
     if (savedUser) {
@@ -183,12 +183,10 @@ export default function MomentsClient({
       } catch { localStorage.removeItem("github_user"); }
     }
 
-    const savedToken = localStorage.getItem("github_token");
-    if (savedToken) {
-      getGithubUser(savedToken)
-        .then((u) => { setUser(u); localStorage.setItem("github_user", JSON.stringify(u)); })
-        .catch(() => { localStorage.removeItem("github_token"); localStorage.removeItem("github_user"); });
-    }
+    localStorage.removeItem("github_token");
+    getGithubUser()
+      .then((u) => { setUser(u); localStorage.setItem("github_user", JSON.stringify(u)); })
+      .catch(() => { localStorage.removeItem("github_user"); setUser(null); });
   }, []);
 
   // "只看这条" 时加载评论
@@ -237,7 +235,11 @@ export default function MomentsClient({
   }
 
   function handleLogin() { sessionStorage.setItem("github_redirect", window.location.pathname); window.location.href = "/api/auth/github/login"; }
-  function handleLogout() { localStorage.removeItem("github_token"); localStorage.removeItem("github_user"); setUser(null); }
+  async function handleLogout() {
+    await logoutGithubUser().catch(() => {});
+    localStorage.removeItem("github_user");
+    setUser(null);
+  }
   function cancelReply() { setReplyTo(null); setCommentInput(""); }
 
   async function handleCommentLike(commentId: number) {

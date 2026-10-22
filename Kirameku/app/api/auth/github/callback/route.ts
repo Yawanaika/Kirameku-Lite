@@ -7,6 +7,7 @@ import {
 } from "@/server/auth/oauth-state";
 import { githubCallbackQuery } from "@/server/modules/github-auth/contracts";
 import { getGithubAuthService } from "@/server/modules/github-auth";
+import { githubCookie } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +34,12 @@ export async function GET(request: Request) {
       }
 
       const result = await getGithubAuthService().handleCallback(query.code);
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: result.redirectUrl,
-          "Set-Cookie": clearGithubStateCookie(),
-          "Cache-Control": "no-store",
-        },
-      });
+      const headers = new Headers();
+      headers.append("Set-Cookie", clearGithubStateCookie());
+      headers.append("Set-Cookie", githubCookie(result.token));
+      headers.set("Location", result.redirectUrl);
+      headers.set("Cache-Control", "no-store");
+      return new Response(null, { status: 302, headers });
     },
     { request },
   );

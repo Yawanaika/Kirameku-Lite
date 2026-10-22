@@ -28,9 +28,6 @@ export function createMessage(data: {
   return request<MessageItem>("/api/messages", {
     method: "POST",
     body: JSON.stringify(data),
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-    },
   });
 }
 
@@ -38,18 +35,4 @@ export function likeMessage(msgId: number, unlike = false) {
   return request<MessageItem>(`/api/messages/${msgId}/${unlike ? "unlike" : "like"}`, {
     method: "POST",
   });
-}
-
-export function getGithubUser(token: string) {
-  return request<{ id: number; login: string; avatar: string; bio: string }>(
-    "/api/auth/github/me",
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-}
-
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("github_token") || "";
 }
