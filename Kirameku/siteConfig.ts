@@ -55,12 +55,12 @@ export const siteConfig = {
     { name: "Tailwind 4", color: "text-teal-400" },
   ],
   icpConfig: {
-    name: "赣ICP备2025078417号",
-    link: "https://beian.miit.gov.cn/",
+    // name: "赣ICP备2025078417号",
+    // link: "https://beian.miit.gov.cn/",
   },
   moeIcpConfig: {
-    name: "萌ICP备20260527号",
-    link: "https://icp.gov.moe/?keyword=20260527",
+    // name: "萌ICP备20260527号",
+    // link: "https://icp.gov.moe/?keyword=20260527",
   },
 
   // 分类标题
