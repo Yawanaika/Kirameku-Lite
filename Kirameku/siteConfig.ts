@@ -2,18 +2,18 @@
 
 export const siteConfig = {
   // 网站标题与博主信息
-  title: "Starhiroの小站",
+  title: "Yawanaikaの秘密小窝",
   // 兜底值：站点 URL 优先取 SITE_URL，其次 FRONTEND_ORIGIN（见 server/site.ts）。
   // 只有两者都没配置时才会用到这里，正常部署不需要改这一行。
-  url: "https://boke.hiromu.top",
-  authorName: "Starhiro",
-  bio: "项目开源在 GitHub,点击下面的GitHub图标跳转,欢迎 star 和 fork！(◕‿◕)",
+  url: "https://blog.yawanaika.com",
+  authorName: "Yawanaika",
+  bio: "不想起床->不想上班->好饿->好困->好想下班->我还不困",
 
   // 头像设置
-  avatarUrl: "/images/hong.jpg",
+  avatarUrl: "/images/middlenightcat.jpg",
 
   // 分享卡片（Open Graph / Twitter）兜底值；可用 SITE_SHARE_* 环境变量覆盖
-  shareImage: "/images/hong.jpg",
+  shareImage: "/images/middlenightcat.jpg",
   shareCard: "summary_large_image" as const,
 
   // 背景设置
@@ -41,16 +41,14 @@ export const siteConfig = {
 
   // 社交链接
   social: {
-    github: "https://github.com/Xinghongia/Kirameku",
-    gitee: "https://gitee.com/hongzyh",
-    google: "mailto:guh982719@gmail.com",
-    email: "your.email@example.com",
-    qq: "123456789",
-    wechat: "your_wechat_id",
+    github: "https://github.com/yawanaika",
+    email: "hello@yawanaika.com",
+    wechat: "Yawanaika",
+    tg: "https://t.me/AYuiMe",
   },
 
   // 站点信息
-  buildDate: "2026-05-07T12:00:00",
+  buildDate: "2026-10-22T12:00:00",
   footerBadges: [
     { name: "Next.js 15", color: "text-sky-500" },
     { name: "React 19", color: "text-cyan-400" },

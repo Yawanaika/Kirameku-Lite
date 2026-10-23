@@ -12,6 +12,12 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+/** Opt-out flag: unset means on, "0"/"false" turns it off. */
+const flagOn = z.preprocess(
+  (value) => !(value === false || value === "0" || value === "false"),
+  z.boolean(),
+);
+
 const optionalUrl = z.preprocess(
   (value) =>
     typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -60,6 +66,18 @@ const envSchema = z.object({
   BACKUP_DIR: optionalString,
   /** Delete visitor records (including IPs) after this many days. */
   VISITOR_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  /**
+   * In-process alert checks (backup age, disk, error rate, pending content).
+   * Disable when the deployment should only serve traffic.
+   */
+  NOTIFICATION_CHECKS: flagOn,
+  /** How often the in-process alert checks run, in minutes. */
+  NOTIFICATION_INTERVAL_MINUTES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1440)
+    .default(5),
 });
 
 const parsed = envSchema.safeParse(process.env);

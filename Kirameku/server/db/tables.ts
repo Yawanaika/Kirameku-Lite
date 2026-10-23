@@ -31,6 +31,8 @@ const jsonColumns: Record<string, readonly string[]> = {
   project: ["tech_stack"],
   bookmark_site: ["platforms"],
   admin_audit_log: ["detail"],
+  notification_channel: ["config"],
+  notification_rule: ["channels", "settings"],
 };
 
 function kindOf(column: SQLiteColumn, tableName: string): ColumnKind {

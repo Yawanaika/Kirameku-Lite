@@ -7,6 +7,11 @@ export { comment } from "./comment";
 export { friendLink } from "./friend-link";
 export { githubUser } from "./github-user";
 export { message } from "./message";
+export {
+  notificationChannel,
+  notificationLog,
+  notificationRule,
+} from "./notification";
 export { post, postTag } from "./post";
 export { project } from "./project";
 export { siteConfig } from "./site-config";

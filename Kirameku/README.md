@@ -52,6 +52,16 @@ scripts/
 └── migrate/                # PostgreSQL → SQLite 导出/审计
 ```
 
+## 预警通知
+
+后台 `/admin/notifications` 提供站内预警推送：渠道配置、事件开关与阈值、手动推送、最近推送记录都在同一页。
+
+- 渠道：Telegram Bot、邮件（SMTP，nodemailer）、Webhook（JSON POST，可选 HMAC-SHA256 签名）。渠道参数存在 `notification_channel` 表，bot token / SMTP 密码 / 签名密钥用 `AUTH_SECRET` 派生密钥做 AES-256-GCM 加密，接口只回显掩码。
+- 事件：`backup.stale`、`disk.low`、`http.error_rate`、`http.not_found_burst`、`db.busy`、`site.health`、`content.pending`。每个事件可单独开关、选渠道、调阈值与冷却时间。
+- 定时巡检：进程内调度器（`instrumentation.ts`）每 `NOTIFICATION_INTERVAL_MINUTES` 分钟跑一次检查；`NOTIFICATION_CHECKS=0` 可关闭，只保留手动推送。
+- 外部推送：`POST /api/internal/notify`，需 `CRON_SECRET`（`Authorization: Bearer <secret>` 或 `x-kirameku-secret`），body 为 `{ eventKey, level, title, body, channels?, force?, fields?, link? }`，方便外部探针或自建巡检接入。
+- 推送记录写入 `notification_log`，只保留最近 2000 条。
+
 ## 常用命令
 
 | 命令 | 说明 |

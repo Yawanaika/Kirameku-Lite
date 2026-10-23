@@ -43,7 +43,7 @@ export default function WelcomeScreen() {
             className="text-4xl md:text-5xl font-bold text-white tracking-tight"
             style={{ fontFamily: "'Noto Serif SC', serif" }}
           >
-            小站
+            秘密小窝
           </span>
         </div>
 

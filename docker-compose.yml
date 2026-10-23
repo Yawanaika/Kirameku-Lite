@@ -112,6 +112,10 @@ services:
       OSS_CUSTOM_DOMAIN: ${OSS_CUSTOM_DOMAIN:-}
       OSS_PREFIX: ${OSS_PREFIX:-}
       VISITOR_RETENTION_DAYS: ${VISITOR_RETENTION_DAYS:-90}
+      # In-process alert checks (/admin/notifications). 1 = on, 0 = off;
+      # the interval is in minutes (1-1440).
+      NOTIFICATION_CHECKS: ${NOTIFICATION_CHECKS:-1}
+      NOTIFICATION_INTERVAL_MINUTES: ${NOTIFICATION_INTERVAL_MINUTES:-5}
     volumes:
       - ${KIRAMEKU_DATA_DIR:-./data}:/data
       # A separate bind mount so backups can be shipped elsewhere (rsync, another

@@ -68,7 +68,7 @@ describe("getShareConfig", () => {
     expect(getShareConfig()).toMatchObject({
       title: siteConfig.title,
       description: siteConfig.bio,
-      image: "https://blog.example.com/images/hong.jpg",
+      image: `https://blog.example.com${siteConfig.shareImage}`,
       card: "summary_large_image",
     });
   });
@@ -92,7 +92,7 @@ describe("getShareConfig", () => {
 
     expect(share.title).toBe("文章标题");
     expect(share.description).toBe(siteConfig.bio);
-    expect(share.image).toBe("https://blog.example.com/images/hong.jpg");
+    expect(share.image).toBe(`https://blog.example.com${siteConfig.shareImage}`);
   });
 
   it("drops the image when a page explicitly passes null", () => {

@@ -24,6 +24,7 @@ import {
   Settings,
   Bookmark,
 } from "lucide-react";
+import {siteConfig} from "@/siteConfig";
 
 const SettingsPanel = dynamic(() => import("@/components/ui/SettingsPanel"), { ssr: false });
 
@@ -201,13 +202,13 @@ export default function Navbar() {
               style={easterEgg ? { animation: "spin 0.5s ease-in-out 6, rainbow 3s linear" } : undefined}
             >
               <span className={`text-xl font-bold tracking-tight ${easterEgg ? "text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500" : "text-slate-800 dark:text-white"}`} style={{ fontFamily: "'Noto Serif SC', serif" }}>
-                Starhiro
+                {siteConfig.authorName}
               </span>
               <span className={`text-xl font-bold ${easterEgg ? "text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500" : "text-sky-500 dark:text-sky-400"}`} style={{ fontFamily: "serif" }}>
                 の
               </span>
               <span className={`text-xl font-bold tracking-tight ${easterEgg ? "text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500" : "text-slate-800 dark:text-white"}`} style={{ fontFamily: "'Noto Serif SC', serif" }}>
-                小站
+                秘密小窝
               </span>
             </Link>
 
