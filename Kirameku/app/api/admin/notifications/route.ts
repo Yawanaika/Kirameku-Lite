@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/server/auth/guard";
 import { handle } from "@/server/http/handler";
 import { getNotificationsService } from "@/server/modules/notifications";
-import { getSchedulerStatus } from "@/server/modules/notifications/scheduler";
+import { ensureNotificationScheduler } from "@/server/modules/notifications/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       await requireAdmin();
       const service = getNotificationsService();
       const state = await service.getState();
-      return { ...state, scheduler: getSchedulerStatus() };
+      return { ...state, scheduler: ensureNotificationScheduler() };
     },
     { request },
   );

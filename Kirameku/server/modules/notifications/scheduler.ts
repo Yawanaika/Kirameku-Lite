@@ -4,17 +4,33 @@ import { runNotificationChecks, type CheckReport } from "./checks";
 import { getNotificationsService } from "./index";
 
 /**
- * Interval-based alert evaluation. The app is one Node process, so a plain
- * timer is enough — no external scheduler and no extra runtime.
+ * Next.js may evaluate this module through separate server entry runtimes
+ * (instrumentation and route handlers). Keep scheduler state on globalThis so
+ * startup, status reads, and manual runs all observe the same process state.
  */
-let timer: ReturnType<typeof setInterval> | null = null;
-let initialTimer: ReturnType<typeof setTimeout> | null = null;
-let ticking = false;
+interface SchedulerState {
+  timer: ReturnType<typeof setInterval> | null;
+  initialTimer: ReturnType<typeof setTimeout> | null;
+  ticking: boolean;
+  lastRunAt: string | null;
+  lastReport: CheckReport | null;
+  lastError: string | null;
+  runCount: number;
+}
 
-let lastRunAt: string | null = null;
-let lastReport: CheckReport | null = null;
-let lastError: string | null = null;
-let runCount = 0;
+const schedulerStateKey = "__kiramekuNotificationScheduler" as const;
+const schedulerGlobal = globalThis as typeof globalThis & {
+  [schedulerStateKey]?: SchedulerState;
+};
+const state = (schedulerGlobal[schedulerStateKey] ??= {
+  timer: null,
+  initialTimer: null,
+  ticking: false,
+  lastRunAt: null,
+  lastReport: null,
+  lastError: null,
+  runCount: 0,
+});
 
 export interface SchedulerStatus {
   active: boolean;
@@ -27,20 +43,20 @@ export interface SchedulerStatus {
 
 export function getSchedulerStatus(): SchedulerStatus {
   return {
-    active: timer !== null,
+    active: state.timer !== null,
     interval_minutes: env.NOTIFICATION_INTERVAL_MINUTES,
-    run_count: runCount,
-    last_run_at: lastRunAt,
-    last_error: lastError,
-    last_triggered: lastReport?.triggered ?? [],
+    run_count: state.runCount,
+    last_run_at: state.lastRunAt,
+    last_error: state.lastError,
+    last_triggered: state.lastReport?.triggered ?? [],
   };
 }
 
 /** Run one evaluation round; concurrent calls are collapsed. */
 export async function runChecksNow(): Promise<CheckReport> {
-  if (ticking) {
+  if (state.ticking) {
     return (
-      lastReport ?? {
+      state.lastReport ?? {
         ran_at: new Date().toISOString(),
         outcomes: [],
         triggered: [],
@@ -49,38 +65,38 @@ export async function runChecksNow(): Promise<CheckReport> {
     );
   }
 
-  ticking = true;
+  state.ticking = true;
   try {
     const report = await runNotificationChecks(getNotificationsService());
-    lastReport = report;
-    lastRunAt = report.ran_at;
-    runCount += 1;
-    lastError = report.errors.length > 0 ? report.errors.join("; ") : null;
+    state.lastReport = report;
+    state.lastRunAt = report.ran_at;
+    state.runCount += 1;
+    state.lastError = report.errors.length > 0 ? report.errors.join("; ") : null;
     return report;
   } catch (error) {
-    lastError = error instanceof Error ? error.message : String(error);
-    lastRunAt = new Date().toISOString();
+    state.lastError = error instanceof Error ? error.message : String(error);
+    state.lastRunAt = new Date().toISOString();
     throw error;
   } finally {
-    ticking = false;
+    state.ticking = false;
   }
 }
 
 function schedule(intervalMinutes: number): void {
-  if (timer || initialTimer) return;
+  if (state.timer || state.initialTimer) return;
 
   const intervalMs = Math.max(1, intervalMinutes) * 60_000;
   // Wait a little after boot so the first check does not compete with startup.
-  initialTimer = setTimeout(() => {
-    initialTimer = null;
+  state.initialTimer = setTimeout(() => {
+    state.initialTimer = null;
     void runChecksNow().catch(() => undefined);
   }, 20_000);
-  initialTimer.unref?.();
+  state.initialTimer.unref?.();
 
-  timer = setInterval(() => {
+  state.timer = setInterval(() => {
     void runChecksNow().catch(() => undefined);
   }, intervalMs);
-  timer.unref?.();
+  state.timer.unref?.();
 }
 
 export function startNotificationScheduler(
@@ -90,13 +106,20 @@ export function startNotificationScheduler(
   return getSchedulerStatus();
 }
 
+/** Start lazily when an admin status request reaches a separate server bundle. */
+export function ensureNotificationScheduler(): SchedulerStatus {
+  return env.NOTIFICATION_CHECKS
+    ? startNotificationScheduler()
+    : getSchedulerStatus();
+}
+
 export function stopNotificationScheduler(): void {
-  if (initialTimer) {
-    clearTimeout(initialTimer);
-    initialTimer = null;
+  if (state.initialTimer) {
+    clearTimeout(state.initialTimer);
+    state.initialTimer = null;
   }
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
+  if (state.timer) {
+    clearInterval(state.timer);
+    state.timer = null;
   }
 }
