@@ -73,7 +73,7 @@ describe("notifications service", () => {
       "email",
       "webhook",
     ]);
-    expect(state.channels.every((channel) => channel.enabled === false)).toBe(true);
+    expect(state.channels.every((channel) => !channel.enabled)).toBe(true);
     expect(state.rules.length).toBeGreaterThan(0);
     expect(state.logs).toEqual([]);
     expect(state.log_total).toBe(0);
@@ -87,6 +87,16 @@ describe("notifications service", () => {
     expect(errorRate?.settings).toMatchObject({
       maxErrorPercent: 5,
       minRequests: 20,
+    });
+
+    const messageCreated = state.rules.find(
+      (rule) => rule.event_key === "message.created",
+    );
+    expect(messageCreated).toMatchObject({
+      enabled: true,
+      channels: [],
+      cooldown_seconds: 0,
+      thresholds: [],
     });
   });
 

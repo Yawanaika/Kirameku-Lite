@@ -160,6 +160,14 @@ export const NOTIFICATION_EVENTS: EventSpec[] = [
       },
     ],
   },
+  {
+    key: "message.created",
+    label: "收到新留言",
+    description: "有新留言或回复提交时立即发送通知。",
+    level: "info",
+    cooldownSeconds: 0,
+    thresholds: [],
+  },
 ];
 
 export function getEventSpec(eventKey: string): EventSpec | undefined {
