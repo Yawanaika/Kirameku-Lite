@@ -1,0 +1,32 @@
+# 方案 A：站外健康探针（Cloudflare Worker + Cron Trigger）。
+# 部署步骤、验证方式和故障域说明见同目录 README.md。
+#
+# 探针本身无状态：重复告警由服务端的 site.health 规则（900s 冷却）压制；
+# 只有「连通知端点都投不出去」的 Telegram 兜底路径才需要 KV 抑制窗口。
+name = "kirameku-probe"
+main = "src/index.ts"
+compatibility_date = "2026-10-20"
+
+# 打开 workers.dev 子域，方便手动触发一次探测（需要 CRON_SECRET 才能跑）。
+workers_dev = true
+
+[triggers]
+# 每 5 分钟一次；最小粒度就是 1 分钟，改成 */15 之类都可以。
+crons = ["*/5 * * * *"]
+
+[vars]
+TARGET_URL = "https://blog.yawanaika.com/api/health"
+NOTIFY_URL = "https://blog.yawanaika.com/api/internal/notify"
+
+# 需要设置的 secret（wrangler secret put <NAME>）：
+#   CRON_SECRET           与服务器 .env 里的 CRON_SECRET 相同，用来调用 /api/internal/notify
+#   TELEGRAM_BOT_TOKEN    可选。站点整体不可达时的直连兜底（与后台通知渠道同一个 bot）
+#   TELEGRAM_CHAT_ID      可选，同上
+#
+# 可选：绑定 KV 后 Telegram 兜底会自我抑制（默认 30 分钟一条）。
+# 不绑定也能用，但站点持续宕机时每 5 分钟就会推一条：
+#   wrangler kv namespace create PROBE_STATE
+#   然后把返回的 id 填进来，去掉下面三行的注释
+# [[kv_namespaces]]
+# binding = "PROBE_STATE"
+# id = ""

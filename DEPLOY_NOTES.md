@@ -270,7 +270,7 @@ IMAGE_REF=ghcr.io/<owner>/kirameku:latest bash scripts/deploy-server.sh
 4. `docker compose exec app pnpm db:backup --prune` 备份 SQLite（`BACKUP_BEFORE_DEPLOY=0` 可跳过）。
 5. `docker compose pull` → `docker compose up -d`。容器 entrypoint 会先跑 `pnpm db:migrate`。
 6. 轮询 `docker inspect` 的 healthcheck 状态（默认 180 秒）。
-7. 健康就结束并清理悬空镜像；不健康则打印日志，用上一个镜像 ID `up -d --pull never --force-recreate`，再检查一次健康，最终仍以非 0 退出。
+7. 健康就结束并清理悬空镜像，同时安装/刷新两个 systemd timer（每日维护 `kirameku-maintenance.timer` 见 6.3、每 5 分钟健康探针 `kirameku-probe.timer` 见 6.6）；不健康则打印日志，用上一个镜像 ID `up -d --pull never --force-recreate`，再检查一次健康，最终仍以非 0 退出。
 
 ## 5. 日常发布与回滚
 
@@ -430,6 +430,8 @@ docker compose logs --since 1h app | grep -i error
 | `GET /api/internal/metrics` | 进程、请求、数据库、备份、磁盘快照；需要 `CRON_SECRET` |
 | `logs/maintenance.log` | 每日维护输出 |
 | `systemctl list-timers kirameku-maintenance.timer` | 定时任务是否还活着 |
+| `logs/probe.log` | 外部探针每次探测的输出（失败次数、投递结果，见 6.6） |
+| `systemctl list-timers kirameku-probe.timer` | 健康探针是否还活着（见 6.6） |
 
 metrics 默认对外 404，只有在 `.env` 里配了 `CRON_SECRET` 才存在，且要带令牌访问：
 
@@ -441,7 +443,53 @@ curl -sH "Authorization: Bearer $CRON_SECRET" https://blog.yawanaika.com/api/int
 
 - `backups.latest_age_s`：最近一次备份至今的秒数，超过 26 小时就说明 timer 没跑成；
 - `backups.uploads_archives`：带图片归档的备份组数，配了 OSS 时它是 0；
-- `disk.available_bytes`：数据盘剩余空间（磁盘告警留到下一步做）。
+- `disk.available_bytes`：数据盘剩余空间（磁盘告警已由预警通知系统的 `disk.low` 规则接管，见 6.6）。
+
+### 6.6 外部健康探针
+
+站点自己的告警链路有一个结构性盲区：**所有通知都要经由站点投递**（`/api/internal/notify` 就在这台机器上），进程内的 `site.health` 自检也只看得见 Node 进程自己。于是「容器没起来 / 反代 502 / Tunnel 断了 / 整机宕机」这几种最需要有人知道的情况，恰恰一条告警都发不出来。补两个探针，故障域不同，都要配：
+
+| 探针 | 位置 | 覆盖 | 部署 |
+|:---|:---|:---|:---|
+| 进程内 `site.health` | 通知调度器 | 应用与数据库自检 | 已随预警通知系统上线 |
+| **B 同机** | systemd timer | 反代 502、Tunnel 断开、容器 unhealthy | 每次发布自动安装 |
+| **A 站外** | Cloudflare Worker + Cron Trigger | 反代/Tunnel/容器/整机全挂（Telegram 直连兜底） | 手动部署一次，见 `ops/cloudflare-probe/` |
+
+**B：同机探针（发布时自动安装）**
+
+每次成功发布会安装/刷新 `kirameku-probe.timer`，每 5 分钟执行一次 `scripts/probe-health.sh`：请求公网 `${SITE_URL}/api/health`，连续 `PROBE_FAIL_THRESHOLD`（默认 2）次失败后 POST `/api/internal/notify`（事件 `site.health`，服务端有 900s 冷却），恢复后再补一条「已恢复」。
+
+投递**优先走容器在 docker 网络上的地址**（`docker inspect` 取 IP + 3000 端口），而不是公网域名：反代坏掉时公网路径同样投不出去，而这一层正是探针要覆盖的。
+
+```bash
+# 状态与下次触发时间
+systemctl list-timers kirameku-probe.timer
+systemctl status kirameku-probe.service --no-pager
+
+# 每次探测一行，含 http 状态、连续失败次数与投递结果
+tail -n 50 logs/probe.log
+# 内部状态（连续失败次数 / 是否已告警），排查闪烁时看这个
+cat logs/.probe-state
+
+# 手工探测一次：只报告、不发通知
+bash scripts/probe-health.sh --dry-run
+```
+
+开关与频率在 `.env`：`PROBE_TIMER=0` 关掉，`PROBE_SCHEDULE=*-*-* *:0/10:00` 改成 10 分钟（改完重新发布一次让它重写 unit）。探针需要 `CRON_SECRET` 才能投递，没配时它只写日志。
+
+脚本只用 `curl` / `flock` / `docker` 这些标准工具，不依赖 node；`flock` 是 util-linux 的东西，所以开发机上手工跑会打一行 `WARNING: flock not found` 并降级为不加锁运行（服务器上不会出现这行）。
+
+服务器没有免密 sudo 时，部署会打 `WARNING: passwordless sudo unavailable; skipping health probe timer install` 并继续，这时用 cron 顶上：
+
+```cron
+*/5 * * * * cd /home/ubuntu/services/Kirameku-Lite && DEPLOY_PATH=$PWD bash scripts/probe-health.sh
+```
+
+**A：站外探针（单独部署一次）**
+
+同机探针和站点共用一个故障域：机器整机挂掉时它什么都发不出去。站外的 Cloudflare Worker 补的正是这一格 —— 从边缘每 5 分钟请求一次公网 `/api/health`，失败后先立即重试一次，仍失败才 POST `/api/internal/notify`；**连通知端点也投不出去时用 Telegram Bot API 直连兜底**。部署见 [`ops/cloudflare-probe/README.md`](./ops/cloudflare-probe/README.md)，需要 `wrangler` 与一次 `wrangler secret put CRON_SECRET`（值与服务器 `.env` 相同）。
+
+**这套设计的边界（写在这里省得以后误判）**：两个探针的告警最终都经由 `/api/internal/notify`，所以「站点整体不可达」时只有 A 的 Telegram 直连兜底送得出去；B 会在 `logs/probe.log` 里留一行 `WARNING: no delivery path worked`。这是设计的边界，不是配置问题。
 
 ## 7. 环境变量
 
@@ -461,6 +509,8 @@ curl -sH "Authorization: Bearer $CRON_SECRET" https://blog.yawanaika.com/api/int
 | `OSS_*` | 配置完整后图片写入阿里云 OSS |
 | `VISITOR_RETENTION_DAYS` | 访客 IP 记录保留天数，默认 90 |
 | `KIRAMEKU_IMAGE` | 可选，覆盖默认镜像标签；回滚脚本会临时设置它 |
+| `PROBE_TIMER` / `PROBE_SCHEDULE` | 同机健康探针的开关与频率，默认每 5 分钟（见 6.6） |
+| `PROBE_FAIL_THRESHOLD` | 连续失败几次才告警，默认 2（见 6.6） |
 
 数据库维护脚本不会自动加载 `.env.local`；用非默认路径时在命令前显式传 `DATABASE_PATH`。
 

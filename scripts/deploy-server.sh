@@ -28,6 +28,11 @@
 #                          scripts/maintenance.sh (default: 1; skipped when sudo
 #                          is not available non-interactively)
 #   MAINTENANCE_SCHEDULE   systemd OnCalendar for that timer (default: *-*-* 04:30:00)
+#   PROBE_TIMER            1 = install/refresh the systemd timer that dials the
+#                          public /api/health and reports failures through
+#                          /api/internal/notify (default: 1; skipped when sudo
+#                          is not available non-interactively)
+#   PROBE_SCHEDULE         systemd OnCalendar for that timer (default: *-*-* *:0/5:00)
 #   PULL_GIT               1 = `git pull --ff-only` before deploying (default: 0)
 #   GHCR_USER / GHCR_TOKEN optional; when set, docker logs in with a throwaway
 #                          config so no expired credential is left behind
@@ -257,9 +262,73 @@ UNIT
   fi
 }
 
+# --- external health probe ---------------------------------------------------
+# The in-process scheduler can only tell that the Node process is alive: a wrong
+# proxy config, a stopped cloudflared or an unhealthy container all look like a
+# normal process from the inside. Install a timer that dials the public
+# /api/health from the host and reports through /api/internal/notify. This still
+# shares the host's failure domain — pair it with ops/cloudflare-probe, which
+# runs off the machine and covers a dead host.
+install_probe_timer() {
+  local toggle="${PROBE_TIMER:-$(read_env PROBE_TIMER)}"
+  [ "${toggle:-1}" = "1" ] || { log "health probe timer disabled"; return 0; }
+  [ -f scripts/probe-health.sh ] || { log "WARNING: scripts/probe-health.sh missing, no probe timer"; return 0; }
+  if ! sudo -n true 2>/dev/null; then
+    log "WARNING: passwordless sudo unavailable; skipping health probe timer install"
+    log "         install it manually (see DEPLOY_NOTES.md 6.6) or run bash scripts/probe-health.sh from cron"
+    return 0
+  fi
+
+  local unit_dir=/etc/systemd/system
+  local schedule="${PROBE_SCHEDULE:-$(read_env PROBE_SCHEDULE)}"
+  schedule="${schedule:-*-*-* *:0/5:00}"
+  local deploy_dir
+  deploy_dir="$(pwd)"
+
+  sudo -n tee "$unit_dir/kirameku-probe.service" >/dev/null <<UNIT
+[Unit]
+Description=Kirameku external health probe (public /api/health)
+Documentation=file://$deploy_dir/DEPLOY_NOTES.md
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$deploy_dir
+Environment=DEPLOY_PATH=$deploy_dir
+Environment="COMPOSE_FILE=$COMPOSE_FILES"
+ExecStart=/usr/bin/env bash $deploy_dir/scripts/probe-health.sh
+Nice=10
+UNIT
+
+  sudo -n tee "$unit_dir/kirameku-probe.timer" >/dev/null <<UNIT
+[Unit]
+Description=Probe the public site from the host
+
+[Timer]
+OnCalendar=$schedule
+# No randomised delay: a probe is meant to be punctual, and a missed window
+# should be visible in the log rather than smeared into the next one.
+AccuracySec=10s
+Unit=kirameku-probe.service
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+  if sudo -n systemctl daemon-reload \
+    && sudo -n systemctl enable --now kirameku-probe.timer >/dev/null 2>&1; then
+    log "health probe timer active ($schedule)"
+  else
+    log "WARNING: could not enable kirameku-probe.timer"
+  fi
+}
+
 if [ -z "$DEPLOY_FAILED" ] && wait_healthy; then
   log "healthy"
   install_maintenance_timer
+  install_probe_timer
   compose ps
   if [ "${PRUNE_IMAGES:-1}" = "1" ]; then
     docker image prune -f >/dev/null 2>&1 || true
