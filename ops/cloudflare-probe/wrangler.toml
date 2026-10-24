@@ -3,7 +3,7 @@
 #
 # 探针本身无状态：重复告警由服务端的 site.health 规则（900s 冷却）压制；
 # 只有「连通知端点都投不出去」的 Telegram 兜底路径才需要 KV 抑制窗口。
-name = "kirameku-probe"
+name = "kirameku-lite"
 main = "src/index.ts"
 compatibility_date = "2026-10-20"
 
