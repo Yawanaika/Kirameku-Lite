@@ -95,7 +95,7 @@ async function probe(target: string): Promise<ProbeResult> {
       // An edge cache answering for the origin would make a broken site look
       // healthy. /api/health already sends no-store; this is belt and braces.
       cf: { cacheTtl: 0, cacheEverything: false },
-      headers: { "user-agent": "kirameku-probe/1 (+ops/cloudflare-probe)", "cache-control": "no-cache" },
+      headers: { "user-agent": "kirameku-lite/1 (+ops/cloudflare-probe)", "cache-control": "no-cache" },
     };
     const response = await fetch(target, init as RequestInit);
     const text = (await response.text()).slice(0, 300);
@@ -152,7 +152,7 @@ async function notifyTelegram(env: Env, result: ProbeResult, trigger: string, si
     return "telegram suppressed (within the suppression window)";
   }
   const text = [
-    "🚨 Kirameku 外部探针：站点不可达",
+    "🚨 Kirameku-Lite 外部探针：站点不可达",
     `目标：${env.TARGET_URL}`,
     `状态：${result.status ?? "n/a"}`,
     `触发：${trigger}`,
