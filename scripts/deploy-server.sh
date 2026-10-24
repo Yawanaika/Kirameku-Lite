@@ -33,7 +33,8 @@
 #                          /api/internal/notify (default: 1; skipped when sudo
 #                          is not available non-interactively)
 #   PROBE_SCHEDULE         systemd OnCalendar for that timer (default: *-*-* *:0/5:00)
-#   PULL_GIT               1 = `git pull --ff-only` before deploying (default: 0)
+#   PULL_GIT               1 = `git pull --ff-only` before deploying (default: 0;
+#                          also read from .env)
 #   GHCR_USER / GHCR_TOKEN optional; when set, docker logs in with a throwaway
 #                          config so no expired credential is left behind
 set -euo pipefail
@@ -51,9 +52,22 @@ for file in $COMPOSE_FILES; do
   [ -f "$file" ] || fail "missing $file in $(pwd)"
 done
 
-if [ "${PULL_GIT:-0}" = "1" ] && [ -d .git ]; then
+read_env() {
+  # Read KEY from .env (last occurrence wins) so deploy-time switches can live
+  # next to the rest of the configuration. Values are unquoted and trimmed.
+  sed -n "s/^$1=//p" .env | tail -n1 | tr -d '\r' | sed -e "s/^[\"' ]*//" -e "s/[\"' ]*$//"
+}
+
+# PULL_GIT is read from the environment first and then from .env, like every
+# other deploy-time switch below — it used to consult the environment only,
+# which silently ignored PULL_GIT=1 in .env. A failed pull must not abort the
+# deploy: the image is already published, and this step only brings repository
+# files (scripts, compose overrides) in step with it.
+if [ "${PULL_GIT:-$(read_env PULL_GIT)}" = "1" ] && [ -d .git ]; then
   log "updating working tree"
-  git pull --ff-only
+  if ! git pull --ff-only; then
+    log "WARNING: git pull failed; deploying with the existing working tree"
+  fi
 fi
 
 # --- shared proxy network ----------------------------------------------------
@@ -61,11 +75,6 @@ fi
 # proxy — typically a Caddy container in another compose project — can reach it
 # as kirameku-app:3000. An external network must exist before `compose up`, and
 # creating it is idempotent, so do it here rather than making it a manual step.
-read_env() {
-  # Read KEY from .env (last occurrence wins) so deploy-time switches can live
-  # next to the rest of the configuration. Values are unquoted and trimmed.
-  sed -n "s/^$1=//p" .env | tail -n1 | tr -d '\r' | sed -e "s/^[\"' ]*//" -e "s/[\"' ]*$//"
-}
 
 if [ -z "${SHARED_NETWORK:-}" ] && [ -f .env ]; then
   # Read it from .env so the network created here is the one compose will join.
