@@ -461,6 +461,8 @@ curl -sH "Authorization: Bearer $CRON_SECRET" https://blog.yawanaika.com/api/int
 
 投递**优先走容器在 docker 网络上的地址**（`docker inspect` 取 IP + 3000 端口），而不是公网域名：反代坏掉时公网路径同样投不出去，而这一层正是探针要覆盖的。
 
+投递结果按响应里的 `sent` 判定：只有 `"sent":true` 才算送达；`"sent":false`（事件被关闭 / 没配渠道 / 命中 900s 冷却）会在 `probe.log` 里留一行 `WARNING: endpoint accepted the call but sent nothing`，两条地址都没答上 `sent` 才记 `no delivery path worked`（即本节末尾那条设计边界）。定时器每 5 分钟一轮、而 `site.health` 冷却 900s，所以**持续故障期间首条告警之后的每一轮都是 `sent:false`，属预期行为、不是投递故障**。
+
 ```bash
 # 状态与下次触发时间
 systemctl list-timers kirameku-probe.timer

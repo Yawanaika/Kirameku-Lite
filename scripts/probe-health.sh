@@ -142,7 +142,10 @@ direct_base() {
 json_escape() { printf '%s' "$1" | tr -d '\r\n\t' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 
 notify() {
-  local level="$1" title="$2" body="$3" payload url response base handled=0
+  local level="$1" title="$2" body="$3" payload url response base
+  # accepted = the endpoint returned a delivery verdict at all; delivered = it
+  # actually pushed the alert. Only the second one means the probe is done.
+  local accepted=0 delivered=0
   if [ "$dry_run" = "1" ]; then
     log "dry-run: would notify [$level] $title"
     return 0
@@ -167,18 +170,36 @@ notify() {
       -H "Authorization: Bearer $secret" -H 'content-type: application/json' \
       -d "$payload" 2>&1 || true)"
     log "notify via $url -> ${response:-<no response>}"
+    # Match the value, not just the key: '"sent":' is a prefix of '"sent":false'
+    # as well, so key-only matching cannot tell a delivered alert from one the
+    # endpoint accepted and then dropped (event off / no channel / cooldown).
+    # Both addresses reach the same app and the same database, so the first
+    # verdict ends the loop either way.
     case "$response" in
-      *'"sent":'*) handled=1; break ;;
+      *'"sent":true'*)
+        accepted=1; delivered=1
+        break
+        ;;
+      *'"sent":false'*)
+        accepted=1
+        break
+        ;;
     esac
   done
 
-  if [ "$handled" = "1" ]; then
-    case "$response" in
-      *'"sent":false'*) log "WARNING: endpoint accepted the call but sent nothing (see reason above)" ;;
-    esac
-  else
-    log "WARNING: no delivery path worked; only an off-host probe (ops/cloudflare-probe) can report this state"
+  if [ "$delivered" = "1" ]; then
+    return 0
   fi
+
+  # "sent":false is a normal answer for this event: site.health carries a 900s
+  # server-side cooldown while the timer fires every 5 minutes, so every round
+  # after the first alert of a continuing outage lands here.
+  if [ "$accepted" = "1" ]; then
+    log "WARNING: endpoint accepted the call but sent nothing (see reason above); this alert was not delivered"
+    return 0
+  fi
+
+  log "WARNING: no delivery path worked; only an off-host probe (ops/cloudflare-probe) can report this state"
 }
 
 body_file="$(mktemp)"
