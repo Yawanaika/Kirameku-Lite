@@ -461,7 +461,7 @@ curl -sH "Authorization: Bearer $CRON_SECRET" https://blog.yawanaika.com/api/int
 
 投递**优先走容器在 docker 网络上的地址**（`docker inspect` 取 IP + 3000 端口），而不是公网域名：反代坏掉时公网路径同样投不出去，而这一层正是探针要覆盖的。
 
-投递结果按响应里的 `sent` 判定：只有 `"sent":true` 才算送达；`"sent":false`（事件被关闭 / 没配渠道 / 命中 900s 冷却）会在 `probe.log` 里留一行 `WARNING: endpoint accepted the call but sent nothing`，两条地址都没答上 `sent` 才记 `no delivery path worked`（即本节末尾那条设计边界）。定时器每 5 分钟一轮、而 `site.health` 冷却 900s，所以**持续故障期间首条告警之后的每一轮都是 `sent:false`，属预期行为、不是投递故障**。
+投递结果按响应里的 `sent` 判定：只有 `"sent":true` 才算送达。`"sent":false` 有四种来源，都能在 `probe.log` 里上一行那条完整响应中看到 —— 事件被关闭（带 `skipped:"rule-disabled"`）、没为该事件选渠道（`"no-channel"`）、命中 900s 冷却（`"cooldown"`）、以及所有渠道都没发成功（**不带 `skipped`**，`reason` 为「所有渠道发送失败」，`outcomes` 里列出每个渠道的 `ok`/`error`，少数情况下是「没有可用的推送渠道（未启用或未配置完整）」）。前三种是服务端有意跳过：脚本记一行 `WARNING: endpoint accepted the call but sent nothing (see reason above); this alert was not delivered` 后照常返回；第四种才是真的投递故障，`reason` 不是「冷却中」就该去查通道配置。判定只看值不看键 —— 键名 `"sent":` 是 `"sent":false` 的前缀，所以脚本匹配的是完整的 `"sent":true` / `"sent":false`；两条地址（docker 网络 + 公网域名）指向同一个应用与同一个库，拿到第一个判决就结束循环。两条都没答上 `sent` 才记 `no delivery path worked`（即本节末尾那条设计边界）。定时器每 5 分钟一轮、而 `site.health` 冷却 900s，所以**持续故障期间首条告警之后的每一轮都是 `sent:false`（冷却），属预期行为、不是投递故障**。
 
 ```bash
 # 状态与下次触发时间
