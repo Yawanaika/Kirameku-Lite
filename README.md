@@ -172,23 +172,24 @@ docker compose exec app \
 
 ## 环境变量
 
-本地开发使用 `Kirameku/.env.local`（完整清单见 `.env.example`）；Docker Compose 使用仓库根目录 `.env`（模板见 `compose.env.example`）。
+本地开发使用 `Kirameku/.env.local`（模板 [`Kirameku/.env.example`](./Kirameku/.env.example)）；Docker Compose 使用仓库根目录 `.env`（模板 [`compose.env.example`](./compose.env.example)）。两份模板的变量名、区块顺序与默认值保持一致，只有少量变量分属两个场景（Compose 侧多 `SHARED_NETWORK` / `SITE_DOMAIN` / `KIRAMEKU_*` / `MAINTENANCE_*` / `PROBE_*` / `PULL_GIT`，裸机侧多本地路径）。关键变量：
 
 ```env
 DATABASE_PATH=./data/kirameku.db
 SITE_READ_ONLY=0
 AUTH_SECRET=          # openssl rand -base64 48
+CRON_SECRET=          # 可选：保护 /api/internal/* 维护接口
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
-GITHUB_REDIRECT_URI=http://localhost:3000/api/auth/github/callback
+# GITHUB_REDIRECT_URI=http://localhost:3000/api/auth/github/callback
 
 # 图片上传：配置完整 OSS_* 后写入 OSS，否则写入 UPLOAD_DIR
 OSS_ACCESS_KEY_ID=
 OSS_ACCESS_KEY_SECRET=
 OSS_BUCKET_NAME=
-OSS_ENDPOINT=
+# OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com
 OSS_CUSTOM_DOMAIN=
-OSS_PREFIX=Boke/
+# OSS_PREFIX=Boke/
 UPLOAD_DIR=./uploads
 
 VISITOR_RETENTION_DAYS=90

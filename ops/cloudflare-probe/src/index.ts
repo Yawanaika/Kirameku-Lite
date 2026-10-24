@@ -11,9 +11,24 @@
  * Deploy: see ops/cloudflare-probe/README.md
  */
 
-interface KVStore {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+/**
+ * The slice of the D1 API this file uses. Declared locally so the probe still
+ * type-checks with a plain `tsc` (no @cloudflare/workers-types dependency).
+ */
+interface D1Result {
+  success: boolean;
+  meta?: unknown;
+}
+
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T = unknown>(): Promise<T | null>;
+  run(): Promise<D1Result>;
+}
+
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
 }
 
 interface Env {
@@ -22,7 +37,8 @@ interface Env {
   CRON_SECRET?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
-  PROBE_STATE?: KVStore;
+  /** D1 database holding the fallback-alert log; see wrangler.toml. */
+  PROBE_DB?: D1Database;
 }
 
 interface Ctx {
@@ -38,7 +54,18 @@ interface ProbeResult {
 const PROBE_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 2_000;
 const TELEGRAM_SUPPRESS_SECONDS = 30 * 60;
-const STATE_KEY = "last-telegram-alert";
+/** Every Telegram fallback lands as one row of this kind in `probe_alerts`. */
+const TELEGRAM_ALERT_KIND = "telegram-fallback";
+/** Rows older than this are pruned on every write; the table is a short log. */
+const ALERT_RETENTION_DAYS = 30;
+const SCHEMA_SQL = [
+  "CREATE TABLE IF NOT EXISTS probe_alerts (" +
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+    "kind TEXT NOT NULL, " +
+    "created_at INTEGER NOT NULL, " +
+    "detail TEXT)",
+  "CREATE INDEX IF NOT EXISTS probe_alerts_kind_created_at ON probe_alerts (kind, created_at DESC)",
+];
 
 export default {
   async scheduled(_event: unknown, env: Env, ctx: Ctx): Promise<void> {
@@ -169,35 +196,56 @@ async function notifyTelegram(env: Env, result: ProbeResult, trigger: string, si
     if (!response.ok) {
       return `telegram ${response.status} ${(await response.text()).slice(0, 160)}`;
     }
-    await rememberAlert(env);
+    await rememberAlert(env, result, trigger);
     return "telegram";
   } catch (error) {
     return `telegram failed: ${errorMessage(error)}`;
   }
 }
 
-/** Suppression needs KV; without the binding the fallback repeats every cron tick. */
+/**
+ * Suppression lives in D1 (`probe_alerts`); without the binding the fallback
+ * repeats on every cron tick.
+ */
 async function recentlyAlerted(env: Env): Promise<boolean> {
-  if (!env.PROBE_STATE) return false;
+  if (!env.PROBE_DB) return false;
   try {
-    const stored = await env.PROBE_STATE.get(STATE_KEY);
-    const at = stored ? Number(stored) : 0;
-    return Number.isFinite(at) && Date.now() - at < TELEGRAM_SUPPRESS_SECONDS * 1000;
+    const row = await env.PROBE_DB.prepare(
+      "SELECT created_at FROM probe_alerts WHERE kind = ? ORDER BY created_at DESC LIMIT 1",
+    )
+      .bind(TELEGRAM_ALERT_KIND)
+      .first<{ created_at: number }>();
+    const at = Number(row?.created_at ?? 0);
+    return Number.isFinite(at) && at > 0 && Date.now() - at < TELEGRAM_SUPPRESS_SECONDS * 1000;
   } catch {
     // A failed suppression read must never swallow the fallback alert: treat an
-    // unreadable KV as "not suppressed" and let the Telegram call go out.
+    // unreadable database as "not suppressed" and let the Telegram call go out.
     return false;
   }
 }
 
-async function rememberAlert(env: Env): Promise<void> {
-  if (!env.PROBE_STATE) return;
+async function rememberAlert(env: Env, result: ProbeResult, trigger: string): Promise<void> {
+  if (!env.PROBE_DB) return;
   try {
-    await env.PROBE_STATE.put(STATE_KEY, String(Date.now()), { expirationTtl: TELEGRAM_SUPPRESS_SECONDS * 2 });
+    // The CREATE statements are issued here on purpose: an un-migrated database
+    // only loses suppression until the first alert creates the table, and one
+    // batch keeps schema + prune + insert in a single round trip.
+    await env.PROBE_DB.batch([
+      env.PROBE_DB.prepare(SCHEMA_SQL[0]),
+      env.PROBE_DB.prepare(SCHEMA_SQL[1]),
+      env.PROBE_DB.prepare("DELETE FROM probe_alerts WHERE created_at < ?").bind(
+        Date.now() - ALERT_RETENTION_DAYS * 86_400_000,
+      ),
+      env.PROBE_DB.prepare("INSERT INTO probe_alerts (kind, created_at, detail) VALUES (?, ?, ?)").bind(
+        TELEGRAM_ALERT_KIND,
+        Date.now(),
+        `${result.status ?? "n/a"} ${trigger}: ${result.detail}`.slice(0, 300),
+      ),
+    ]);
   } catch (error) {
     // The message already went out; a failed suppression write only costs us a
     // duplicate next tick, so it must not be reported as a delivery failure.
-    console.warn(`probe: could not record suppression window: ${errorMessage(error)}`);
+    console.warn(`probe: could not record the suppression window: ${errorMessage(error)}`);
   }
 }
 

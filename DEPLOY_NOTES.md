@@ -477,6 +477,8 @@ bash scripts/probe-health.sh --dry-run
 
 开关与频率在 `.env`：`PROBE_TIMER=0` 关掉，`PROBE_SCHEDULE=*-*-* *:0/10:00` 改成 10 分钟（改完重新发布一次让它重写 unit）。探针需要 `CRON_SECRET` 才能投递，没配时它只写日志。
 
+要**立即**停用还要 `sudo systemctl disable --now kirameku-probe.timer`（unit 文件保留，`sudo systemctl enable --now kirameku-probe.timer` 即可恢复）：`.env` 里的 `PROBE_TIMER=0` 只保证下次发布不再装回来 —— 不加它的话，下一次 push `main` 触发的发布会把它重新启用。
+
 脚本只用 `curl` / `flock` / `docker` 这些标准工具，不依赖 node；`flock` 是 util-linux 的东西，所以开发机上手工跑会打一行 `WARNING: flock not found` 并降级为不加锁运行（服务器上不会出现这行）。
 
 服务器没有免密 sudo 时，部署会打 `WARNING: passwordless sudo unavailable; skipping health probe timer install` 并继续，这时用 cron 顶上：
@@ -510,7 +512,7 @@ COMPOSE_FILES=docker-compose.yml bash -c \
 
 同机探针和站点共用一个故障域：机器整机挂掉时它什么都发不出去。站外的 Cloudflare Worker 补的正是这一格 —— 从边缘每 5 分钟请求一次公网 `/api/health`，失败后先立即重试一次，仍失败才 POST `/api/internal/notify`；**连通知端点也投不出去时用 Telegram Bot API 直连兜底**。部署见 [`ops/cloudflare-probe/README.md`](./ops/cloudflare-probe/README.md)，需要 `wrangler` 与一次 `wrangler secret put CRON_SECRET`（值与服务器 `.env` 相同）。
 
-**生产状态（2026-10-24）**：Worker `kirameku-lite` 已部署在 `https://kirameku-lite.yawanaika.workers.dev`（cron `*/5 * * * *` 已注册），KV 命名空间 `kirameku-lite` 已绑定为 `PROBE_STATE`。手动触发只能在能访问 `*.workers.dev` 的机器上做（本机大陆网络直连超时），命令、绑定注意事项与 `inherit` 这个坑见该 README 的「当前生产状态」一节。
+**生产状态（2026-10-24）**：Worker `kirameku-lite` 已部署在 `https://kirameku-lite.yawanaika.workers.dev`（cron `*/5 * * * *` 已注册），D1 数据库 `kirameku-lite`（表 `probe_alerts`）已绑定为 `PROBE_DB` —— v1 用的 KV `PROBE_STATE` 已退役。手动触发只能在能访问 `*.workers.dev` 的机器上做（本机大陆网络直连超时），命令、绑定注意事项与 `inherit` 这个坑见该 README 的「当前生产状态」一节。
 
 **这套设计的边界（写在这里省得以后误判）**：两个探针的告警最终都经由 `/api/internal/notify`，所以「站点整体不可达」时只有 A 的 Telegram 直连兜底送得出去；B 会在 `logs/probe.log` 里留一行 `WARNING: no delivery path worked`。这是设计的边界，不是配置问题。
 
@@ -534,6 +536,7 @@ COMPOSE_FILES=docker-compose.yml bash -c \
 | `KIRAMEKU_IMAGE` | 可选，覆盖默认镜像标签；回滚脚本会临时设置它 |
 | `PROBE_TIMER` / `PROBE_SCHEDULE` | 同机健康探针的开关与频率，默认每 5 分钟（见 6.6） |
 | `PROBE_FAIL_THRESHOLD` | 连续失败几次才告警，默认 2（见 6.6） |
+| `PULL_GIT` | `1` = 每次发布先 `git pull --ff-only`；仓库里新增的脚本与覆盖文件才会随发布到达服务器工作树（默认 0，踩坑见 6.6） |
 
 数据库维护脚本不会自动加载 `.env.local`；用非默认路径时在命令前显式传 `DATABASE_PATH`。
 

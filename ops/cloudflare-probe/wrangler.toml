@@ -2,7 +2,8 @@
 # 部署步骤、验证方式和故障域说明见同目录 README.md。
 #
 # 探针本身无状态：重复告警由服务端的 site.health 规则（900s 冷却）压制；
-# 只有「连通知端点都投不出去」的 Telegram 兜底路径才需要 KV 抑制窗口。
+# 只有「连通知端点都投不出去」的 Telegram 兜底路径才需要 D1 里的抑制窗口
+# （probe_alerts 表，默认 30 分钟一条，见 src/index.ts）。
 name = "kirameku-lite"
 main = "src/index.ts"
 compatibility_date = "2026-10-20"
@@ -23,14 +24,18 @@ NOTIFY_URL = "https://blog.yawanaika.com/api/internal/notify"
 #   TELEGRAM_BOT_TOKEN    可选。站点整体不可达时的直连兜底（与后台通知渠道同一个 bot）
 #   TELEGRAM_CHAT_ID      可选，同上
 #
-# KV 绑定：Telegram 兜底会自我抑制（默认 30 分钟一条）；不绑也能用，
+# D1 绑定：Telegram 兜底的自我抑制窗口存在这里（表 probe_alerts）。不绑也能用，
 # 但站点持续宕机时每 5 分钟就会推一条 Telegram。
-# 生产里这个命名空间已存在并已绑定（2026-10-24）；换账号时重建并替换 id：
-#   wrangler kv namespace create kirameku-lite
-#
+# 生产库已创建并绑定（2026-10-24）；换账号时重建并替换下面的 database_id：
+#   wrangler d1 create kirameku-lite
+# 建表由 Worker 自己保证（第一次告警写入时先 CREATE TABLE IF NOT EXISTS），
+# 也可以提前手工执行，见 README.md 的「存储（D1）」一节。
+[[d1_databases]]
+binding = "PROBE_DB"
+database_name = "kirameku-lite"
+
 # 注意：用 API（不是 wrangler deploy）上传脚本时，metadata.bindings 是整体替换，
 # 已有的 secret 必须原样写成 { "name": "CRON_SECRET", "type": "inherit" } 传回，
 # 并带上 ?bindings_inherit=strict，否则这次上传会把它们清掉。
-#[[kv_namespaces]]
-#binding = "PROBE_STATE"
-#id = ""
+# D1 绑定在 API 里是 { "name": "PROBE_DB", "type": "d1", "id": "<database_id>" }
+# （字段名是 id，不是 database_id）。
