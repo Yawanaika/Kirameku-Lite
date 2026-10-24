@@ -50,7 +50,7 @@ export default {
    * does not hold CRON_SECRET: an open probe endpoint would be both a free
    * traffic amplifier and a way to page the operator on demand.
    *
-   *   curl -s "https://kirameku-probe.<account>.workers.dev/?token=$CRON_SECRET" | jq
+   *   curl -s "https://kirameku-lite.<account>.workers.dev/?token=$CRON_SECRET" | jq
    */
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -179,14 +179,26 @@ async function notifyTelegram(env: Env, result: ProbeResult, trigger: string, si
 /** Suppression needs KV; without the binding the fallback repeats every cron tick. */
 async function recentlyAlerted(env: Env): Promise<boolean> {
   if (!env.PROBE_STATE) return false;
-  const stored = await env.PROBE_STATE.get(STATE_KEY);
-  const at = stored ? Number(stored) : 0;
-  return Number.isFinite(at) && Date.now() - at < TELEGRAM_SUPPRESS_SECONDS * 1000;
+  try {
+    const stored = await env.PROBE_STATE.get(STATE_KEY);
+    const at = stored ? Number(stored) : 0;
+    return Number.isFinite(at) && Date.now() - at < TELEGRAM_SUPPRESS_SECONDS * 1000;
+  } catch {
+    // A failed suppression read must never swallow the fallback alert: treat an
+    // unreadable KV as "not suppressed" and let the Telegram call go out.
+    return false;
+  }
 }
 
 async function rememberAlert(env: Env): Promise<void> {
   if (!env.PROBE_STATE) return;
-  await env.PROBE_STATE.put(STATE_KEY, String(Date.now()), { expirationTtl: TELEGRAM_SUPPRESS_SECONDS * 2 });
+  try {
+    await env.PROBE_STATE.put(STATE_KEY, String(Date.now()), { expirationTtl: TELEGRAM_SUPPRESS_SECONDS * 2 });
+  } catch (error) {
+    // The message already went out; a failed suppression write only costs us a
+    // duplicate next tick, so it must not be reported as a delivery failure.
+    console.warn(`probe: could not record suppression window: ${errorMessage(error)}`);
+  }
 }
 
 function sleep(ms: number): Promise<void> {

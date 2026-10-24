@@ -485,9 +485,32 @@ bash scripts/probe-health.sh --dry-run
 */5 * * * * cd /home/ubuntu/services/Kirameku-Lite && DEPLOY_PATH=$PWD bash scripts/probe-health.sh
 ```
 
+**B 有没有真的装上（这次踩到的坑）**
+
+发布脚本 `scripts/deploy-server.sh` 是**流式**送给服务器执行的（CI 里 `cat … | ssh … bash -s`），所以服务器跑的是新版脚本，
+但**工作树不一定跟着更新**：`PULL_GIT` 默认 0，镜像会更新、仓库里新增的文件不会。`install_probe_timer` 找不到
+`scripts/probe-health.sh` 时只打一行 `WARNING: scripts/probe-health.sh missing, no probe timer` 就返回 ——
+现象是「发布成功、timer 却没有」。2026-10-24 第一次就漏在这里。判断与补救：
+
+```bash
+# 没装的话这里是 NotFound；文件不在 = 服务器工作树没更新
+systemctl status kirameku-probe.timer --no-pager
+ls -l scripts/probe-health.sh
+
+# 补齐：先拉工作树，再只装 timer（不重启容器、不碰镜像）
+cd /home/ubuntu/services/Kirameku-Lite
+git pull --ff-only
+COMPOSE_FILES=docker-compose.yml bash -c \
+  'eval "$(sed -n "/^install_probe_timer()/,/^}/p" scripts/deploy-server.sh)"; install_probe_timer'
+```
+
+长期办法是在服务器 `.env` 里设 `PULL_GIT=1`（见 §7），让每次发布先拉工作树，新增的脚本与覆盖文件才会一起到位。
+
 **A：站外探针（单独部署一次）**
 
 同机探针和站点共用一个故障域：机器整机挂掉时它什么都发不出去。站外的 Cloudflare Worker 补的正是这一格 —— 从边缘每 5 分钟请求一次公网 `/api/health`，失败后先立即重试一次，仍失败才 POST `/api/internal/notify`；**连通知端点也投不出去时用 Telegram Bot API 直连兜底**。部署见 [`ops/cloudflare-probe/README.md`](./ops/cloudflare-probe/README.md)，需要 `wrangler` 与一次 `wrangler secret put CRON_SECRET`（值与服务器 `.env` 相同）。
+
+**生产状态（2026-10-24）**：Worker `kirameku-lite` 已部署在 `https://kirameku-lite.yawanaika.workers.dev`（cron `*/5 * * * *` 已注册），KV 命名空间 `kirameku-lite` 已绑定为 `PROBE_STATE`。手动触发只能在能访问 `*.workers.dev` 的机器上做（本机大陆网络直连超时），命令、绑定注意事项与 `inherit` 这个坑见该 README 的「当前生产状态」一节。
 
 **这套设计的边界（写在这里省得以后误判）**：两个探针的告警最终都经由 `/api/internal/notify`，所以「站点整体不可达」时只有 A 的 Telegram 直连兜底送得出去；B 会在 `logs/probe.log` 里留一行 `WARNING: no delivery path worked`。这是设计的边界，不是配置问题。
 

@@ -40,20 +40,68 @@ npx wrangler secret put CRON_SECRET
 npx wrangler secret put TELEGRAM_BOT_TOKEN     # 与后台通知渠道用的同一个 bot
 npx wrangler secret put TELEGRAM_CHAT_ID
 
-# 4.（可选）绑定 KV 后 Telegram 兜底会自我抑制，默认 30 分钟一条
-npx wrangler kv namespace create PROBE_STATE   # 把输出的 id 填进 wrangler.toml 的 [[kv_namespaces]]
+# 4. KV 绑定：Telegram 兜底会自我抑制，默认 30 分钟一条（生产已就绪，换账号时重建）
+npx wrangler kv namespace create kirameku-lite   # 把输出的 id 填进 wrangler.toml 的 [[kv_namespaces]]
 
 npx wrangler deploy
 ```
 
-部署输出里会给出 `https://kirameku-probe.<account>.workers.dev`。cron 表达式在 `wrangler.toml` 的
+部署输出里会给出 `https://kirameku-lite.<account>.workers.dev`。cron 表达式在 `wrangler.toml` 的
 `[triggers] crons`，默认 `*/5 * * * *`。
+
+## 当前生产状态（2026-10-24）
+
+| 项 | 值 |
+|:---|:---|
+| Worker 名 / 地址 | `kirameku-lite` → `https://kirameku-lite.yawanaika.workers.dev`（account `af16f1d17243e21edf13cfbd34652d3c`，workers.dev 子域 `yawanaika`） |
+| Cron | `*/5 * * * *`（注册于 2026-10-24T06:38Z） |
+| KV 命名空间 | `kirameku-lite`，id `71924058c2bd492ba40e7e75264b98e7`，绑定名 `PROBE_STATE` |
+| 绑定清单 | `CRON_SECRET` / `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`（`secret_text`），`NOTIFY_URL` / `TARGET_URL`（`plain_text`），`PROBE_STATE`（`kv_namespace`） |
+
+注意：**线上正在跑的是 2026-10-24T06:42Z 那版 bundle**（仪表盘 Quick Edit），仓库 `src/index.ts` 之后补的两处 KV 容错
+`recentlyAlerted` / `rememberAlert` 的 `try/catch` 要等下一次 `wrangler deploy` 才会生效（本轮只改了绑定、内容原样回传）。
+
+已验证：从服务器带 `CRON_SECRET` 手动触发一次 → `{"ok":true,"status":200,"notified":"none"}`；KV 里此时没有 key，
+说明还没发生过 Telegram 兜底投递（有 key 就代表抑制窗口在生效）。
+
+时间点注意：**本机（中国大陆网络）连不上 `*.workers.dev`**（`curl` 超时，而同一台机器访问站点正常），
+手动触发只能在服务器或开了代理的机器上做；cron 跑在 Cloudflare 边缘，不受影响。
+
+```bash
+# 在服务器上手动触发一次
+cd /home/ubuntu/services/Kirameku-Lite
+S=$(grep -m1 '^CRON_SECRET=' .env | cut -d= -f2-)
+curl -s -G --data-urlencode "token=$S" https://kirameku-lite.yawanaika.workers.dev/ | jq
+
+# 看抑制状态有没有写进 KV（有 key = 最近发生过 Telegram 兜底投递）
+npx wrangler kv key list --namespace-id 71924058c2bd492ba40e7e75264b98e7
+```
+
+### 用 API 改绑定时的坑（2026-10-24 实测）
+
+`PUT /accounts/{account_id}/workers/scripts/{script_name}?bindings_inherit=strict`（以及 `POST …/versions`）
+的 `metadata.bindings` 是**整体替换**。想在不重传密钥的前提下加一个绑定，必须把已有的 `secret_text` 按名字原样传回：
+
+```json
+{ "bindings": [
+  { "name": "CRON_SECRET", "type": "inherit" },
+  { "name": "TELEGRAM_BOT_TOKEN", "type": "inherit" },
+  { "name": "TELEGRAM_CHAT_ID", "type": "inherit" },
+  { "name": "NOTIFY_URL", "type": "plain_text", "text": "…" },
+  { "name": "TARGET_URL", "type": "plain_text", "text": "…" },
+  { "name": "PROBE_STATE", "type": "kv_namespace", "namespace_id": "71924058c2bd492ba40e7e75264b98e7" }
+] }
+```
+
+`inherit` 从**最近一次上传的版本**取值；带 `bindings_inherit=strict` 时解析不到就直接报 10057（不会静默丢绑定），
+不带 strict 时会**静默丢弃**解析不到的项。另外 `PATCH …/script-settings` 只接受 `logpush` / `observability` /
+`tags` / `tail_consumers`，改不了 binding。用 `wrangler deploy` 时这些都由它自动处理。
 
 ## 验证
 
 ```bash
 # 手动触发一次真实探测（不带 token 一律 404，这是故意的：探针端点不能公开）
-curl -s "https://kirameku-probe.<account>.workers.dev/?token=$CRON_SECRET" | jq
+curl -s "https://kirameku-lite.<account>.workers.dev/?token=$CRON_SECRET" | jq
 # {"ok":true,"status":200,"notified":"none"}
 
 # 看 cron 是否在跑、有没有异常

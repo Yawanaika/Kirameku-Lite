@@ -23,10 +23,14 @@ NOTIFY_URL = "https://blog.yawanaika.com/api/internal/notify"
 #   TELEGRAM_BOT_TOKEN    可选。站点整体不可达时的直连兜底（与后台通知渠道同一个 bot）
 #   TELEGRAM_CHAT_ID      可选，同上
 #
-# 可选：绑定 KV 后 Telegram 兜底会自我抑制（默认 30 分钟一条）。
-# 不绑定也能用，但站点持续宕机时每 5 分钟就会推一条：
-#   wrangler kv namespace create PROBE_STATE
-#   然后把返回的 id 填进来，去掉下面三行的注释
-# [[kv_namespaces]]
-# binding = "PROBE_STATE"
-# id = ""
+# KV 绑定：Telegram 兜底会自我抑制（默认 30 分钟一条）；不绑也能用，
+# 但站点持续宕机时每 5 分钟就会推一条 Telegram。
+# 生产里这个命名空间已存在并已绑定（2026-10-24）；换账号时重建并替换 id：
+#   wrangler kv namespace create kirameku-lite
+#
+# 注意：用 API（不是 wrangler deploy）上传脚本时，metadata.bindings 是整体替换，
+# 已有的 secret 必须原样写成 { "name": "CRON_SECRET", "type": "inherit" } 传回，
+# 并带上 ?bindings_inherit=strict，否则这次上传会把它们清掉。
+#[[kv_namespaces]]
+#binding = "PROBE_STATE"
+#id = ""
