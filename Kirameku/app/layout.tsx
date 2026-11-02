@@ -2,16 +2,17 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "highlight.js/styles/atom-one-dark.css";
 import { loadSiteSettings } from "@/server/modules/site-settings";
-import { buildShareConfig, getSiteUrl } from "@/server/site";
+import { buildShareConfig, resolveSiteUrl } from "@/server/site";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSiteSettings();
-  const share = buildShareConfig(settings);
+  const siteUrl = resolveSiteUrl(settings);
+  const share = buildShareConfig(settings, siteUrl);
 
   return {
     // metadataBase lets the rest of the app write root-relative URLs (icons,
     // per-page openGraph images) and have Next resolve them to the public origin.
-    metadataBase: new URL(getSiteUrl()),
+    metadataBase: new URL(siteUrl),
     title: settings.profile.siteTitle,
     description: share.description,
     alternates: {
@@ -25,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
       locale: "zh_CN",
       title: share.title,
       description: share.description,
-      url: getSiteUrl(),
+      url: siteUrl,
       images: share.image ? [{ url: share.image, alt: share.title }] : undefined,
     },
     twitter: {

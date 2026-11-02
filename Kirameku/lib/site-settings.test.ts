@@ -3,6 +3,7 @@ import {
   createDefaultSiteSettings,
   isSafeAssetUrl,
   isSafeSettingsLink,
+  isSiteUrl,
   parseSiteSettings,
   SITE_SETTINGS_LIMITS,
 } from "./site-settings";
@@ -103,6 +104,19 @@ describe("parseSiteSettings", () => {
     );
   });
 
+  it("keeps a configured site url and drops relative or unsafe ones", () => {
+    expect(
+      parseSiteSettings({ profile: { url: "https://blog.example.com/" } }).profile.url,
+    ).toBe("https://blog.example.com/");
+    expect(
+      parseSiteSettings({ profile: { url: "/relative" } }).profile.url,
+    ).toBe("");
+    expect(
+      parseSiteSettings({ profile: { url: "javascript:alert(1)" } }).profile.url,
+    ).toBe("");
+    expect(parseSiteSettings({}).profile.url).toBe("");
+  });
+
   it("truncates over-long text fields", () => {
     const settings = parseSiteSettings({
       profile: { authorName: "x".repeat(SITE_SETTINGS_LIMITS.authorName + 20) },
@@ -122,6 +136,15 @@ describe("url guards", () => {
     expect(isSafeAssetUrl("javascript:alert(1)")).toBe(false);
     expect(isSafeAssetUrl("data:text/html,x")).toBe(false);
     expect(isSafeAssetUrl("")).toBe(false);
+  });
+
+  it("only accepts absolute http(s) site urls", () => {
+    expect(isSiteUrl("")).toBe(true);
+    expect(isSiteUrl("https://blog.example.com")).toBe(true);
+    expect(isSiteUrl("http://localhost:3000")).toBe(true);
+    expect(isSiteUrl("/about")).toBe(false);
+    expect(isSiteUrl("blog.example.com")).toBe(false);
+    expect(isSiteUrl("javascript:alert(1)")).toBe(false);
   });
 
   it("allows settings links to be empty", () => {

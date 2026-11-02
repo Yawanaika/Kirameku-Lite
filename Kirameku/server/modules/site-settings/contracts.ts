@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   isSafeAssetUrl,
   isSafeSettingsLink,
+  isSiteUrl,
   SITE_SETTINGS_LIMITS,
 } from "@/lib/site-settings";
 
@@ -47,6 +48,18 @@ const hexColor = z
 export const siteSettingsInput = z.object({
   profile: z.object({
     siteTitle: requiredText(SITE_SETTINGS_LIMITS.siteTitle, "站点标题"),
+    url: z
+      .string()
+      .trim()
+      .max(
+        SITE_SETTINGS_LIMITS.url,
+        `站点地址最多 ${SITE_SETTINGS_LIMITS.url} 个字符`,
+      )
+      .default("")
+      .refine(
+        (value) => isSiteUrl(value),
+        "站点地址需要留空，或写成 https://example.com 这样的绝对地址",
+      ),
     authorName: requiredText(SITE_SETTINGS_LIMITS.authorName, "昵称"),
     bio: optionalText(SITE_SETTINGS_LIMITS.bio, "简介"),
     avatarUrl: assetUrl("头像地址"),

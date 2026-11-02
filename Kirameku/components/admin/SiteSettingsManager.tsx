@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   isSafeAssetUrl,
   isSafeSettingsLink,
+  isSiteUrl,
   SITE_SETTINGS_LIMITS,
   type SiteSettings,
   type SiteShareCard,
@@ -86,6 +87,9 @@ function validate(settings: SiteSettings): string | null {
   if (!profile.siteTitle.trim()) return "站点标题不能为空";
   if (profile.siteTitle.trim().length > SITE_SETTINGS_LIMITS.siteTitle) {
     return "站点标题最多 " + SITE_SETTINGS_LIMITS.siteTitle + " 个字符";
+  }
+  if (!isSiteUrl(profile.url)) {
+    return "站点地址需要留空，或写成 https://example.com 这样的绝对地址";
   }
   if (!profile.authorName.trim()) return "昵称不能为空";
   if (profile.authorName.trim().length > SITE_SETTINGS_LIMITS.authorName) {
@@ -440,6 +444,20 @@ function SiteSettingsEditor({
                 value={draft.profile.siteTitle}
                 maxLength={SITE_SETTINGS_LIMITS.siteTitle}
                 onChange={(event) => updateProfile({ siteTitle: event.target.value })}
+              />
+            </Field>
+            <Field
+              id="site-url"
+              label="站点地址"
+              hint="留空则自动跟随部署环境（SITE_URL / FRONTEND_ORIGIN）。填写后会用于 sitemap、RSS 和分享卡片里的绝对链接，例如 https://blog.example.com"
+            >
+              <Input
+                id="site-url"
+                inputMode="url"
+                placeholder="留空 = 自动使用访问域名"
+                value={draft.profile.url}
+                maxLength={SITE_SETTINGS_LIMITS.url}
+                onChange={(event) => updateProfile({ url: event.target.value })}
               />
             </Field>
             <Field

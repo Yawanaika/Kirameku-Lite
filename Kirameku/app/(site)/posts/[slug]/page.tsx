@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 import { renderMarkdown } from "@/lib/markdown";
 import { AppError } from "@/server/http/errors";
 import { getPostsService } from "@/server/modules/posts";
-import { getShareConfig, shareImageUrl, siteUrl } from "@/server/site";
+import {
+  getShareConfig,
+  getSiteUrl,
+  shareImageUrl,
+  siteUrl,
+} from "@/server/site";
 import PostDetailClient from "./PostDetailClient";
 
 export const revalidate = 60;
@@ -24,14 +29,15 @@ export async function generateMetadata({
 
   try {
     const post = await getPost(slug);
-    const url = siteUrl(`/posts/${post.slug}`);
+    const base = await getSiteUrl();
+    const url = siteUrl(`/posts/${post.slug}`, base);
     // Fall back to the configured site share card for description and image so
     // a post without a cover still produces a complete preview.
     const share = await getShareConfig({
       title: post.title,
       description: post.description,
-      image: post.cover ? shareImageUrl(post.cover) : undefined,
-    });
+      image: post.cover ? shareImageUrl(post.cover, base) : undefined,
+    }, base);
 
     return {
       title: post.title,

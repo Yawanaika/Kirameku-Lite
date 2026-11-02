@@ -5,8 +5,8 @@ import { getSiteUrl } from "@/server/site";
 // they must be read per request instead of baked into the build output.
 export const dynamic = "force-dynamic";
 
-export default function robots(): MetadataRoute.Robots {
-  const base = getSiteUrl();
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const base = await getSiteUrl();
 
   return {
     rules: [

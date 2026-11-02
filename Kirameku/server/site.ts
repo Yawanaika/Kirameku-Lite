@@ -17,20 +17,30 @@ export interface ShareConfig {
 /**
  * Canonical public URL without a trailing slash.
  *
- * Resolution order is SITE_URL -> FRONTEND_ORIGIN -> siteConfig.url: a normal
- * deployment sets FRONTEND_ORIGIN for same-origin checks and gets the right URL
- * for free, while a proxy that rewrites the host can set SITE_URL alone.
+ * Resolution order is SITE_URL -> 后台「站点设置」里的站点地址 -> FRONTEND_ORIGIN
+ * -> siteConfig.url: SITE_URL wins for a deployment that needs to override
+ * everything, the admin value covers the everyday "my domain changed" case
+ * without touching the container, and FRONTEND_ORIGIN keeps a plain deployment
+ * working with a single variable.
  */
-export function getSiteUrl(): string {
-  const raw = env.SITE_URL ?? env.FRONTEND_ORIGIN ?? siteConfig.url;
+export function resolveSiteUrl(settings: SiteSettings): string {
+  const raw =
+    env.SITE_URL ??
+    (settings.profile.url || undefined) ??
+    env.FRONTEND_ORIGIN ??
+    siteConfig.url;
   return raw.trim().replace(/\/+$/, "");
 }
 
+/** Same as {@link resolveSiteUrl} but reads the admin-managed settings first. */
+export async function getSiteUrl(): Promise<string> {
+  return resolveSiteUrl(await loadSiteSettings());
+}
+
 /** Absolute URL for a site path ("/feed") or an already absolute URL. */
-export function siteUrl(pathname = "/"): string {
+export function siteUrl(pathname: string, base: string): string {
   if (/^https?:\/\//i.test(pathname)) return pathname;
 
-  const base = getSiteUrl();
   const path = pathname.replace(/^\/+/, "");
   return path === "" ? `${base}/` : `${base}/${path}`;
 }
@@ -40,10 +50,13 @@ export function siteUrl(pathname = "/"): string {
  * resolved against the canonical site URL because RSS readers and social
  * crawlers do not apply a document base to image links.
  */
-export function shareImageUrl(value: string | null | undefined): string | null {
+export function shareImageUrl(
+  value: string | null | undefined,
+  base: string,
+): string | null {
   const trimmed = value?.trim();
   if (!trimmed) return null;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : siteUrl(trimmed);
+  return /^https?:\/\//i.test(trimmed) ? trimmed : siteUrl(trimmed, base);
 }
 
 /**
@@ -54,18 +67,22 @@ export function shareImageUrl(value: string | null | undefined): string | null {
  */
 export function buildShareConfig(
   settings: SiteSettings,
+  base: string,
   overrides: Partial<ShareConfig> = {},
 ): ShareConfig {
   const title = env.SITE_SHARE_TITLE ?? settings.profile.siteTitle;
   const description = env.SITE_SHARE_DESCRIPTION ?? settings.profile.bio;
-  const image = shareImageUrl(env.SITE_SHARE_IMAGE ?? settings.share.image);
+  const image = shareImageUrl(env.SITE_SHARE_IMAGE ?? settings.share.image, base);
   const card: ShareCard = env.SITE_SHARE_CARD ?? settings.share.card;
 
   return {
     title: overrides.title?.trim() || title,
     description: overrides.description?.trim() || description,
     // undefined = keep the site default; null = this page explicitly has none.
-    image: overrides.image !== undefined ? shareImageUrl(overrides.image) : image,
+    image:
+      overrides.image !== undefined
+        ? shareImageUrl(overrides.image, base)
+        : image,
     card: overrides.card ?? card,
   };
 }
@@ -78,6 +95,8 @@ export function buildShareConfig(
  */
 export async function getShareConfig(
   overrides: Partial<ShareConfig> = {},
+  base?: string,
 ): Promise<ShareConfig> {
-  return buildShareConfig(await loadSiteSettings(), overrides);
+  const settings = await loadSiteSettings();
+  return buildShareConfig(settings, base ?? resolveSiteUrl(settings), overrides);
 }

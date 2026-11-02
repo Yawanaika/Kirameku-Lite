@@ -7,7 +7,7 @@ import type {
   PostItem,
 } from "@/server/modules/posts/contracts";
 import { env } from "@/server/env";
-import { buildShareConfig, getSiteUrl } from "@/server/site";
+import { buildShareConfig, resolveSiteUrl } from "@/server/site";
 
 // The channel <link> and <atom:link> are configuration, so this route must be
 // rendered per request rather than prerendered with build-time placeholders.
@@ -34,9 +34,9 @@ export async function GET() {
       ),
     );
 
-    const siteUrl = getSiteUrl();
     const settings = await loadSiteSettings();
-    const share = buildShareConfig(settings);
+    const siteUrl = resolveSiteUrl(settings);
+    const share = buildShareConfig(settings, siteUrl);
     const authorName = feedAuthor(settings.profile.authorName);
 
     const items = (

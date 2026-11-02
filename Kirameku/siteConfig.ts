@@ -1,10 +1,18 @@
-// siteConfig.ts - 全站配置中心
-
+/**
+ * 全站配置的**出厂默认值**。
+ *
+ * 真正生效的值来自后台「站点设置」页（/admin/site-settings，存在 site_config 表的
+ * site_settings 键）。这里只做两件事：
+ *   1. 首次部署、库里还没有配置时提供一份可用的默认值；
+ *   2. 后台某个字段被清空时作为回落值。
+ *
+ * 所以除非你要改「新部署的默认样子」，否则不要在这里改值——去后台改。
+ */
 export const siteConfig = {
   // 网站标题与博主信息
   title: "Yawanaikaの秘密小窝",
-  // 兜底值：站点 URL 优先取 SITE_URL，其次 FRONTEND_ORIGIN（见 server/site.ts）。
-  // 只有两者都没配置时才会用到这里，正常部署不需要改这一行。
+  // 站点 URL 的最终兜底：解析顺序为 SITE_URL → 后台「站点地址」→
+  // FRONTEND_ORIGIN → 这里（见 server/site.ts 的 resolveSiteUrl）。
   url: "https://blog.yawanaika.com",
   authorName: "Yawanaika",
   bio: "不想起床->不想上班->好饿->好困->好想下班->我还不困",

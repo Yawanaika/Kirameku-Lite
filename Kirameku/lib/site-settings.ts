@@ -38,6 +38,11 @@ export type SiteShareCard = "summary" | "summary_large_image";
 export interface SiteSettingsProfile {
   /** 站点标题，用于浏览器标签、分享卡片与后台标题。 */
   siteTitle: string;
+  /**
+   * 站点对外地址（绝对 URL）。留空表示「跟随部署环境」：仍按
+   * SITE_URL → FRONTEND_ORIGIN → siteConfig.url 的顺序解析。
+   */
+  url: string;
   authorName: string;
   bio: string;
   avatarUrl: string;
@@ -119,6 +124,16 @@ export function isSafeAssetUrl(value: string): boolean {
   return trimmed.startsWith("/");
 }
 
+/**
+ * 站点对外地址：允许留空（跟随部署环境），否则必须是 http(s) 绝对地址。
+ * sitemap / RSS / 分享卡片都拿它拼绝对 URL，相对路径没有意义。
+ */
+export function isSiteUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  return /^https?:\/\/[^\s]+$/i.test(trimmed);
+}
+
 /** ICP 备案这类可点击外链，允许留空。 */
 export function isSafeSettingsLink(value: string): boolean {
   const trimmed = value.trim();
@@ -131,6 +146,13 @@ function assetUrl(value: unknown, fallback: string): string {
   const trimmed = value.trim().slice(0, SITE_SETTINGS_LIMITS.image);
   if (!trimmed) return fallback;
   return isSafeAssetUrl(trimmed) ? trimmed : fallback;
+}
+
+function absoluteUrl(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim().slice(0, SITE_SETTINGS_LIMITS.url);
+  if (!trimmed) return "";
+  return isSiteUrl(trimmed) ? trimmed : fallback;
 }
 
 function link(value: unknown, fallback: string): string {
@@ -203,6 +225,8 @@ export function createDefaultSiteSettings(): SiteSettings {
   return {
     profile: {
       siteTitle: siteConfig.title,
+      // 空串 = 跟随部署环境（见 server/site.ts 的解析顺序）。
+      url: "",
       authorName: siteConfig.authorName,
       bio: siteConfig.bio,
       avatarUrl: siteConfig.avatarUrl,
@@ -275,6 +299,7 @@ export function parseSiteSettings(raw: unknown): SiteSettings {
         defaults.profile.siteTitle,
         SITE_SETTINGS_LIMITS.siteTitle,
       ),
+      url: absoluteUrl(profileRaw.url, defaults.profile.url),
       authorName: text(
         profileRaw.authorName,
         defaults.profile.authorName,
