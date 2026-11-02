@@ -2,20 +2,27 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * 后台按钮。
+ *
+ * 默认是浅色玻璃质感，与前台卡片保持一致；暗色模式通过 `dark:` 变体切换。
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-sky-400 text-slate-950 hover:bg-sky-300",
+        default:
+          "bg-sky-500 text-white shadow-sm shadow-sky-500/20 hover:bg-sky-600 dark:bg-sky-400 dark:text-slate-950 dark:hover:bg-sky-300",
         secondary:
-          "bg-white/10 text-slate-100 hover:bg-white/15 focus-visible:ring-white/30",
+          "border border-white/70 bg-white/60 text-slate-700 shadow-sm backdrop-blur hover:bg-white/80 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15",
         outline:
-          "border border-white/10 bg-transparent text-slate-300 hover:bg-white/5 hover:text-white",
-        ghost: "text-slate-400 hover:bg-white/5 hover:text-white",
+          "border border-slate-300/80 bg-white/40 text-slate-700 backdrop-blur hover:bg-white/70 dark:border-white/10 dark:bg-transparent dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
+        ghost:
+          "text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white",
         destructive:
-          "bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 focus-visible:ring-rose-400/40",
-        link: "text-sky-300 underline-offset-4 hover:underline",
+          "border border-rose-500/25 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 dark:border-rose-400/20 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25",
+        link: "text-sky-600 underline-offset-4 hover:underline dark:text-sky-400",
       },
       size: {
         default: "h-9 px-3.5",

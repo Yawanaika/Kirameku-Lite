@@ -15,6 +15,7 @@ import {
   Navigation,
   ScrollText,
   Settings,
+  SlidersHorizontal,
   UserRound,
   Users,
 } from "lucide-react";
@@ -31,8 +32,9 @@ const primaryItems = [
   { href: "/admin/friend-links", label: "友链", icon: Link2 },
   { href: "/admin/bookmarks", label: "收藏夹", icon: Bookmark },
   { href: "/admin/albums", label: "相册", icon: Images },
-  { href: "/admin/site-config", label: "站点配置", icon: Settings },
+  { href: "/admin/site-settings", label: "站点设置", icon: Settings },
   { href: "/admin/navigation", label: "导航菜单", icon: Navigation },
+  { href: "/admin/site-config", label: "站点配置", icon: SlidersHorizontal },
   { href: "/admin/visitors", label: "访客", icon: Users },
   { href: "/admin/notifications", label: "预警通知", icon: BellRing },
   { href: "/admin/audit", label: "操作审计", icon: ScrollText },
@@ -44,7 +46,7 @@ export default function AdminNav() {
 
   return (
     <nav className="mt-8 space-y-1" aria-label="后台导航">
-      <p className="px-3 pb-2 text-[10px] font-semibold tracking-[0.18em] text-slate-600 uppercase">
+      <p className="px-3 pb-2 text-[10px] font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-600">
         Workspace
       </p>
       {primaryItems.map((item) => {
@@ -59,16 +61,18 @@ export default function AdminNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
               active
-                ? "bg-white/10 font-medium text-white"
-                : "text-slate-400 hover:bg-white/5 hover:text-white",
+                ? "bg-sky-500/10 font-medium text-sky-700 shadow-sm dark:bg-white/10 dark:text-white dark:shadow-none"
+                : "text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white",
             )}
           >
             <Icon
               className={cn(
                 "size-4",
-                active ? "text-sky-300" : "text-slate-500",
+                active
+                  ? "text-sky-600 dark:text-sky-300"
+                  : "text-slate-400 dark:text-slate-500",
               )}
               aria-hidden
             />

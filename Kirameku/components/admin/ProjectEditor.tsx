@@ -201,12 +201,12 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
         <div>
           <Link
             href="/admin/projects"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             返回项目列表
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
             {projectId ? "编辑项目" : "新建项目"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -241,7 +241,7 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -309,8 +309,8 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-sm font-semibold text-white">相关链接</h2>
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">相关链接</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="project-github">GitHub</Label>
@@ -353,8 +353,8 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-sm font-semibold text-white">展示设置</h2>
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">展示设置</h2>
             <div className="mt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="project-status">状态</Label>
@@ -387,14 +387,14 @@ export default function ProjectEditor({ projectId }: ProjectEditorProps) {
                 />
                 <p className="text-[11px] text-slate-600">数字越小越靠前。</p>
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-400">
+              <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <input
                   type="checkbox"
                   checked={form.isFeatured}
                   onChange={(event) =>
                     update("isFeatured", event.target.checked)
                   }
-                  className="size-3.5 rounded border-white/20 bg-slate-950 accent-sky-400"
+                  className="size-3.5 rounded border-slate-300/80 dark:border-white/20 bg-slate-950 accent-sky-400"
                 />
                 推荐项目
               </label>

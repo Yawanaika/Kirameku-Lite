@@ -120,7 +120,7 @@ export default function AccountManager({ initialProfile }: AccountManagerProps) 
         <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
           Account
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           账号
         </h1>
         <p className="mt-1.5 text-sm text-slate-500">
@@ -130,10 +130,10 @@ export default function AccountManager({ initialProfile }: AccountManagerProps) 
 
       {profile ? (
         <p className="text-xs text-slate-500">
-          登录账号：<span className="text-slate-300">{profile.username}</span>
+          登录账号：<span className="text-slate-600 dark:text-slate-300">{profile.username}</span>
           {" · "}
           角色：
-          <span className="text-slate-300">
+          <span className="text-slate-600 dark:text-slate-300">
             {profile.isAdmin ? "管理员" : "普通用户"}
           </span>
         </p>
@@ -141,9 +141,9 @@ export default function AccountManager({ initialProfile }: AccountManagerProps) 
 
       <form
         onSubmit={saveProfile}
-        className="space-y-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6"
+        className="space-y-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-950/40 p-6"
       >
-        <h2 className="flex items-center gap-2 text-sm font-medium text-slate-200">
+        <h2 className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
           <UserRound className="size-4 text-sky-300" aria-hidden />
           个人资料
         </h2>
@@ -203,9 +203,9 @@ export default function AccountManager({ initialProfile }: AccountManagerProps) 
 
       <form
         onSubmit={savePassword}
-        className="space-y-5 rounded-2xl border border-white/10 bg-slate-950/40 p-6"
+        className="space-y-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-950/40 p-6"
       >
-        <h2 className="flex items-center gap-2 text-sm font-medium text-slate-200">
+        <h2 className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
           <KeyRound className="size-4 text-amber-300" aria-hidden />
           修改密码
         </h2>

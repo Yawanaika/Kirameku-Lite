@@ -139,7 +139,7 @@ function FieldInput({
         aria-checked={value === true}
         onClick={() => onChange(value !== true)}
         className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-          value === true ? "bg-sky-400" : "bg-white/15"
+          value === true ? "bg-sky-400" : "bg-slate-900/[0.08] dark:bg-white/15"
         }`}
       >
         <span
@@ -252,7 +252,7 @@ function ChannelCard({
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-white/5 text-sky-300">
+          <span className="grid size-8 place-items-center rounded-lg bg-slate-900/[0.04] dark:bg-white/5 text-sky-300">
             <Icon className="size-4" aria-hidden />
           </span>
           <div>
@@ -444,7 +444,7 @@ function RuleCard({
             aria-checked={enabled}
             onClick={() => setEnabled((current) => !current)}
             className={`relative h-5 w-9 rounded-full transition ${
-              enabled ? "bg-sky-400" : "bg-white/15"
+              enabled ? "bg-sky-400" : "bg-slate-900/[0.08] dark:bg-white/15"
             }`}
           >
             <span
@@ -453,7 +453,7 @@ function RuleCard({
               }`}
             />
           </button>
-          <span className="text-xs text-slate-400">启用此预警</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">启用此预警</span>
         </div>
 
         <div className="space-y-1.5">
@@ -470,7 +470,7 @@ function RuleCard({
                   className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                     active
                       ? "border-sky-400/50 bg-sky-400/15 text-sky-200"
-                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20"
+                      : "border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 hover:border-slate-300/80 dark:hover:border-white/20"
                   }`}
                 >
                   {channel?.label ?? type}
@@ -533,7 +533,7 @@ function RuleCard({
           </div>
           <div className="space-y-1.5">
             <Label>最近触发</Label>
-            <p className="py-2 text-xs text-slate-400">
+            <p className="py-2 text-xs text-slate-500 dark:text-slate-400">
               {rule.last_fired_at ? formatDateTime(rule.last_fired_at) : "从未触发"}
             </p>
           </div>
@@ -678,7 +678,7 @@ function DispatchCard({
                   className={`rounded-lg border px-2.5 py-1 text-xs transition ${
                     active
                       ? "border-sky-400/50 bg-sky-400/15 text-sky-200"
-                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20"
+                      : "border-slate-200/80 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] text-slate-500 dark:text-slate-400 hover:border-slate-300/80 dark:hover:border-white/20"
                   }`}
                 >
                   {channel.label}
@@ -743,10 +743,10 @@ function LogsCard({ logs, total }: { logs: LogView[]; total: number }) {
                         {levelText(log.level)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-300">
+                    <TableCell className="text-xs text-slate-600 dark:text-slate-300">
                       {log.title}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-400">
+                    <TableCell className="text-xs text-slate-500 dark:text-slate-400">
                       {log.channel_type}
                     </TableCell>
                     <TableCell>
@@ -789,20 +789,20 @@ function SchedulerCard({ status }: { status: SchedulerStatus }) {
           </p>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 text-xs text-slate-400 sm:grid-cols-3">
+      <CardContent className="grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-3">
         <div>
           <p className="text-[11px] text-slate-600">本轮启动后运行次数</p>
-          <p className="mt-1 text-slate-200">{status.run_count}</p>
+          <p className="mt-1 text-slate-700 dark:text-slate-200">{status.run_count}</p>
         </div>
         <div>
           <p className="text-[11px] text-slate-600">最近一次巡检</p>
-          <p className="mt-1 text-slate-200">
+          <p className="mt-1 text-slate-700 dark:text-slate-200">
             {status.last_run_at ? formatDateTime(status.last_run_at) : "尚未运行"}
           </p>
         </div>
         <div>
           <p className="text-[11px] text-slate-600">最近触发的预警</p>
-          <p className="mt-1 text-slate-200">
+          <p className="mt-1 text-slate-700 dark:text-slate-200">
             {status.last_triggered.length > 0
               ? status.last_triggered.join("、")
               : "无"}

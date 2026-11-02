@@ -2,15 +2,19 @@ import type { Metadata } from "next";
 import type { Album } from "@/components/photos/AlbumCard";
 import type { Photo } from "@/data/photos";
 import { getAlbumsService } from "@/server/modules/albums";
-import { siteConfig } from "@/siteConfig";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 import PhotoWallClient from "./PhotoWallClient";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: `照片墙 · ${siteConfig.title}`,
-  description: "用照片记录生活的每一个瞬间",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { profile } = await loadSiteSettings();
+
+  return {
+    title: `照片墙 · ${profile.siteTitle}`,
+    description: "用照片记录生活的每一个瞬间",
+  };
+}
 
 async function loadAlbums(): Promise<Album[]> {
   const service = getAlbumsService();

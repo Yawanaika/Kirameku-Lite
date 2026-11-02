@@ -87,7 +87,7 @@ export default function MarkdownEditor({
   return (
     <div
       ref={containerRef}
-      className="h-[420px] overflow-hidden rounded-xl border border-white/10"
+      className="h-[420px] overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10"
     />
   );
 }

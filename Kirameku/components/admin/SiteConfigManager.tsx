@@ -190,13 +190,13 @@ export default function SiteConfigManager() {
               正在加载配置…
             </div>
           ) : filtered.length > 0 ? (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
               {filtered.map((item) => (
                 <li key={item.id} className="px-5 py-4">
                   <div className="flex flex-wrap items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <code className="rounded bg-white/5 px-1.5 py-0.5 text-xs text-sky-300">
+                        <code className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-xs text-sky-300">
                           {item.key}
                         </code>
                         {item.description ? (

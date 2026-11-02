@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { siteConfig } from "@/siteConfig";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 
 interface BackgroundContextType {
   bgImage: string;
@@ -22,8 +22,10 @@ export function useBackground() {
 }
 
 export function BackgroundProvider({ children }: { children: ReactNode }) {
+  const { appearance } = useSiteSettings();
+  const bgImages = appearance.bgImages;
   const [bgImage, setBgImage] = useState(
-    siteConfig.bgImages[siteConfig.bgImages.length - 1] ?? ""
+    bgImages[bgImages.length - 1] ?? ""
   );
   const [bgBlur, setBgBlur] = useState(20);
   const [mounted, setMounted] = useState(false);
@@ -34,15 +36,15 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
     const savedImg = localStorage.getItem("bg-image");
     const savedBlur = localStorage.getItem("bg-blur");
 
-    if (savedImg && siteConfig.bgImages.includes(savedImg)) {
+    if (savedImg && bgImages.includes(savedImg)) {
       setBgImage(savedImg);
     } else {
-      setBgImage(siteConfig.bgImages[siteConfig.bgImages.length - 1]);
+      setBgImage(bgImages[bgImages.length - 1] ?? "");
     }
 
     setBgBlur(savedBlur ? Number(savedBlur) : 20);
     setMounted(true);
-  }, []);
+  }, [bgImages]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {

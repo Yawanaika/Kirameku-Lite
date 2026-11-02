@@ -85,7 +85,7 @@ export default function AdminMobileNav() {
         aria-label="打开后台导航"
         aria-expanded={open}
         aria-controls="admin-mobile-nav"
-        className="grid size-9 place-items-center rounded-lg border border-white/10 text-slate-300 transition hover:bg-white/5 hover:text-white lg:hidden"
+        className="grid size-9 place-items-center rounded-xl border border-slate-200/80 bg-white/60 text-slate-600 backdrop-blur transition hover:bg-white/80 hover:text-slate-900 dark:border-white/10 dark:bg-transparent dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white lg:hidden"
       >
         <Menu className="size-5" aria-hidden />
       </button>
@@ -93,7 +93,7 @@ export default function AdminMobileNav() {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm dark:bg-slate-950/70"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
@@ -103,7 +103,7 @@ export default function AdminMobileNav() {
             role="dialog"
             aria-modal="true"
             aria-label="后台导航"
-            className="relative flex h-full w-[280px] max-w-[85vw] flex-col border-r border-white/10 bg-slate-900 px-4 py-4 shadow-2xl"
+            className="relative flex h-full w-[280px] max-w-[85vw] flex-col border-r border-white/70 bg-white/90 px-4 py-4 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900"
           >
             <div className="flex items-center justify-between gap-3">
               <Link
@@ -111,11 +111,11 @@ export default function AdminMobileNav() {
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-3 px-1"
               >
-                <span className="grid size-9 place-items-center rounded-xl bg-sky-400 text-sm font-black text-slate-950">
+                <span className="grid size-9 place-items-center rounded-xl bg-sky-500 text-sm font-black text-white shadow-sm shadow-sky-500/30 dark:bg-sky-400 dark:text-slate-950">
                   K
                 </span>
                 <span>
-                  <span className="block text-sm font-semibold tracking-wide">
+                  <span className="block text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
                     Kirameku
                   </span>
                   <span className="block text-[11px] text-slate-500">
@@ -128,7 +128,7 @@ export default function AdminMobileNav() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="关闭后台导航"
-                className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
+                className="grid size-9 place-items-center rounded-xl text-slate-500 transition hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
               >
                 <X className="size-5" aria-hidden />
               </button>

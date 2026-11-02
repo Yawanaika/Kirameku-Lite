@@ -252,12 +252,12 @@ export default function PostEditor({ postId }: PostEditorProps) {
         <div>
           <Link
             href="/admin/posts"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             返回文章列表
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
             {postId ? "编辑文章" : "新建文章"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -289,7 +289,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="post-title">标题</Label>
@@ -330,7 +330,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <Label htmlFor="post-content">正文（Markdown）</Label>
@@ -341,7 +341,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
               <div
                 role="group"
                 aria-label="编辑视图"
-                className="flex items-center rounded-lg border border-white/10 bg-slate-950/40 p-0.5"
+                className="flex items-center rounded-lg border border-slate-200/80 dark:border-white/10 bg-slate-950/40 p-0.5"
               >
                 {viewModes.map((mode) => {
                   const Icon = mode.icon;
@@ -354,8 +354,8 @@ export default function PostEditor({ postId }: PostEditorProps) {
                       aria-pressed={active}
                       className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
                         active
-                          ? "bg-white/10 text-white"
-                          : "text-slate-500 hover:text-slate-200"
+                          ? "bg-slate-900/[0.06] dark:bg-white/10 text-slate-900 dark:text-white"
+                          : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                       }`}
                     >
                       <Icon className="size-3.5" aria-hidden />
@@ -382,7 +382,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
               </div>
 
               {viewMode !== "editor" ? (
-                <div className="h-[420px] overflow-y-auto rounded-xl border border-white/10 bg-slate-950/60 p-5">
+                <div className="h-[420px] overflow-y-auto rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-950/60 p-5">
                   <div className="mb-3 flex items-center justify-between text-[11px] text-slate-600">
                     <span>预览</span>
                     {previewLoading ? (
@@ -411,8 +411,8 @@ export default function PostEditor({ postId }: PostEditorProps) {
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-sm font-semibold text-white">发布设置</h2>
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">发布设置</h2>
             <div className="mt-4 space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="post-status">状态</Label>
@@ -455,20 +455,20 @@ export default function PostEditor({ postId }: PostEditorProps) {
                   用逗号分隔；不存在的标签会自动创建。
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-400">
+              <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <input
                   type="checkbox"
                   checked={form.isPinned}
                   onChange={(event) => update("isPinned", event.target.checked)}
-                  className="size-3.5 rounded border-white/20 bg-slate-950 accent-sky-400"
+                  className="size-3.5 rounded border-slate-300/80 dark:border-white/20 bg-slate-950 accent-sky-400"
                 />
                 置顶文章
               </label>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <h2 className="text-sm font-semibold text-white">封面</h2>
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">封面</h2>
             <div className="mt-4">
               <ImageUploader
                 id="post-cover"
@@ -479,14 +479,14 @@ export default function PostEditor({ postId }: PostEditorProps) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-xs text-slate-500">
-            <p className="font-medium text-slate-300">已有标签</p>
+          <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5 text-xs text-slate-500">
+            <p className="font-medium text-slate-600 dark:text-slate-300">已有标签</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {(tags ?? []).length > 0 ? (
                 (tags ?? []).map((item) => (
                   <span
                     key={item.id}
-                    className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
+                    className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
                   >
                     {item.name}
                   </span>

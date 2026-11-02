@@ -193,7 +193,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
   if (!album) {
     return (
       <div className="mx-auto max-w-3xl space-y-4 py-16 text-center">
-        <p className="text-sm text-slate-400">相册不存在或加载失败</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">相册不存在或加载失败</p>
         {error ? <AdminError message={error} /> : null}
         <Link href="/admin/albums" className={buttonVariants({ variant: "outline" })}>
           返回相册列表
@@ -208,12 +208,12 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
         <div>
           <Link
             href="/admin/albums"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             返回相册列表
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
             {album.title}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -312,7 +312,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
 
           <form
             onSubmit={addPhoto}
-            className="grid gap-3 border-b border-white/10 p-5 sm:grid-cols-2"
+            className="grid gap-3 border-b border-slate-200/80 dark:border-white/10 p-5 sm:grid-cols-2"
           >
             <div className="space-y-1.5 sm:col-span-2">
               <ImageUploader
@@ -394,7 +394,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
               {photos.map((photo) => (
                 <article
                   key={photo.id}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/40"
+                  className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-950/40"
                 >
                   <img
                     src={photo.url}
@@ -402,7 +402,7 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
                     className="h-32 w-full object-cover"
                   />
                   <div className="p-3">
-                    <p className="line-clamp-2 min-h-8 text-xs leading-4 text-slate-300">
+                    <p className="line-clamp-2 min-h-8 text-xs leading-4 text-slate-600 dark:text-slate-300">
                       {photo.caption || "无说明"}
                     </p>
                     <p className="mt-1 text-[10px] text-slate-600">

@@ -4,12 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import { useBackground } from "@/components/providers/BackgroundProvider";
 import { useEffects } from "@/components/providers/EffectProvider";
-import { siteConfig } from "@/siteConfig";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 
 export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { bgImage, bgBlur, setBgImage, setBgBlur } = useBackground();
   const { clickEffect, mouseTrail, seasonalEffect, sparkleEffect, toggleClickEffect, toggleMouseTrail, toggleSeasonalEffect, toggleSparkleEffect } = useEffects();
-  const images = siteConfig.bgImages;
+  const { appearance } = useSiteSettings();
+  const images = appearance.bgImages;
   const currentIndex = images.indexOf(bgImage);
   const [showGrid, setShowGrid] = useState(false);
 

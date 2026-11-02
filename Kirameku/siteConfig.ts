@@ -31,9 +31,6 @@ export const siteConfig = {
   // 默认封面图
   defaultPostCover: "/images/default-cover.jpg",
 
-  // 照片墙预览图
-  photoWallImage: "/images/photo-wall.jpg",
-
   // 云音乐配置（网易云音乐）
   // 填歌单 ID 则自动拉取整个歌单，填歌曲 ID 列表则只播放指定歌曲
   cloudMusicPlaylistId: "17943739323",  // 歌单 ID（优先）

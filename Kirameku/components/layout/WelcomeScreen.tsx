@@ -1,5 +1,5 @@
-import { siteConfig } from "@/siteConfig";
 import WelcomeGreeting from "@/components/layout/WelcomeGreeting";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 
 /**
  * Server-rendered welcome overlay.
@@ -8,7 +8,9 @@ import WelcomeGreeting from "@/components/layout/WelcomeGreeting";
  * 逻辑：遮罩随初始 HTML 一起绘制，不会在水合后才成为 LCP 候选；站点布局里的阻塞
  * 脚本在首帧前就把「本会话已看过」的会话隐藏掉，退场动画也完全由 CSS 完成。
  */
-export default function WelcomeScreen() {
+export default async function WelcomeScreen() {
+  const { profile } = await loadSiteSettings();
+
   return (
     <div
       id="welcome-screen"
@@ -31,7 +33,7 @@ export default function WelcomeScreen() {
             className="text-4xl md:text-5xl font-bold text-white tracking-tight"
             style={{ fontFamily: "'Noto Serif SC', serif" }}
           >
-            {siteConfig.authorName}
+            {profile.authorName}
           </span>
           <span
             className="text-4xl md:text-5xl font-bold text-sky-400"

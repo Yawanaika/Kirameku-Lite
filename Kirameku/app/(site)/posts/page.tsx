@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
 import { getCategoriesService } from "@/server/modules/categories";
 import { getPostsService } from "@/server/modules/posts";
-import { siteConfig } from "@/siteConfig";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 import PostsClient from "./PostsClient";
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-  title: `文章 · ${siteConfig.title}`,
-  description: "记录技术探索、学术研究与生活感悟",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { profile } = await loadSiteSettings();
+
+  return {
+    title: `文章 · ${profile.siteTitle}`,
+    description: "记录技术探索、学术研究与生活感悟",
+  };
+}
 
 const PAGE_SIZE = 12;
 

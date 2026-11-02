@@ -135,12 +135,12 @@ export default function ChatterEditor({ chatterId }: ChatterEditorProps) {
         <div>
           <Link
             href="/admin/chatters"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
             返回说说列表
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
             {chatterId ? "编辑说说" : "新建说说"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -173,7 +173,7 @@ export default function ChatterEditor({ chatterId }: ChatterEditorProps) {
 
       {error ? <AdminError message={error} /> : null}
 
-      <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+      <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="chatter-content">内容</Label>

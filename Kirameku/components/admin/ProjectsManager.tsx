@@ -130,7 +130,7 @@ export default function ProjectsManager() {
                     <TableCell className="max-w-80">
                       <Link
                         href={`/admin/projects/${project.id}`}
-                        className="block truncate font-medium text-slate-200 hover:text-sky-300"
+                        className="block truncate font-medium text-slate-700 dark:text-slate-200 hover:text-sky-300"
                       >
                         {project.name}
                       </Link>
@@ -149,7 +149,7 @@ export default function ProjectsManager() {
                         {project.tech_stack.slice(0, 4).map((item) => (
                           <span
                             key={item}
-                            className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
+                            className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
                           >
                             {item}
                           </span>

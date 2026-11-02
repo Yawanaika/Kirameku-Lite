@@ -138,7 +138,7 @@ export default function AuditLogManager() {
                         <TableCell className="text-xs whitespace-nowrap text-slate-500">
                           {formatDateTime(item.created_at)}
                         </TableCell>
-                        <TableCell className="text-xs text-slate-300">
+                        <TableCell className="text-xs text-slate-600 dark:text-slate-300">
                           {item.actor_name}
                           {item.actor_id ? (
                             <span className="ml-1 text-[10px] text-slate-600">
@@ -149,7 +149,7 @@ export default function AuditLogManager() {
                         <TableCell>
                           <Badge variant={meta.variant}>{meta.label}</Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-400">
+                        <TableCell className="text-xs text-slate-500 dark:text-slate-400">
                           {targetLabel}
                           {item.target_id ? (
                             <span className="ml-1 font-mono text-[10px] text-slate-600">
@@ -158,7 +158,7 @@ export default function AuditLogManager() {
                           ) : null}
                         </TableCell>
                         <TableCell className="max-w-72">
-                          <p className="font-mono text-[11px] text-slate-400">
+                          <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
                             {requestPath ?? "—"}
                           </p>
                           {method ? (

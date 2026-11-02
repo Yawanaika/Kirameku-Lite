@@ -27,7 +27,7 @@ export async function generateMetadata({
     const url = siteUrl(`/posts/${post.slug}`);
     // Fall back to the configured site share card for description and image so
     // a post without a cover still produces a complete preview.
-    const share = getShareConfig({
+    const share = await getShareConfig({
       title: post.title,
       description: post.description,
       image: post.cover ? shareImageUrl(post.cover) : undefined,

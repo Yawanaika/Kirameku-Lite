@@ -288,7 +288,7 @@ function NavDropdownEditor({
                   onClick={() => update({ enabled: !draft.enabled })}
                   className={cn(
                     "relative mt-1 h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-sky-400/50 focus-visible:outline-none",
-                    draft.enabled ? "bg-sky-400" : "bg-white/15",
+                    draft.enabled ? "bg-sky-400" : "bg-slate-900/[0.08] dark:bg-white/15",
                   )}
                 >
                   <span
@@ -351,7 +351,7 @@ function NavDropdownEditor({
             </CardHeader>
             <CardContent className="space-y-3">
               {draft.links.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-500">
+                <p className="rounded-xl border border-dashed border-slate-200/80 dark:border-white/10 px-4 py-8 text-center text-xs text-slate-500">
                   还没有链接。点「添加链接」填上站外地址或站内路径。
                 </p>
               ) : null}
@@ -359,13 +359,13 @@ function NavDropdownEditor({
               {draft.links.map((link, index) => (
                 <div
                   key={index}
-                  className="space-y-2.5 rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                  className="space-y-2.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/55 dark:bg-white/[0.02] p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       链接 {index + 1}
                       {isExternalHref(link.href) ? (
-                        <span className="flex items-center gap-0.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-sky-300">
+                        <span className="flex items-center gap-0.5 rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-sky-300">
                           <ExternalLink className="size-2.5" aria-hidden />
                           站外
                         </span>
@@ -462,11 +462,11 @@ function NavDropdownEditor({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-950/60 p-4">
               <div
                 className={cn(
                   "flex w-fit items-center gap-1.5 rounded-lg px-3 py-2 text-sm",
-                  draft.enabled ? "text-slate-100" : "text-slate-600",
+                  draft.enabled ? "text-slate-800 dark:text-slate-100" : "text-slate-600",
                 )}
               >
                 <PreviewIcon className="size-4" aria-hidden />
@@ -474,7 +474,7 @@ function NavDropdownEditor({
                 <ChevronDown className="size-3.5" aria-hidden />
               </div>
 
-              <div className="mt-2 w-56 rounded-2xl border border-white/10 bg-slate-900/90 p-2">
+              <div className="mt-2 w-56 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-slate-900/90 p-2">
                 {draft.links.length === 0 ? (
                   <p className="px-3 py-2 text-[11px] text-slate-600">
                     菜单里还没有条目
@@ -484,7 +484,7 @@ function NavDropdownEditor({
                     {draft.links.map((link, index) => (
                       <li
                         key={index}
-                        className="rounded-lg px-3 py-1.5 text-xs text-slate-300"
+                        className="rounded-lg px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300"
                       >
                         <span className="flex items-center gap-1">
                           <span className="truncate">
@@ -512,11 +512,11 @@ function NavDropdownEditor({
             <dl className="space-y-1.5 text-[11px] text-slate-500">
               <div className="flex items-center justify-between">
                 <dt>链接数量</dt>
-                <dd className="text-slate-300">{draft.links.length}</dd>
+                <dd className="text-slate-600 dark:text-slate-300">{draft.links.length}</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt>其中站外链接</dt>
-                <dd className="text-slate-300">{externalCount}</dd>
+                <dd className="text-slate-600 dark:text-slate-300">{externalCount}</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt>未保存的修改</dt>

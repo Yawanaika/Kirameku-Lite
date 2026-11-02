@@ -26,7 +26,7 @@ export default function AdminPagination({
   if (!canGoPrevious && !canGoNext && total === undefined) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 dark:border-white/10 px-5 py-3.5">
       <p className="text-xs text-slate-600">
         {total === undefined ? (
           <>第 {page} 页</>

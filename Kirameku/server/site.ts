@@ -1,5 +1,7 @@
 import "server-only";
+import type { SiteSettings } from "@/lib/site-settings";
 import { env } from "@/server/env";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 import { siteConfig } from "@/siteConfig";
 
 export type ShareCard = "summary" | "summary_large_image";
@@ -45,15 +47,19 @@ export function shareImageUrl(value: string | null | undefined): string | null {
 }
 
 /**
- * Site-level share card defaults. Every value is a configuration item
- * (SITE_SHARE_* env vars) with a siteConfig fallback; per-page callers pass
- * overrides for the title/description/image of the thing being shared.
+ * Site-level share card defaults derived from an already-loaded settings
+ * object. Every value is a configuration item: the SITE_SHARE_* env vars win,
+ * then the admin-managed site settings, which themselves fall back to
+ * siteConfig when the database has nothing.
  */
-export function getShareConfig(overrides: Partial<ShareConfig> = {}): ShareConfig {
-  const title = env.SITE_SHARE_TITLE ?? siteConfig.title;
-  const description = env.SITE_SHARE_DESCRIPTION ?? siteConfig.bio;
-  const image = shareImageUrl(env.SITE_SHARE_IMAGE ?? siteConfig.shareImage);
-  const card: ShareCard = env.SITE_SHARE_CARD ?? "summary_large_image";
+export function buildShareConfig(
+  settings: SiteSettings,
+  overrides: Partial<ShareConfig> = {},
+): ShareConfig {
+  const title = env.SITE_SHARE_TITLE ?? settings.profile.siteTitle;
+  const description = env.SITE_SHARE_DESCRIPTION ?? settings.profile.bio;
+  const image = shareImageUrl(env.SITE_SHARE_IMAGE ?? settings.share.image);
+  const card: ShareCard = env.SITE_SHARE_CARD ?? settings.share.card;
 
   return {
     title: overrides.title?.trim() || title,
@@ -62,4 +68,16 @@ export function getShareConfig(overrides: Partial<ShareConfig> = {}): ShareConfi
     image: overrides.image !== undefined ? shareImageUrl(overrides.image) : image,
     card: overrides.card ?? card,
   };
+}
+
+/**
+ * Share card defaults for the whole site, reading the admin-managed settings.
+ *
+ * Per-page callers pass overrides for the title/description/image of the thing
+ * being shared.
+ */
+export async function getShareConfig(
+  overrides: Partial<ShareConfig> = {},
+): Promise<ShareConfig> {
+  return buildShareConfig(await loadSiteSettings(), overrides);
 }

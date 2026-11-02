@@ -16,7 +16,7 @@ import {
 import type { ChatterItem } from "@/lib/api/chatters";
 import { getGithubUser, logoutGithubUser } from "@/lib/api/github-auth";
 import type { GitHubUser } from "@/lib/api/types";
-import { siteConfig } from "@/siteConfig";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 
 interface Moment {
   id: string;
@@ -132,6 +132,7 @@ export default function MomentsClient({
   initialChatters: ChatterItem[];
   initialOnlyView: string | null;
 }) {
+  const { profile } = useSiteSettings();
   const [moments, setMoments] = useState<Moment[]>(() => initialChatters.map(toMoment));
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [onlyViewId, setOnlyViewId] = useState<string | null>(initialOnlyView);
@@ -369,7 +370,7 @@ export default function MomentsClient({
                           <div className="flex items-center justify-between mb-2 md:mb-3">
                             <div className="flex items-center gap-1.5 md:gap-2">
                               <Image src="/images/hong.jpg" alt="avatar" width={24} height={24} className="rounded-full object-cover md:w-7 md:h-7" />
-                              <span className="text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200">{siteConfig.authorName}</span>
+                              <span className="text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200">{profile.authorName}</span>
                               <span suppressHydrationWarning className="text-[10px] md:text-xs text-slate-400">{relativeTime(moment.created_at)}</span>
                             </div>
                             {moment.mood && (

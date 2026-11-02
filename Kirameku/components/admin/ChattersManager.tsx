@@ -172,7 +172,7 @@ export default function ChattersManager() {
                       <TableCell className="max-w-96">
                         <Link
                           href={`/admin/chatters/${chatter.id}`}
-                          className="line-clamp-2 text-sm text-slate-200 hover:text-sky-300"
+                          className="line-clamp-2 text-sm text-slate-700 dark:text-slate-200 hover:text-sky-300"
                         >
                           {chatter.content}
                         </Link>
@@ -185,7 +185,7 @@ export default function ChattersManager() {
                       <TableCell>
                         <StatusBadge status={chatter.status} />
                       </TableCell>
-                      <TableCell className="text-xs text-slate-400">
+                      <TableCell className="text-xs text-slate-500 dark:text-slate-400">
                         {chatter.mood || "—"}
                       </TableCell>
                       <TableCell className="text-xs whitespace-nowrap text-slate-500 tabular-nums">

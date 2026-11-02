@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/providers/ToastProvider";
 import { BackgroundProvider } from "@/components/providers/BackgroundProvider";
 import { MusicProvider } from "@/components/providers/MusicProvider";
 import { EffectProvider } from "@/components/providers/EffectProvider";
+import { SiteSettingsProvider } from "@/components/providers/SiteSettingsProvider";
 import BackgroundRenderer from "@/components/layout/BackgroundRenderer";
 import Navbar from "@/components/layout/Navbar";
 import ClientWidgets from "@/components/layout/ClientWidgets";
@@ -16,19 +17,25 @@ import KiraSparkle from "@/components/ui/KiraSparkle";
 import WelcomeScreen from "@/components/layout/WelcomeScreen";
 import VisitorTracker from "@/components/layout/VisitorTracker";
 import { WELCOME_SESSION_KEY } from "@/lib/welcome";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
-export default function SiteLayout({
+export default async function SiteLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Site settings are read once per render here and handed to client components
+  // through context, so the navbar, background and widgets all render the
+  // admin-configured values on the first paint.
+  const settings = await loadSiteSettings();
+
   return (
-    <>
+    <SiteSettingsProvider value={settings}>
       {/*
         阻塞式引导脚本：在首次绘制前确定「欢迎屏是否已看」与「明暗主题」，
         这样服务端 HTML 不必猜测客户端状态，也就不会产生水合不匹配
@@ -64,6 +71,6 @@ export default function SiteLayout({
         </BackgroundProvider>
       </EffectProvider>
       </ThemeProvider>
-    </>
+    </SiteSettingsProvider>
   );
 }

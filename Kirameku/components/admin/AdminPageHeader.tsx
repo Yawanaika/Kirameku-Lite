@@ -23,10 +23,10 @@ export default function AdminPageHeader({
       )}
     >
       <div>
-        <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-600 uppercase">
+        <p className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 uppercase dark:text-slate-600">
           {eyebrow}
         </p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           {title}
         </h1>
         {description ? (

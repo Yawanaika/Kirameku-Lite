@@ -41,7 +41,7 @@ function MessageNode({
     <div
       className={
         depth > 0
-          ? "ml-4 border-l border-white/10 pl-4 sm:ml-6 sm:pl-5"
+          ? "ml-4 border-l border-slate-200/80 dark:border-white/10 pl-4 sm:ml-6 sm:pl-5"
           : ""
       }
     >
@@ -53,15 +53,15 @@ function MessageNode({
               alt=""
               width={24}
               height={24}
-              className="size-6 rounded-full border border-white/10"
+              className="size-6 rounded-full border border-slate-200/80 dark:border-white/10"
               unoptimized
             />
           ) : (
-            <span className="grid size-6 place-items-center rounded-full bg-white/5 text-[10px] text-slate-500">
+            <span className="grid size-6 place-items-center rounded-full bg-slate-900/[0.04] dark:bg-white/5 text-[10px] text-slate-500">
               {(user?.login ?? "匿").slice(0, 1).toUpperCase()}
             </span>
           )}
-          <span className="text-xs font-medium text-slate-300">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
             {user?.login ?? "匿名用户"}
           </span>
           <StatusBadge status={message.status} />
@@ -75,7 +75,7 @@ function MessageNode({
           ) : null}
         </div>
 
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">
           {message.content}
         </p>
 

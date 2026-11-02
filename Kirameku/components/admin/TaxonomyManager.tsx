@@ -233,10 +233,10 @@ export default function TaxonomyManager() {
 
           <form
             onSubmit={submitCategory}
-            className="space-y-3 border-b border-white/10 p-5"
+            className="space-y-3 border-b border-slate-200/80 dark:border-white/10 p-5"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-slate-300">
+              <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
                 {editingCategoryId
                   ? `编辑分类 #${editingCategoryId}`
                   : "新建分类"}
@@ -342,14 +342,14 @@ export default function TaxonomyManager() {
               正在加载分类…
             </div>
           ) : categories && categories.length > 0 ? (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
               {categories.map((item) => (
                 <li
                   key={item.id}
                   className="flex flex-wrap items-center gap-3 px-5 py-3.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-slate-200">
+                    <p className="truncate text-sm text-slate-700 dark:text-slate-200">
                       {item.name}
                       <span className="ml-2 text-[10px] text-slate-600">
                         /{item.slug}
@@ -396,10 +396,10 @@ export default function TaxonomyManager() {
 
           <form
             onSubmit={submitTag}
-            className="space-y-3 border-b border-white/10 p-5"
+            className="space-y-3 border-b border-slate-200/80 dark:border-white/10 p-5"
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-medium text-slate-300">
+              <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
                 {editingTagId ? `编辑标签 #${editingTagId}` : "新建标签"}
               </h3>
               {editingTagId ? (
@@ -469,14 +469,14 @@ export default function TaxonomyManager() {
               正在加载标签…
             </div>
           ) : tags && tags.length > 0 ? (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
               {tags.map((item) => (
                 <li
                   key={item.id}
                   className="flex flex-wrap items-center gap-3 px-5 py-3.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-slate-200">
+                    <p className="truncate text-sm text-slate-700 dark:text-slate-200">
                       {item.name}
                       <span className="ml-2 text-[10px] text-slate-600">
                         /{item.slug}

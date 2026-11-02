@@ -186,7 +186,7 @@ export default function FriendLinksManager() {
               正在加载友链…
             </div>
           ) : links && links.length > 0 ? (
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
               {links.map((item) => (
                 <li
                   key={item.id}
@@ -194,7 +194,7 @@ export default function FriendLinksManager() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         {item.name}
                       </p>
                       <StatusBadge
@@ -333,7 +333,7 @@ export default function FriendLinksManager() {
                 }
               />
             </div>
-            <label className="flex items-center gap-2 text-xs text-slate-400">
+            <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <input
                 type="checkbox"
                 checked={form.isApproved}
@@ -343,7 +343,7 @@ export default function FriendLinksManager() {
                     isApproved: event.target.checked,
                   }))
                 }
-                className="size-3.5 rounded border-white/20 bg-slate-950 accent-sky-400"
+                className="size-3.5 rounded border-slate-300/80 dark:border-white/20 bg-slate-950 accent-sky-400"
               />
               审核通过（前台可见）
             </label>

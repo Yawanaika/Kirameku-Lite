@@ -341,14 +341,14 @@ export default function BookmarksManager() {
                 正在加载分类…
               </div>
             ) : categories && categories.length > 0 ? (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
                 {categories.map((item) => (
                   <li
                     key={item.id}
                     className="flex flex-wrap items-center gap-3 px-5 py-4"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-200">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                         {item.name}
                         <span className="ml-2 text-[10px] text-slate-600">
                           {sitesByCategory.get(item.id)?.length ?? 0} 个站点
@@ -506,16 +506,16 @@ export default function BookmarksManager() {
                 正在加载站点…
               </div>
             ) : filteredSites.length > 0 ? (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-slate-200/70 dark:divide-white/5">
                 {filteredSites.map((item) => (
                   <li key={item.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-start gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-medium text-slate-200">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             {item.name}
                           </p>
-                          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
+                          <span className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500">
                             {categoryNameById.get(item.category_id) ??
                               `分类 #${item.category_id}`}
                           </span>
@@ -536,7 +536,7 @@ export default function BookmarksManager() {
                           {item.platforms.map((platform) => (
                             <span
                               key={platform}
-                              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
+                              className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
                             >
                               {platform}
                             </span>

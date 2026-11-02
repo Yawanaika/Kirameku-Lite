@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { createDefaultSiteSettings } from "@/lib/site-settings";
 import { env } from "@/server/env";
 import { siteConfig } from "@/siteConfig";
-import { getShareConfig, getSiteUrl, shareImageUrl, siteUrl } from "./site";
+import {
+  buildShareConfig,
+  getSiteUrl,
+  shareImageUrl,
+  siteUrl,
+} from "./site";
 
 beforeEach(() => {
   env.SITE_URL = undefined;
@@ -63,13 +69,30 @@ describe("shareImageUrl", () => {
   });
 });
 
-describe("getShareConfig", () => {
+describe("buildShareConfig", () => {
   it("uses siteConfig defaults", () => {
-    expect(getShareConfig()).toMatchObject({
+    expect(
+      buildShareConfig(createDefaultSiteSettings()),
+    ).toMatchObject({
       title: siteConfig.title,
       description: siteConfig.bio,
       image: `https://blog.example.com${siteConfig.shareImage}`,
       card: "summary_large_image",
+    });
+  });
+
+  it("prefers the admin-managed settings over siteConfig", () => {
+    const settings = createDefaultSiteSettings();
+    settings.profile.siteTitle = "后台标题";
+    settings.profile.bio = "后台简介";
+    settings.share.image = "/images/admin-card.png";
+    settings.share.card = "summary";
+
+    expect(buildShareConfig(settings)).toEqual({
+      title: "后台标题",
+      description: "后台简介",
+      image: "https://blog.example.com/images/admin-card.png",
+      card: "summary",
     });
   });
 
@@ -79,7 +102,7 @@ describe("getShareConfig", () => {
     env.SITE_SHARE_IMAGE = "https://cdn.example.com/card.png";
     env.SITE_SHARE_CARD = "summary";
 
-    expect(getShareConfig()).toEqual({
+    expect(buildShareConfig(createDefaultSiteSettings())).toEqual({
       title: "配置标题",
       description: "配置描述",
       image: "https://cdn.example.com/card.png",
@@ -88,7 +111,10 @@ describe("getShareConfig", () => {
   });
 
   it("applies per-page overrides and keeps the site image fallback", () => {
-    const share = getShareConfig({ title: "文章标题", description: "" });
+    const share = buildShareConfig(createDefaultSiteSettings(), {
+      title: "文章标题",
+      description: "",
+    });
 
     expect(share.title).toBe("文章标题");
     expect(share.description).toBe(siteConfig.bio);
@@ -96,6 +122,8 @@ describe("getShareConfig", () => {
   });
 
   it("drops the image when a page explicitly passes null", () => {
-    expect(getShareConfig({ image: null }).image).toBeNull();
+    expect(
+      buildShareConfig(createDefaultSiteSettings(), { image: null }).image,
+    ).toBeNull();
   });
 });

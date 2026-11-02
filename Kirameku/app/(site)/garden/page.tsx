@@ -11,7 +11,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { siteConfig } from "@/siteConfig";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 import { postsData } from "@/data/posts";
 import { chattersData } from "@/data/chatters";
 import { getPosts, getPostsCount, type PostItem } from "@/lib/api/posts";
@@ -117,7 +117,8 @@ export default function GardenPage() {
   const [trendData, setTrendData] = useState<Array<{ date: string; 文章: number; 说说: number }>>([]);
   const [categoryData, setCategoryData] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [activePie, setActivePie] = useState<number | undefined>();
-  const days = getDaysSince(siteConfig.buildDate);
+  const { profile } = useSiteSettings();
+  const days = getDaysSince(profile.buildDate);
   const q = quotes[quoteIdx];
 
   useEffect(() => {

@@ -113,7 +113,7 @@ export default function ImageUploader({
       {error ? <AdminError message={error} /> : null}
 
       {value ? (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/40">
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-950/40">
           <img
             key={value}
             src={value}
@@ -125,7 +125,7 @@ export default function ImageUploader({
           />
         </div>
       ) : (
-        <div className="flex h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 text-xs text-slate-600">
+        <div className="flex h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200/80 dark:border-white/10 text-xs text-slate-600">
           <ImageOff className="size-4" aria-hidden />
           还没有图片
         </div>

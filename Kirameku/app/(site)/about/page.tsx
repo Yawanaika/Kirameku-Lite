@@ -2,10 +2,11 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { renderMarkdown } from "@/lib/markdown";
-import { siteConfig } from "@/siteConfig";
+import { loadSiteSettings } from "@/server/modules/site-settings";
 import FadeIn from "@/components/ui/FadeIn";
 
 export default async function AboutPage() {
+  const { profile } = await loadSiteSettings();
   const fullPath = path.join(process.cwd(), "content", "about.md");
   let contentHtml = "博主很懒，还没有写自我介绍哦...";
   let coverImage = "/images/2.webp";
@@ -39,7 +40,7 @@ export default async function AboutPage() {
           {/* 头像 */}
           <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white dark:border-slate-800 shadow-2xl overflow-hidden -mt-12 md:-mt-16 relative z-20 bg-white">
             <img
-              src={siteConfig.avatarUrl}
+              src={profile.avatarUrl}
               alt="avatar"
               className="w-full h-full object-cover"
             />
@@ -51,7 +52,7 @@ export default async function AboutPage() {
               关于我
             </h1>
             <p className="text-sm md:text-lg text-indigo-600 dark:text-indigo-400 font-bold tracking-widest uppercase transition-colors duration-700">
-              Hello World, I&apos;m {siteConfig.authorName}
+              Hello World, I&apos;m {profile.authorName}
             </p>
           </div>
 

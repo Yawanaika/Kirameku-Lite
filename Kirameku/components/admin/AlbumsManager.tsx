@@ -163,9 +163,9 @@ export default function AlbumsManager() {
               {albums.map((item) => (
                 <article
                   key={item.id}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/40"
+                  className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-950/40"
                 >
-                  <div className="relative h-32 bg-white/[0.03]">
+                  <div className="relative h-32 bg-white/60 dark:bg-white/[0.03]">
                     {item.cover ? (
                       <img
                         src={item.cover}
@@ -177,12 +177,12 @@ export default function AlbumsManager() {
                         <Images className="size-8" aria-hidden />
                       </div>
                     )}
-                    <span className="absolute top-2 right-2 rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] text-slate-300">
+                    <span className="absolute top-2 right-2 rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] text-slate-600 dark:text-slate-300">
                       {item.photo_count} 张
                     </span>
                   </div>
                   <div className="p-4">
-                    <p className="truncate text-sm font-medium text-slate-200">
+                    <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">
                       {item.title}
                     </p>
                     <p className="mt-1 line-clamp-2 min-h-8 text-[11px] leading-4 text-slate-500">

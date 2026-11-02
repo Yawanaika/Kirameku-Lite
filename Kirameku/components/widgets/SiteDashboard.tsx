@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { siteConfig } from "@/siteConfig";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 
 export default function SiteDashboard() {
+  const { profile, content } = useSiteSettings();
   const [timeStr, setTimeStr] = useState("");
   const [uptimeStr, setUptimeStr] = useState("");
 
   const START_DATE = new Date(
-    siteConfig.buildDate || "2026-05-07T12:00:00"
+    profile.buildDate || "2026-05-07T12:00:00"
   ).getTime();
 
   useEffect(() => {
@@ -56,24 +57,24 @@ export default function SiteDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-center md:justify-end">
-          {siteConfig.icpConfig?.name && (
+          {content.icp.name && (
             <a
-              href={siteConfig.icpConfig.link}
+              href={content.icp.link}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-indigo-500 transition-colors border-b border-dashed border-slate-400 dark:border-slate-500 pb-0.5"
             >
-              {siteConfig.icpConfig.name}
+              {content.icp.name}
             </a>
           )}
-          {siteConfig.moeIcpConfig?.name && (
+          {content.moeIcp.name && (
             <a
-              href={siteConfig.moeIcpConfig.link}
+              href={content.moeIcp.link}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-indigo-500 transition-colors border-b border-dashed border-slate-400 dark:border-slate-500 pb-0.5"
             >
-              {siteConfig.moeIcpConfig.name}
+              {content.moeIcp.name}
             </a>
           )}
         </div>

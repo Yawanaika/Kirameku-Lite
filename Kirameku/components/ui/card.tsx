@@ -8,7 +8,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/10 bg-white/[0.035]",
+        "rounded-2xl border border-white/70 bg-white/55 shadow-sm shadow-slate-900/5 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none",
         className,
       )}
       {...props}
@@ -23,7 +23,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4",
+        "flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-4 dark:border-white/10",
         className,
       )}
       {...props}
@@ -37,7 +37,10 @@ export function CardTitle({
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={cn("text-sm font-semibold text-white", className)}
+      className={cn(
+        "text-sm font-semibold text-slate-900 dark:text-white",
+        className,
+      )}
       {...props}
     />
   );
@@ -48,7 +51,13 @@ export function CardDescription({
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("mt-0.5 text-xs text-slate-500", className)} {...props} />
+    <p
+      className={cn(
+        "mt-0.5 text-xs text-slate-500 dark:text-slate-400",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -66,7 +75,7 @@ export function CardFooter({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 border-t border-white/10 px-5 py-3.5",
+        "flex flex-wrap items-center gap-2 border-t border-slate-200/70 px-5 py-3.5 dark:border-white/10",
         className,
       )}
       {...props}

@@ -147,14 +147,14 @@ export default function VisitorsManager() {
                   {visitors.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="max-w-64">
-                        <p className="font-mono text-xs text-slate-300">
+                        <p className="font-mono text-xs text-slate-600 dark:text-slate-300">
                           {item.ip}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-slate-600">
                           {item.path || "/"}
                         </p>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-400">
+                      <TableCell className="text-xs text-slate-500 dark:text-slate-400">
                         {[item.country, item.region, item.city, item.district]
                           .filter(Boolean)
                           .join(" · ") || "—"}

@@ -210,7 +210,7 @@ export default function PostsManager() {
                       <TableCell className="max-w-72">
                         <Link
                           href={`/admin/posts/${post.id}`}
-                          className="block truncate font-medium text-slate-200 hover:text-sky-300"
+                          className="block truncate font-medium text-slate-700 dark:text-slate-200 hover:text-sky-300"
                         >
                           {post.title}
                         </Link>
@@ -221,7 +221,7 @@ export default function PostsManager() {
                       <TableCell>
                         <StatusBadge status={post.status} />
                       </TableCell>
-                      <TableCell className="text-xs text-slate-400">
+                      <TableCell className="text-xs text-slate-500 dark:text-slate-400">
                         {post.category || "—"}
                       </TableCell>
                       <TableCell className="max-w-44">
@@ -230,7 +230,7 @@ export default function PostsManager() {
                             post.tags.map((item) => (
                               <span
                                 key={item}
-                                className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
+                                className="rounded bg-slate-900/[0.04] dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-500"
                               >
                                 {item}
                               </span>
