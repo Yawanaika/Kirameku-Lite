@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Eye, Heart, Clock, Pin } from "lucide-react";
+import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
+import { bypassImageOptimization } from "@/lib/image";
 
 export interface PostOut {
   id: number;
@@ -31,6 +33,8 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, index }: PostCardProps) {
+  const { appearance } = useSiteSettings();
+  const defaultCover = appearance.defaultPostCover || "/images/default-cover.jpg";
   const cardRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
@@ -95,10 +99,11 @@ export default function PostCard({ post, index }: PostCardProps) {
             {/* 封面图 */}
             <div className="relative aspect-[16/10] w-full overflow-hidden">
               <Image
-                src={post.cover || "/images/default-cover.jpg"}
+                src={post.cover || defaultCover}
                 alt={post.title}
                 fill
                 priority={index < 3}
+                unoptimized={bypassImageOptimization(post.cover || defaultCover)}
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />

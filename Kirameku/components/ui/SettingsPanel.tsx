@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useBackground } from "@/components/providers/BackgroundProvider";
 import { useEffects } from "@/components/providers/EffectProvider";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
+import { bypassImageOptimization } from "@/lib/image";
 
 export default function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { bgImage, bgBlur, setBgImage, setBgBlur } = useBackground();
@@ -72,6 +73,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
                   alt="背景"
                   fill
                   sizes="80px"
+                  unoptimized={bypassImageOptimization(img)}
                   className="object-cover"
                 />
               </button>
@@ -86,6 +88,7 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
             alt="当前背景"
             fill
             sizes="288px"
+            unoptimized={bypassImageOptimization(bgImage)}
             className="object-cover"
           />
           <button

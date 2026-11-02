@@ -17,6 +17,7 @@ import type { ChatterItem } from "@/lib/api/chatters";
 import { getGithubUser, logoutGithubUser } from "@/lib/api/github-auth";
 import type { GitHubUser } from "@/lib/api/types";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
+import { bypassImageOptimization } from "@/lib/image";
 
 interface Moment {
   id: string;
@@ -387,7 +388,7 @@ export default function MomentsClient({
                                 return (
                                   <div key={idx} onClick={(e) => { e.stopPropagation(); setLightbox({ photos, index: idx }); }}
                                     className="relative rounded-lg md:rounded-xl overflow-hidden cursor-pointer group/img aspect-square">
-                                    <Image src={img} alt="" fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover transition-transform duration-300 group-hover/img:scale-105" />
+                                    <Image src={img} alt="" fill sizes="(max-width: 640px) 50vw, 33vw" unoptimized={bypassImageOptimization(img)} className="object-cover transition-transform duration-300 group-hover/img:scale-105" />
                                   </div>
                                 );
                               })}
@@ -412,7 +413,7 @@ export default function MomentsClient({
                           <div className="border-t border-slate-200/50 dark:border-white/5 px-3 md:px-5 py-3 md:py-4" onClick={(e) => e.stopPropagation()}>
                             {user ? (
                               <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-xl bg-white/40 dark:bg-slate-700/30">
-                                <Image src={user.avatar} alt={user.login} width={24} height={24} className="rounded-full md:w-7 md:h-7" />
+                                <Image src={user.avatar} alt={user.login} width={24} height={24} unoptimized={bypassImageOptimization(user.avatar)} className="rounded-full md:w-7 md:h-7" />
                                 <span className="text-xs font-medium text-slate-700 dark:text-slate-300 flex-1">{user.login}</span>
                                 <button type="button" onClick={handleLogout}
                                   className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-red-500 transition-colors">
@@ -519,7 +520,7 @@ function CommentCard({ comment, expandedReplies, onReply, onToggleReplies, liked
       <div className="p-2 md:p-3">
         <div className="flex items-center gap-2 mb-1.5">
           {comment.github_user ? (
-            <Image src={comment.github_user.avatar} alt={comment.github_user.login} width={22} height={22} className="rounded-full md:w-6 md:h-6" />
+            <Image src={comment.github_user.avatar} alt={comment.github_user.login} width={22} height={22} unoptimized={bypassImageOptimization(comment.github_user.avatar)} className="rounded-full md:w-6 md:h-6" />
           ) : (
             <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-white text-[10px] font-bold">?</div>
           )}
@@ -564,7 +565,7 @@ function ReplyCard({ reply, onReply, likedCommentIds, onCommentLike }: {
     <div className="px-2 py-1.5 md:px-3 md:py-2 border-b border-slate-200/20 dark:border-white/5 last:border-0">
       <div className="flex items-start gap-1.5 md:gap-2">
         {reply.github_user ? (
-          <Image src={reply.github_user.avatar} alt={reply.github_user.login} width={18} height={18} className="rounded-full mt-0.5 md:w-5 md:h-5" />
+          <Image src={reply.github_user.avatar} alt={reply.github_user.login} width={18} height={18} unoptimized={bypassImageOptimization(reply.github_user.avatar)} className="rounded-full mt-0.5 md:w-5 md:h-5" />
         ) : (
           <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-white text-[8px] font-bold mt-0.5">?</div>
         )}

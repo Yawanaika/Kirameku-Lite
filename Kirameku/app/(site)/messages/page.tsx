@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { bypassImageOptimization } from "@/lib/image";
 
 function GithubIcon({ className }: { className?: string }) {
   return (
@@ -270,6 +271,7 @@ function MessagesContent() {
             <Image
               src={user.avatar}
               alt={user.login}
+              unoptimized={bypassImageOptimization(user.avatar)}
               width={32}
               height={32}
               className="rounded-full md:w-9 md:h-9"
@@ -458,6 +460,7 @@ function MessageCard({
             <Image
               src={msg.github_user.avatar}
               alt={msg.github_user.login}
+              unoptimized={bypassImageOptimization(msg.github_user.avatar)}
               width={32}
               height={32}
               className="rounded-full md:w-9 md:h-9"
@@ -580,6 +583,7 @@ function ReplyCard({
           <Image
             src={reply.github_user.avatar}
             alt={reply.github_user.login}
+            unoptimized={bypassImageOptimization(reply.github_user.avatar)}
             width={24}
             height={24}
             className="rounded-full mt-0.5 md:w-7 md:h-7"

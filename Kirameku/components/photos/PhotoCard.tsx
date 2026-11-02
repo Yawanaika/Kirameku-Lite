@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import type { Photo } from "@/data/photos";
+import { bypassImageOptimization } from "@/lib/image";
 
 interface PhotoCardProps {
   photo: Photo;
@@ -48,6 +49,7 @@ export default function PhotoCard({ photo, index, onClick }: PhotoCardProps) {
             src={photo.url}
             alt={photo.caption || "照片"}
             fill
+            unoptimized={bypassImageOptimization(photo.url)}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
               loaded ? "opacity-100" : "opacity-0"

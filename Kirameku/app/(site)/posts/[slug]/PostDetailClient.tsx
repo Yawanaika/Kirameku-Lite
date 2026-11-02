@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, Eye, Heart, X } from "lucide-react";
 import { likePost, reportPostView, type PostDetail } from "@/lib/api";
 import ReadingProgress from "@/components/ui/ReadingProgress";
+import { bypassImageOptimization } from "@/lib/image";
 
 const PostComments = dynamic(() => import("@/components/posts/PostComments"), { ssr: false });
 
@@ -133,6 +134,7 @@ export default function PostDetailClient({
               src={post.cover}
               alt={post.title}
               fill
+              unoptimized={bypassImageOptimization(post.cover)}
               className="object-cover"
               priority
             />

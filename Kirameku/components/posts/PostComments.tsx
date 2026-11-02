@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Heart, Send, Reply, ChevronDown, ChevronUp, LogOut } from "lucide-react";
+import { bypassImageOptimization } from "@/lib/image";
 import {
   getPostComments,
   createComment,
@@ -232,6 +233,7 @@ export default function PostComments({ postId }: { postId: number }) {
             <Image
               src={user.avatar}
               alt={user.login}
+              unoptimized={bypassImageOptimization(user.avatar)}
               width={32}
               height={32}
               className="rounded-full md:w-9 md:h-9"
@@ -447,6 +449,7 @@ function CommentCard({
             <Image
               src={comment.github_user.avatar}
               alt={comment.github_user.login}
+              unoptimized={bypassImageOptimization(comment.github_user.avatar)}
               width={32}
               height={32}
               className="rounded-full md:w-9 md:h-9"
@@ -564,6 +567,7 @@ function ReplyCard({
           <Image
             src={reply.github_user.avatar}
             alt={reply.github_user.login}
+            unoptimized={bypassImageOptimization(reply.github_user.avatar)}
             width={24}
             height={24}
             className="rounded-full mt-0.5 md:w-7 md:h-7"

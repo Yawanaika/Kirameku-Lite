@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import PhotoCard from "./PhotoCard";
 import type { Photo } from "@/data/photos";
+import { bypassImageOptimization } from "@/lib/image";
 
 export interface Album {
   id: number;
@@ -66,6 +67,7 @@ export default function AlbumCard({ album, isExpanded, onToggle, onPhotoClick }:
                   src={photo.url}
                   alt={photo.caption || album.title}
                   fill
+                  unoptimized={bypassImageOptimization(photo.url)}
                   className="object-cover"
                   sizes="260px"
                 />

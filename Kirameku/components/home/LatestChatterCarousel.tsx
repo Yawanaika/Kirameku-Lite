@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { MessageSquare, Heart } from "lucide-react";
 import { getChatters } from "@/lib/api";
 import type { ChatterItem } from "@/lib/api";
+import { bypassImageOptimization } from "@/lib/image";
 
 function ChatterImage({ src }: { src: string }) {
   const [isLandscape, setIsLandscape] = useState(true);
@@ -19,6 +20,7 @@ function ChatterImage({ src }: { src: string }) {
       <Image
         src={src}
         fill
+        unoptimized={bypassImageOptimization(src)}
         sizes={isLandscape ? "100px" : "56px"}
         draggable={false}
         className="object-cover"

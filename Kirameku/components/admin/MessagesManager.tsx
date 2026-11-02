@@ -14,6 +14,7 @@ import { formatDateTime } from "./format";
 import { useAdminData } from "./use-admin-data";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { bypassImageOptimization } from "@/lib/image";
 import { Select } from "@/components/ui/select";
 import type { MessageItem } from "@/server/modules/messages/contracts";
 
@@ -51,10 +52,10 @@ function MessageNode({
             <Image
               src={user.avatar}
               alt=""
+              unoptimized={bypassImageOptimization(user.avatar)}
               width={24}
               height={24}
               className="size-6 rounded-full border border-slate-200/80 dark:border-white/10"
-              unoptimized
             />
           ) : (
             <span className="grid size-6 place-items-center rounded-full bg-slate-900/[0.04] dark:bg-white/5 text-[10px] text-slate-500">

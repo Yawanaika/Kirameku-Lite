@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Photo } from "@/data/photos";
+import { bypassImageOptimization } from "@/lib/image";
 
 interface LightboxProps {
   photos: Photo[];
@@ -109,6 +110,7 @@ export default function Lightbox({
               src={photo.url}
               alt={photo.caption || "照片"}
               width={1600}
+              unoptimized={bypassImageOptimization(photo.url)}
               height={1200}
               className="max-h-[85vh] w-auto object-contain rounded-lg shadow-2xl"
               priority
