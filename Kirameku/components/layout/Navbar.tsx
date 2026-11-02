@@ -302,9 +302,9 @@ export default function Navbar() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 glass-card rounded-none border-x-0 border-t-0">
-        {/* 导航项比页面正文多（含可配置的下拉菜单），2xl 起容器略放宽；
-            正文仍在 max-w-6xl 内，视觉重心不变 */}
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-6 xl:px-8 2xl:max-w-[86rem]">
+        {/* 导航项比页面正文多（含可配置的下拉菜单），2xl 起容器略放宽，
+            这样 2xl 断点能容纳原始规格（px-3 + 项间距）；正文仍在 max-w-6xl 内，视觉重心不变 */}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 2xl:max-w-[86rem]">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link
@@ -325,10 +325,13 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            {/* 导航项数量可以后台增加，所以尺寸按断点分三档：
-                lg 小图标 + 紧凑内边距，2xl 内容宽度够用时才放大到原来的规格。
-                链接一律 nowrap + shrink-0，避免文字被压成两行。 */}
-            <div className="hidden min-w-0 items-center lg:flex lg:gap-x-0 xl:gap-x-0.5">
+            {/* 11 个固定项 + 1 个可配置下拉菜单，1280px 以下塞不进原始规格：
+                 1024 视口可用宽度约 704px，而原始规格（text-sm + px-3 + w-4 图标）
+                 12 项需要约 990px，任何压缩都会让文字换行。
+                 所以 xl（1280）起才显示行内导航，更窄时走汉堡抽屉（内容一致）。
+                 xl 档尺寸、字号、图标、项间距都与原版一致，只把左右内边距
+                 从 12px 收到 8px 换取约 90px；2xl 容器放宽后完全回到原版 px-3。 */}
+            <div className="hidden min-w-0 items-center gap-x-1 xl:flex">
               {navLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
@@ -336,12 +339,12 @@ export default function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 xl:gap-1 xl:px-2 xl:text-[13px] 2xl:gap-1.5 2xl:px-2.5 2xl:text-sm ${isActive
+                    className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-all duration-200 2xl:px-3 ${isActive
                         ? "text-sky-600 dark:text-sky-400"
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       }`}
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4" />
+                    <Icon className="h-4 w-4 shrink-0" />
                     <span>{link.label}</span>
                     {isActive && (
                       <motion.div
@@ -385,12 +388,12 @@ export default function Navbar() {
                     aria-haspopup="true"
                     aria-expanded={isDropdownOpen}
                     aria-controls="navbar-dropdown-menu"
-                    className={`relative flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 xl:gap-1 xl:px-2 xl:text-[13px] 2xl:gap-1.5 2xl:px-2.5 2xl:text-sm ${dropdownActive
+                    className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-all duration-200 2xl:px-3 ${dropdownActive
                         ? "text-sky-600 dark:text-sky-400"
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       }`}
                   >
-                    <DropdownIcon className="h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4" />
+                    <DropdownIcon className="h-4 w-4 shrink-0" />
                     {/* 菜单名称由后台自由填写，限宽后省略，避免长名称把整行导航撑溢出 */}
                     <span
                       className="max-w-[4rem] truncate"
@@ -399,7 +402,7 @@ export default function Navbar() {
                       {activeDropdown.label}
                     </span>
                     <ChevronDown
-                      className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
+                      className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
                       aria-hidden
                     />
                     {dropdownActive && (
@@ -487,7 +490,7 @@ export default function Navbar() {
 
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100/50 dark:text-slate-400 dark:hover:bg-slate-800/50 lg:hidden"
+                className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100/50 dark:text-slate-400 dark:hover:bg-slate-800/50 xl:hidden"
               >
                 {isMobileMenuOpen ? (
                   <X className="w-5 h-5" />
@@ -507,7 +510,7 @@ export default function Navbar() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain glass-card rounded-none border-x-0 lg:hidden"
+            className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain glass-card rounded-none border-x-0 xl:hidden"
           >
             <div className="p-4 space-y-1">
               {navLinks.map((link) => {
