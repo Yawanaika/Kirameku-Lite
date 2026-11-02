@@ -23,8 +23,20 @@ import {
   X,
   Settings,
   Bookmark,
+  ChevronDown,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
 import {siteConfig} from "@/siteConfig";
+import {
+  isExternalHref,
+  isInternalHref,
+  isNavLinkActive,
+  parseNavDropdownConfig,
+  type NavDropdownConfig,
+  type NavDropdownLink,
+} from "@/lib/nav-dropdown";
+import { navDropdownIcons } from "@/lib/nav-dropdown-icons";
 
 const SettingsPanel = dynamic(() => import("@/components/ui/SettingsPanel"), { ssr: false });
 
@@ -42,6 +54,56 @@ const navLinks = [
   { href: "/about", label: "关于", icon: User },
 ];
 
+/**
+ * 下拉菜单里的一条链接：站内路径交给 next/link，站外地址用原生 a 并在新标签页打开。
+ */
+function NavDropdownItem({
+  link,
+  onSelect,
+  className,
+}: {
+  link: NavDropdownLink;
+  onSelect: () => void;
+  className: string;
+}) {
+  const external = isExternalHref(link.href);
+
+  const content = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate">{link.label}</span>
+        {external ? (
+          <ExternalLink className="size-3 shrink-0 opacity-50" aria-hidden />
+        ) : null}
+      </span>
+      {link.description ? (
+        <span className="block truncate text-[11px] opacity-70">
+          {link.description}
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (!external && isInternalHref(link.href)) {
+    return (
+      <Link href={link.href} onClick={onSelect} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <a
+      href={link.href}
+      onClick={onSelect}
+      className={className}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {content}
+    </a>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const { toggleTheme } = useTheme();
@@ -50,6 +112,28 @@ export default function Navbar() {
   const settingsRef = useRef<HTMLDivElement>(null);
   const [easterEgg, setEasterEgg] = useState(false);
   const clickTimes = useRef<number[]>([]);
+
+  // 导航栏自定义下拉菜单：配置存在站点配置里，由 /api/nav-dropdown 读取。
+  // 读不到或不合法时保持 null，导航栏退回纯静态链接，不影响整站渲染。
+  const [navDropdown, setNavDropdown] = useState<NavDropdownConfig | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileGroupOpen, setIsMobileGroupOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/nav-dropdown", { signal: controller.signal, cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: unknown) => {
+        if (!controller.signal.aborted) {
+          setNavDropdown(parseNavDropdownConfig(payload));
+        }
+      })
+      .catch(() => {
+        // 拿不到配置时就当作没有自定义菜单。
+      });
+    return () => controller.abort();
+  }, []);
 
   const handleLogoClick = useCallback(() => {
     const now = Date.now();
@@ -181,24 +265,52 @@ export default function Navbar() {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
         setIsSettingsOpen(false);
       }
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsSettingsOpen(false);
+        setIsDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
   // 子站页面隐藏主站导航栏
   if (pathname.startsWith("/garden")) return null;
 
+  const activeDropdown =
+    navDropdown && navDropdown.enabled && navDropdown.links.length > 0
+      ? navDropdown
+      : null;
+  const DropdownIcon = activeDropdown ? navDropdownIcons[activeDropdown.icon] : Link2;
+  const dropdownActive = activeDropdown
+    ? activeDropdown.links.some((link) => isNavLinkActive(pathname, link.href))
+    : false;
+  const dropdownItemClass =
+    "block rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:text-slate-300 dark:hover:bg-sky-500/10 dark:hover:text-sky-300";
+  const dropdownItemMobileClass =
+    "block rounded-lg px-4 py-2.5 text-sm text-slate-600 transition-colors hover:bg-slate-100/50 dark:text-slate-400 dark:hover:bg-slate-800/50";
+
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 glass-card rounded-none border-x-0 border-t-0">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* 导航项比页面正文多（含可配置的下拉菜单），2xl 起容器略放宽；
+            正文仍在 max-w-6xl 内，视觉重心不变 */}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-6 xl:px-8 2xl:max-w-[86rem]">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link
               href="/"
               onClick={handleLogoClick}
-              className={`flex items-center space-x-0.5 select-none ${easterEgg ? "animate-[spin_0.5s_ease-in-out_3]" : ""}`}
+              className={`flex shrink-0 items-center space-x-0.5 whitespace-nowrap select-none ${easterEgg ? "animate-[spin_0.5s_ease-in-out_3]" : ""}`}
               style={easterEgg ? { animation: "spin 0.5s ease-in-out 6, rainbow 3s linear" } : undefined}
             >
               <span className={`text-xl font-bold tracking-tight ${easterEgg ? "text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500" : "text-slate-800 dark:text-white"}`} style={{ fontFamily: "'Noto Serif SC', serif" }}>
@@ -213,7 +325,10 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
+            {/* 导航项数量可以后台增加，所以尺寸按断点分三档：
+                lg 小图标 + 紧凑内边距，2xl 内容宽度够用时才放大到原来的规格。
+                链接一律 nowrap + shrink-0，避免文字被压成两行。 */}
+            <div className="hidden min-w-0 items-center lg:flex lg:gap-x-0 xl:gap-x-0.5">
               {navLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
@@ -221,12 +336,12 @@ export default function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive
+                    className={`relative flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 xl:gap-1 xl:px-2 xl:text-[13px] 2xl:gap-1.5 2xl:px-2.5 2xl:text-sm ${isActive
                         ? "text-sky-600 dark:text-sky-400"
                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                       }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4" />
                     <span>{link.label}</span>
                     {isActive && (
                       <motion.div
@@ -242,6 +357,95 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+
+              {/* 自定义下拉菜单（后台「导航菜单」页配置）。
+                  桌面端导航项数量可配置，图标只保留在移动端抽屉里，
+                  否则 12 项以上一定挤成两行。 */}
+              {activeDropdown && (
+                <div
+                  ref={dropdownRef}
+                  className="relative"
+                  onMouseEnter={() => setIsDropdownOpen(true)}
+                  onMouseLeave={() => setIsDropdownOpen(false)}
+                >
+                  <button
+                    type="button"
+                    // 鼠标点击时 detail >= 1，而此时 onMouseEnter 已经把菜单打开，
+                    // 再切换一次会立刻关掉；只有键盘（Enter/Space，detail === 0）才需要切换。
+                    onClick={(event) => {
+                      if (event.detail === 0) {
+                        setIsDropdownOpen((open) => !open);
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setIsDropdownOpen(false);
+                      }
+                    }}
+                    aria-haspopup="true"
+                    aria-expanded={isDropdownOpen}
+                    aria-controls="navbar-dropdown-menu"
+                    className={`relative flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 xl:gap-1 xl:px-2 xl:text-[13px] 2xl:gap-1.5 2xl:px-2.5 2xl:text-sm ${dropdownActive
+                        ? "text-sky-600 dark:text-sky-400"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                      }`}
+                  >
+                    <DropdownIcon className="h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4" />
+                    {/* 菜单名称由后台自由填写，限宽后省略，避免长名称把整行导航撑溢出 */}
+                    <span
+                      className="max-w-[4rem] truncate"
+                      title={activeDropdown.label}
+                    >
+                      {activeDropdown.label}
+                    </span>
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
+                      aria-hidden
+                    />
+                    {dropdownActive && (
+                      <motion.div
+                        layoutId="navbar-indicator"
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-sky-500 rounded-full"
+                        transition={{
+                          type: "spring",
+                          stiffness: 350,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {isDropdownOpen && (
+                      <motion.div
+                        id="navbar-dropdown-menu"
+                        initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                        transition={{ duration: 0.16, ease: "easeOut" }}
+                        // pt-1 而不是 mt-1：留出的间隙仍在 popover 盒内，
+                        // 鼠标从按钮移到面板的途中不会触发 mouseleave 把菜单关掉。
+                        className="absolute right-0 top-full z-50 w-64 origin-top-right pt-1"
+                      >
+                        <div className="rounded-2xl border border-white/50 bg-white/90 p-2 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/90">
+                          {/* 链接最多 20 条，超出视口高度时面板内部滚动 */}
+                          <ul className="max-h-[min(24rem,calc(100dvh-6rem))] space-y-0.5 overflow-y-auto overscroll-contain">
+                            {activeDropdown.links.map((link) => (
+                              <li key={`${link.label}-${link.href}`}>
+                                <NavDropdownItem
+                                  link={link}
+                                  onSelect={() => setIsDropdownOpen(false)}
+                                  className={dropdownItemClass}
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
 
             {/* Theme Toggle, Settings & Mobile Menu */}
@@ -283,7 +487,7 @@ export default function Navbar() {
 
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors"
+                className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100/50 dark:text-slate-400 dark:hover:bg-slate-800/50 lg:hidden"
               >
                 {isMobileMenuOpen ? (
                   <X className="w-5 h-5" />
@@ -303,7 +507,7 @@ export default function Navbar() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-x-0 top-16 z-40 glass-card rounded-none border-x-0 md:hidden"
+            className="fixed inset-x-0 top-16 z-40 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain glass-card rounded-none border-x-0 lg:hidden"
           >
             <div className="p-4 space-y-1">
               {navLinks.map((link) => {
@@ -324,6 +528,54 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+
+              {/* 自定义下拉菜单：移动端变成可展开的一组 */
+              activeDropdown && (
+                <div className="mt-1 border-t border-slate-200/60 pt-1 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileGroupOpen((open) => !open)}
+                    aria-expanded={isMobileGroupOpen}
+                    aria-controls="navbar-mobile-dropdown"
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-3 transition-colors ${dropdownActive
+                        ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <DropdownIcon className="w-5 h-5" />
+                      <span className="font-medium">{activeDropdown.label}</span>
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform duration-200 ${isMobileGroupOpen ? "rotate-180" : ""}`}
+                      aria-hidden
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {isMobileGroupOpen && (
+                      <motion.div
+                        id="navbar-mobile-dropdown"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-1 pb-1 pl-6">
+                          {activeDropdown.links.map((link) => (
+                            <NavDropdownItem
+                              key={`${link.label}-${link.href}`}
+                              link={link}
+                              onSelect={() => setIsMobileMenuOpen(false)}
+                              className={dropdownItemMobileClass}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

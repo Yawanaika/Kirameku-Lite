@@ -147,7 +147,7 @@ export default function SiteConfigManager() {
       <AdminPageHeader
         eyebrow="Settings"
         title="站点配置"
-        description="维护前台读取的键值配置；值可以是普通字符串或 JSON。"
+        description="维护前台读取的键值配置；值可以是普通字符串或 JSON。导航栏的下拉菜单请在「导航菜单」页维护（对应 nav_dropdown 键）。"
         actions={
           <Button variant="outline" onClick={reload}>
             <RefreshCw className="size-4" aria-hidden />
