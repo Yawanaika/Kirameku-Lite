@@ -24,8 +24,35 @@ interface Track {
   lyric_id: string;
 }
 
+/**
+ * /api/music 的响应体。
+ * 从前这里直接返回 SongData[]，但「上游失败」「歌单不可播」「没配置」三种情况
+ * 都会退化成空数组，前台只能显示「暂无音乐」。现在把统计与原因一起返回，
+ * 前台可以据此给出可操作的提示。
+ */
+interface MusicResponse {
+  songs: SongData[];
+  /** 网易云返回的曲目总数（歌单可能被截断，见 MAX_PLAYLIST_TRACKS）。 */
+  total: number;
+  /** 有曲目但拿不到播放地址而被跳过的数量。 */
+  skipped: number;
+  source: "playlist" | "ids";
+  /** 为空数组时给前台的提示；正常返回时是空字符串。 */
+  message: string;
+}
+
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const cache = new TtlCache<SongData[]>(CACHE_TTL_MS, 100);
+const CACHE_MAX_ENTRIES = 100;
+const MAX_SONG_IDS = 50;
+/** 歌单可能上千首，逐首换取播放地址太慢，只解析前 N 首。 */
+const MAX_PLAYLIST_TRACKS = 100;
+/** 对网易云的并发请求数，避免一次性打出上百个 eapi 请求。 */
+const RESOLVE_CONCURRENCY = 4;
+const EMPTY_MESSAGE_PLAYLIST =
+  "没有从网易云取到歌曲，请确认歌单 ID 是否正确、歌单是否为空。";
+const EMPTY_MESSAGE_IDS = "没有从网易云取到歌曲，请确认歌曲 ID 是否正确。";
+
+const cache = new TtlCache<MusicResponse>(CACHE_TTL_MS, CACHE_MAX_ENTRIES);
 
 function parseQuery(request: NextRequest): {
   playlistId?: string;
@@ -48,8 +75,8 @@ function parseQuery(request: NextRequest): {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean);
-    if (ids.length === 0 || ids.length > 50) {
-      throw errors.badRequest("一次最多查询 50 首歌曲");
+    if (ids.length === 0 || ids.length > MAX_SONG_IDS) {
+      throw errors.badRequest(`一次最多查询 ${MAX_SONG_IDS} 首歌曲`);
     }
     if (ids.some((value) => !/^\d{1,20}$/.test(value))) {
       throw errors.badRequest("歌曲 ID 必须是数字");
@@ -60,73 +87,128 @@ function parseQuery(request: NextRequest): {
   return { playlistId };
 }
 
+/** 固定并发数的 map，保持结果顺序。 */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const size = Math.min(Math.max(1, limit), items.length);
+  const runners = Array.from({ length: size }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
+function toHttps(url: string | undefined): string {
+  return (url || "").replace(/^http:\/\//, "https://");
+}
+
+async function loadTracks(
+  meting: Meting,
+  target: { playlistId?: string; songIds?: string[] },
+): Promise<Track[]> {
+  if (target.playlistId) {
+    const raw = await meting.playlist(target.playlistId);
+    const parsed = JSON.parse(raw as string) as unknown;
+    return Array.isArray(parsed) ? (parsed as Track[]) : [];
+  }
+
+  if (!target.songIds) return [];
+
+  const results = await mapWithConcurrency(
+    target.songIds,
+    RESOLVE_CONCURRENCY,
+    async (id) => {
+      try {
+        const raw = await meting.song(id);
+        const parsed = JSON.parse(raw as string) as unknown;
+        if (Array.isArray(parsed)) return parsed as Track[];
+        return parsed ? [parsed as Track] : [];
+      } catch {
+        // 单首歌取不到不影响其它歌。
+        return [] as Track[];
+      }
+    },
+  );
+  return results.flat();
+}
+
+async function resolveTrack(meting: Meting, track: Track): Promise<SongData> {
+  let src = "";
+  try {
+    const urlRaw = await meting.url(track.url_id, 320);
+    const urlData = JSON.parse(urlRaw as string) as { url?: string };
+    src = toHttps(urlData.url);
+  } catch {
+    // 单首不可播不应拖垮整个歌单，下面统计后会给出提示。
+  }
+
+  let cover = "";
+  try {
+    const picRaw = await meting.pic(track.pic_id, 300);
+    const picData = JSON.parse(picRaw as string) as { url?: string };
+    cover = toHttps(picData.url);
+  } catch {
+    // 封面可选。
+  }
+
+  return {
+    id: String(track.id),
+    title: track.name || "未知歌曲",
+    artist: Array.isArray(track.artist)
+      ? track.artist.join(", ")
+      : String(track.artist || "未知歌手"),
+    cover,
+    src,
+    lrcUrl: track.lyric_id
+      ? `https://api.injahow.cn/meting/?server=netease&type=lrc&id=${track.lyric_id}`
+      : "",
+  };
+}
+
 async function resolveSongs(target: {
   playlistId?: string;
   songIds?: string[];
-}): Promise<SongData[]> {
+}): Promise<MusicResponse> {
   const meting = new Meting("netease");
   meting.format(true);
+  const source: MusicResponse["source"] = target.playlistId ? "playlist" : "ids";
 
-  let tracks: Track[] = [];
+  let tracks: Track[];
   try {
-    if (target.playlistId) {
-      const raw = await meting.playlist(target.playlistId);
-      const parsed = JSON.parse(raw as string) as unknown;
-      tracks = Array.isArray(parsed) ? (parsed as Track[]) : [];
-    } else if (target.songIds) {
-      const results = await Promise.all(
-        target.songIds.map(async (id) => {
-          try {
-            const raw = await meting.song(id);
-            const parsed = JSON.parse(raw as string) as unknown;
-            return Array.isArray(parsed) ? (parsed as Track[]) : [parsed as Track];
-          } catch {
-            return [];
-          }
-        }),
-      );
-      tracks = results.flat();
-    }
+    tracks = await loadTracks(meting, target);
   } catch {
     throw errors.upstream("获取音乐数据失败");
   }
 
-  const songs = await Promise.all(
-    tracks.map(async (track) => {
-      let src = "";
-      try {
-        const urlRaw = await meting.url(track.url_id, 320);
-        const urlData = JSON.parse(urlRaw as string) as { url?: string };
-        src = (urlData.url || "").replace(/^http:\/\//, "https://");
-      } catch {
-        // A single unavailable track should not fail the whole playlist.
-      }
-
-      let cover = "";
-      try {
-        const picRaw = await meting.pic(track.pic_id, 300);
-        const picData = JSON.parse(picRaw as string) as { url?: string };
-        cover = (picData.url || "").replace(/^http:\/\//, "https://");
-      } catch {
-        // Cover art is optional.
-      }
-
-      return {
-        id: String(track.id),
-        title: track.name || "未知歌曲",
-        artist: Array.isArray(track.artist)
-          ? track.artist.join(", ")
-          : String(track.artist || "未知歌手"),
-        cover,
-        src,
-        lrcUrl: track.lyric_id
-          ? `https://api.injahow.cn/meting/?server=netease&type=lrc&id=${track.lyric_id}`
-          : "",
-      } satisfies SongData;
-    }),
+  const total = tracks.length;
+  const limited = tracks.slice(0, MAX_PLAYLIST_TRACKS);
+  const resolved = await mapWithConcurrency(limited, RESOLVE_CONCURRENCY, (track) =>
+    resolveTrack(meting, track),
   );
+  const songs = resolved.filter((song) => song.src);
+  const skipped = resolved.length - songs.length;
 
-  return songs.filter((song) => song.src);
+  let message = "";
+  if (songs.length === 0) {
+    if (total === 0) {
+      message = source === "playlist" ? EMPTY_MESSAGE_PLAYLIST : EMPTY_MESSAGE_IDS;
+    } else {
+      message = `这 ${total} 首歌在网易云都不可播放（无版权或已下架），换一个歌单或歌曲 ID 试试。`;
+    }
+  } else if (skipped > 0) {
+    message = `已跳过 ${skipped} 首不可播放的歌曲。`;
+  }
+
+  return { songs, total, skipped, source, message };
 }
 
 export async function GET(request: NextRequest) {
@@ -149,12 +231,20 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const songs = await resolveSongs(target);
-      cache.set(cacheKey, songs);
+      const payload = await resolveSongs(target);
+      const empty = payload.songs.length === 0;
 
-      return Response.json(songs, {
+      // 空结果不写缓存：歌单补版权、配置修正后应当立刻生效，
+      // 这也是之前「配了歌单却一直显示暂无音乐」的原因之一。
+      if (!empty) {
+        cache.set(cacheKey, payload);
+      }
+
+      return Response.json(payload, {
         headers: {
-          "cache-control": "public, max-age=600, stale-while-revalidate=3600",
+          "cache-control": empty
+            ? "no-store"
+            : "public, max-age=600, stale-while-revalidate=3600",
         },
       });
     },

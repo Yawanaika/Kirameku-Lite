@@ -52,6 +52,8 @@ interface MusicContextType {
   currentLyric: string;
   allLyrics: { time: number; text: string }[];
   isLoading: boolean;
+  /** 拉取歌单失败或歌单不可播时给出的提示；正常情况下为 null。 */
+  error: string | null;
   volume: number;
   isMuted: boolean;
   playMode: PlayMode;
@@ -81,6 +83,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [lyrics, setLyrics] = useState<{ time: number; text: string }[]>([]);
   const [currentLyric, setCurrentLyric] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [volume, setVolumeState] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [playMode, setPlayMode] = useState<PlayMode>("loop");
@@ -126,9 +129,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         }
 
         const res = await fetch(apiUrl);
-        const data = await res.json();
+        const data = (await res.json()) as unknown;
 
-        const songs = (Array.isArray(data) ? data : [])
+        if (!res.ok) {
+          const failure = data as { error?: { message?: string } } | null;
+          if (mounted) {
+            setError(failure?.error?.message ?? "音乐接口请求失败，请稍后重试");
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // 接口现在返回 { songs, total, skipped, source, message }；
+        // 兼容旧版的纯数组响应。
+        const payload = data as { songs?: unknown; message?: unknown } | null;
+        const rawSongs = Array.isArray(data)
+          ? data
+          : Array.isArray(payload?.songs)
+            ? payload.songs
+            : [];
+        const hostMessage =
+          !Array.isArray(data) && typeof payload?.message === "string"
+            ? payload.message
+            : "";
+
+        const songs = rawSongs
           .map((r: Record<string, string>) => ({
             id: String(r.id || Math.random()),
             title: String(r.title || r.name || "未知歌曲"),
@@ -142,10 +167,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
         if (mounted) {
           if (songs.length > 0) setPlaylist(songs);
+          setError(songs.length === 0 ? hostMessage || "没有可播放的音乐" : null);
           setIsLoading(false);
         }
       } catch {
-        if (mounted) setIsLoading(false);
+        if (mounted) {
+          setError("音乐加载失败，请检查网络后重试");
+          setIsLoading(false);
+        }
       }
     };
     fetchMusicData();
@@ -265,7 +294,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       value={{
         playlist, currentIndex, currentSong: playlist[currentIndex],
         isPlaying, progress, currentTime, duration,
-        currentLyric, allLyrics: lyrics, isLoading,
+        currentLyric, allLyrics: lyrics, isLoading, error,
         volume, isMuted, playMode, saying, refreshSaying,
         togglePlay, nextSong, prevSong, handleSeek, playSong,
         setVolume, toggleMute, togglePlayMode,

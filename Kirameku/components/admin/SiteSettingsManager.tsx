@@ -61,6 +61,24 @@ const HEX_COLOR_6 = /^#[0-9a-f]{6}$/i;
 const BADGE_COLOR = /^[a-z0-9 /:-]*$/i;
 const TRACK_ID = /^\d+$/;
 
+/**
+ * 歌曲 ID 输入框的解析规则：换行、逗号（含中文逗号）、分号、空格都算分隔符。
+ * 这里只做切分与去重，非数字的片段留在数组里交给 validate() 报错，
+ * 免得用户敲到一半就被悄悄吞掉。
+ */
+function splitTrackIds(text: string): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const token of text.split(/[\s,，;；]+/)) {
+    const id = token.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= SITE_SETTINGS_LIMITS.musicTrackIds) break;
+  }
+  return ids;
+}
+
 function toDraft(settings: SiteSettings): SiteSettings {
   return {
     profile: { ...settings.profile, social: { ...settings.profile.social } },
@@ -143,6 +161,10 @@ function validate(settings: SiteSettings): string | null {
   }
   if (!isSafeSettingsLink(content.moeIcp.link)) {
     return "萌备案链接需要留空、以 / 开头，或使用 http(s)://";
+  }
+
+  if (music.playlistId.trim() && !/^\d{1,20}$/.test(music.playlistId.trim())) {
+    return "歌单 ID 只能是数字（在歌单链接里 id= 后面那串）";
   }
 
   for (const [index, id] of music.trackIds.entries()) {
@@ -301,6 +323,12 @@ function SiteSettingsEditor({
   const [tab, setTab] = useState<TabId>("profile");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 歌曲 ID 的原样文本。draft.music.trackIds 是解析后的数组，
+  // 直接拿它 join("\n") 当输入框的值会把用户刚敲的换行吃掉，
+  // 所以这里单独保存一份文本，只在提交时用 splitTrackIds 解析。
+  const [trackIdsText, setTrackIdsText] = useState(() =>
+    settings.music.trackIds.join("\n"),
+  );
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
 
@@ -375,6 +403,7 @@ function SiteSettingsEditor({
   async function discard() {
     if (dirty && !(await confirm("放弃当前未保存的修改？"))) return;
     setDraft(toDraft(settings));
+    setTrackIdsText(settings.music.trackIds.join("\n"));
     setError(null);
     onSaved("");
     onReload();
@@ -976,24 +1005,21 @@ function SiteSettingsEditor({
               id="track-ids"
               label="歌曲 ID 列表"
               hint={
-                "每行一个数字 ID，或用逗号分隔；最多 " +
+                "每行一个数字 ID，也可用空格、逗号或分号分隔；最多 " +
                 SITE_SETTINGS_LIMITS.musicTrackIds +
                 " 首。"
               }
             >
               <Textarea
                 id="track-ids"
-                value={draft.music.trackIds.join("\n")}
+                value={trackIdsText}
                 className="min-h-32 font-mono text-xs leading-6"
                 placeholder={"1824045033\n1974443814"}
-                onChange={(event) =>
-                  updateMusic({
-                    trackIds: event.target.value
-                      .split(/[\s,\uff0c]+/)
-                      .map((item) => item.trim())
-                      .filter(Boolean),
-                  })
-                }
+                onChange={(event) => {
+                  const text = event.target.value;
+                  setTrackIdsText(text);
+                  updateMusic({ trackIds: splitTrackIds(text) });
+                }}
               />
             </Field>
             <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-500">
@@ -1015,6 +1041,7 @@ function SiteSettingsEditor({
             variant="outline"
             onClick={() => {
               setDraft(toDraft(settings));
+              setTrackIdsText(settings.music.trackIds.join("\n"));
               setError(null);
             }}
             disabled={saving || !dirty}

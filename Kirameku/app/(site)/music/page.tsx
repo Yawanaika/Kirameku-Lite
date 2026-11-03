@@ -88,7 +88,7 @@ function MusicCard({ children, className = "" }: { children: React.ReactNode; cl
 export default function MusicPage() {
   const {
     playlist, currentIndex, currentSong, isPlaying, progress, currentTime, duration,
-    currentLyric, allLyrics, isLoading, volume, isMuted, playMode,
+    currentLyric, allLyrics, isLoading, error, volume, isMuted, playMode,
     togglePlay, nextSong, prevSong, handleSeek, playSong,
     setVolume, toggleMute, togglePlayMode,
   } = useMusic();
@@ -133,7 +133,9 @@ export default function MusicPage() {
       <div className="max-w-4xl mx-auto px-4 py-6 md:py-12">
         <MusicCard>
           <div className="flex items-center justify-center h-40 md:h-64">
-            <div className="text-sm md:text-base text-slate-600 dark:text-slate-300 font-medium">暂无音乐，请在后台「站点设置」的「云音乐」中配置歌单或歌曲 ID</div>
+            <div className="max-w-md text-center text-sm md:text-base text-slate-600 dark:text-slate-300 font-medium">
+              {error ?? "暂无音乐，请在后台「站点设置」的「云音乐」中配置歌单或歌曲 ID"}
+            </div>
           </div>
         </MusicCard>
       </div>
