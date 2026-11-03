@@ -54,7 +54,7 @@ function musicRequest(query: string) {
 /**
  * 兜底音源探测：默认认为拿不到，需要时再放开。
  * 公开接口可播时 302 到 *.music.126.net，不可播时回 200 空响应，
- * 所以 location 默认指向网易云 CDN，由 status 决定是否算可播。
+ * 所以 location 默认指向网易云 CDN 的可播文件，由 status 决定是否算可播。
  */
 function stubFallback(status: number, location = "https://m8.music.126.net/fallback.mp3?x=1") {
   vi.stubGlobal(
@@ -137,9 +137,8 @@ describe("GET /api/music", () => {
     const body = await response.json();
 
     expect(body.songs).toHaveLength(1);
-    expect(body.songs[0].src).toBe(
-      "https://api.injahow.cn/meting/?server=netease&type=url&id=url-30",
-    );
+    // 交给前端的是签名后的 CDN 直链，而不是第三方接口地址。
+    expect(body.songs[0].src).toBe("https://m8.music.126.net/fallback.mp3?x=1");
     expect(body.message).toBe("");
   });
 
