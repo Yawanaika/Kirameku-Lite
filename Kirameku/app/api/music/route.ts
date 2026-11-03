@@ -202,7 +202,9 @@ async function resolveSongs(target: {
     if (total === 0) {
       message = source === "playlist" ? EMPTY_MESSAGE_PLAYLIST : EMPTY_MESSAGE_IDS;
     } else {
-      message = `这 ${total} 首歌在网易云都不可播放（无版权或已下架），换一个歌单或歌曲 ID 试试。`;
+      // 海外服务器常见：曲目在国内可播、到服务器所在地区就是空地址，
+      // 所以文案要同时提地区限制，不要一口咬定「歌没了」。
+      message = `这 ${total} 首歌在网易云都不可播放（可能无版权、已下架，或受服务器所在地区的版权限制）。换一个歌单或歌曲 ID 试试。`;
     }
   } else if (skipped > 0) {
     message = `已跳过 ${skipped} 首不可播放的歌曲。`;

@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { isPlaylistId, splitMusicIds } from "@/lib/music-ids";
 import {
   isSafeAssetUrl,
   isSafeSettingsLink,
@@ -60,24 +61,6 @@ const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 const HEX_COLOR_6 = /^#[0-9a-f]{6}$/i;
 const BADGE_COLOR = /^[a-z0-9 /:-]*$/i;
 const TRACK_ID = /^\d+$/;
-
-/**
- * 歌曲 ID 输入框的解析规则：换行、逗号（含中文逗号）、分号、空格都算分隔符。
- * 这里只做切分与去重，非数字的片段留在数组里交给 validate() 报错，
- * 免得用户敲到一半就被悄悄吞掉。
- */
-function splitTrackIds(text: string): string[] {
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  for (const token of text.split(/[\s,，;；]+/)) {
-    const id = token.trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    ids.push(id);
-    if (ids.length >= SITE_SETTINGS_LIMITS.musicTrackIds) break;
-  }
-  return ids;
-}
 
 function toDraft(settings: SiteSettings): SiteSettings {
   return {
@@ -163,7 +146,7 @@ function validate(settings: SiteSettings): string | null {
     return "萌备案链接需要留空、以 / 开头，或使用 http(s)://";
   }
 
-  if (music.playlistId.trim() && !/^\d{1,20}$/.test(music.playlistId.trim())) {
+  if (!isPlaylistId(music.playlistId)) {
     return "歌单 ID 只能是数字（在歌单链接里 id= 后面那串）";
   }
 
@@ -1018,7 +1001,7 @@ function SiteSettingsEditor({
                 onChange={(event) => {
                   const text = event.target.value;
                   setTrackIdsText(text);
-                  updateMusic({ trackIds: splitTrackIds(text) });
+                  updateMusic({ trackIds: splitMusicIds(text) });
                 }}
               />
             </Field>
