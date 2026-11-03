@@ -37,6 +37,10 @@ const FRUIT_DEFS = [
 
 let nextId = 0;
 
+function makeFruit(id: number, x: number, y: number, vx: number, vy: number, r: number, type: number, settled: boolean): Fruit {
+  return { id, x, y, vx, vy, r, type, settled };
+}
+
 function circleOverlap(a: Fruit, b: Fruit): boolean {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -97,13 +101,7 @@ export default function WatermelonGame() {
 
   const spawnFruit = useCallback((x: number, type: number) => {
     const def = FRUIT_DEFS[type];
-    fruitsRef.current.push({
-      id: nextId++,
-      x, y: WALL_Y + def.r,
-      vx: 0, vy: 0,
-      r: def.r, type,
-      settled: false,
-    });
+    fruitsRef.current.push(makeFruit(nextId++, x, WALL_Y + def.r, 0, 0, def.r, type, false));
   }, []);
 
   const draw = useCallback(() => {
@@ -228,14 +226,7 @@ export default function WatermelonGame() {
           const my = (a.y + b.y) / 2;
           toRemove.add(a.id);
           toRemove.add(b.id);
-          toAdd.push({
-            id: nextId++,
-            x: mx, y: my,
-            vx: (a.vx + b.vx) * 0.5,
-            vy: (a.vy + b.vy) * 0.5 - 50,
-            r: newR, type: newType,
-            settled: false,
-          });
+          toAdd.push(makeFruit(nextId++, mx, my, (a.vx + b.vx) * 0.5, (a.vy + b.vy) * 0.5 - 50, newR, newType, false));
           scoreRef.current += FRUIT_DEFS[newType].score;
           setScore(scoreRef.current);
         } else {

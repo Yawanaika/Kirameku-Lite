@@ -23,6 +23,9 @@ interface FallingPiece {
   color: string;
 }
 
+function makeBlock(x: number, w: number, color: string): Block { return { x, w, color }; }
+function makeFallingPiece(x: number, w: number, y: number, vy: number, color: string): FallingPiece { return { x, w, y, vy, color }; }
+
 export default function StackGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
@@ -36,7 +39,7 @@ export default function StackGame() {
   const startedRef = useRef(false);
   const gameOverRef = useRef(false);
   const blocksRef = useRef<Block[]>([]);
-  const currentRef = useRef<Block>({ x: 0, w: 0, color: "" });
+  const currentRef = useRef<Block>(makeBlock(0, 0, ""));
   const dirRef = useRef(1);
   const fallingRef = useRef<FallingPiece[]>([]);
   const frameRef = useRef<number | null>(null);
@@ -48,8 +51,8 @@ export default function StackGame() {
 
   const initGame = useCallback(() => {
     const baseW = W * 0.6;
-    blocksRef.current = [{ x: (W - baseW) / 2, w: baseW, color: COLORS[0] }];
-    currentRef.current = { x: -baseW, w: baseW, color: COLORS[1] };
+    blocksRef.current = [makeBlock((W - baseW) / 2, baseW, COLORS[0])];
+    currentRef.current = makeBlock(-baseW, baseW, COLORS[1]);
     dirRef.current = 1;
     fallingRef.current = [];
     scoreRef.current = 0;
@@ -69,8 +72,8 @@ export default function StackGame() {
   // 首次挂载只铺设底部方块与待落方块：此时各 state 已是初始值，不必再 setState
   useEffect(() => {
     const baseW = W * 0.6;
-    blocksRef.current = [{ x: (W - baseW) / 2, w: baseW, color: COLORS[0] }];
-    currentRef.current = { x: -baseW, w: baseW, color: COLORS[1] };
+    blocksRef.current = [makeBlock((W - baseW) / 2, baseW, COLORS[0])];
+    currentRef.current = makeBlock(-baseW, baseW, COLORS[1]);
   }, []);
 
   const placeBlock = useCallback(() => {
@@ -102,31 +105,19 @@ export default function StackGame() {
     }
 
     // Add placed block
-    const newBlock: Block = {
-      x: overlapLeft,
-      w: overlapW,
-      color: cur.color,
-    };
+    const newBlock = makeBlock(overlapLeft, overlapW, cur.color);
     blocksRef.current.push(newBlock);
 
     // Falling piece
     if (cur.x < prev.x) {
-      fallingRef.current.push({
-        x: cur.x,
-        w: prev.x - cur.x,
-        y: blocksRef.current.length * BLOCK_H,
-        vy: 0,
-        color: cur.color,
-      });
+      fallingRef.current.push(
+        makeFallingPiece(cur.x, prev.x - cur.x, blocksRef.current.length * BLOCK_H, 0, cur.color)
+      );
     } else if (cur.x + cur.w > prev.x + prev.w) {
       const cutStart = prev.x + prev.w;
-      fallingRef.current.push({
-        x: cutStart,
-        w: cur.x + cur.w - cutStart,
-        y: blocksRef.current.length * BLOCK_H,
-        vy: 0,
-        color: cur.color,
-      });
+      fallingRef.current.push(
+        makeFallingPiece(cutStart, cur.x + cur.w - cutStart, blocksRef.current.length * BLOCK_H, 0, cur.color)
+      );
     }
 
     scoreRef.current += isPerfect ? 2 + comboRef.current : 1;
@@ -144,11 +135,7 @@ export default function StackGame() {
     const nextW = isPerfect ? prev.w : overlapW;
     const nextColor = COLORS[blocksRef.current.length % COLORS.length];
     dirRef.current = -dirRef.current;
-    currentRef.current = {
-      x: dirRef.current > 0 ? -nextW : W,
-      w: nextW,
-      color: nextColor,
-    };
+    currentRef.current = makeBlock(dirRef.current > 0 ? -nextW : W, nextW, nextColor);
   }, [saveBest]);
 
   const draw = useCallback(() => {

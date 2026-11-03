@@ -36,6 +36,14 @@ const ITEM_DEFS: Record<ItemType, { emoji: string; points: number; r: number; co
   bomb:    { emoji: "💣", points: -1,  r: 14, color: "#1e293b", chance: 0.15 },
 };
 
+function makeItem(x: number, y: number, type: ItemType, speed: number, wobble: number, phase: number): FallingItem {
+  return { x, y, type, speed, wobble, phase };
+}
+
+function makeParticle(x: number, y: number, vx: number, vy: number, life: number, maxLife: number, color: string, size: number): Particle {
+  return { x, y, vx, vy, life, maxLife, color, size };
+}
+
 function randomItemType(score: number): ItemType {
   // Increase bomb chance as score goes up
   const adjustedChance = { ...ITEM_DEFS };
@@ -103,14 +111,9 @@ export default function CoinCatcherGame() {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 30 + Math.random() * 80;
-      particlesRef.current.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 30,
-        life: 0.3 + Math.random() * 0.3,
-        maxLife: 0.4,
-        color, size: 2 + Math.random() * 3,
-      });
+      particlesRef.current.push(
+        makeParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed - 30, 0.3 + Math.random() * 0.3, 0.4, color, 2 + Math.random() * 3)
+      );
     }
   };
 
@@ -242,14 +245,9 @@ export default function CoinCatcherGame() {
     if (spawnTimer.current >= spawnInterval) {
       spawnTimer.current = 0;
       const type = randomItemType(scoreRef.current);
-      itemsRef.current.push({
-        x: 20 + Math.random() * (W - 40),
-        y: -20,
-        type,
-        speed: 100 + Math.random() * 60 + timeRef.current * 1.5,
-        wobble: 5 + Math.random() * 10,
-        phase: Math.random() * Math.PI * 2,
-      });
+      itemsRef.current.push(
+        makeItem(20 + Math.random() * (W - 40), -20, type, 100 + Math.random() * 60 + timeRef.current * 1.5, 5 + Math.random() * 10, Math.random() * Math.PI * 2)
+      );
     }
 
     // Move items

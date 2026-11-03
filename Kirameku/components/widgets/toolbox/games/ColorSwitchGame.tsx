@@ -43,6 +43,10 @@ interface Particle {
   color: string; size: number;
 }
 
+function makeParticle(x: number, y: number, vx: number, vy: number, life: number, maxLife: number, color: string, size: number): Particle {
+  return { x, y, vx, vy, life, maxLife, color, size };
+}
+
 export default function ColorSwitchGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
@@ -102,14 +106,9 @@ export default function ColorSwitchGame() {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = 40 + Math.random() * 80;
-      particlesRef.current.push({
-        x, y,
-        vx: Math.cos(angle) * spd,
-        vy: Math.sin(angle) * spd,
-        life: 0.3 + Math.random() * 0.3,
-        maxLife: 0.4,
-        color, size: 2 + Math.random() * 2,
-      });
+      particlesRef.current.push(
+        makeParticle(x, y, Math.cos(angle) * spd, Math.sin(angle) * spd, 0.3 + Math.random() * 0.3, 0.4, color, 2 + Math.random() * 2)
+      );
     }
   };
 
@@ -285,14 +284,15 @@ export default function ColorSwitchGame() {
       saveBest((b) => Math.max(b, scoreRef.current));
     }
 
-    for (let i = particlesRef.current.length - 1; i >= 0; i--) {
-      const pt = particlesRef.current[i];
-      pt.x += pt.vx * dt;
-      pt.y += pt.vy * dt;
-      pt.vy += 100 * dt;
-      pt.life -= dt;
-      if (pt.life <= 0) particlesRef.current.splice(i, 1);
-    }
+    particlesRef.current = particlesRef.current
+      .map((pt) => ({
+        ...pt,
+        x: pt.x + pt.vx * dt,
+        y: pt.y + pt.vy * dt,
+        vy: pt.vy + 100 * dt,
+        life: pt.life - dt,
+      }))
+      .filter((pt) => pt.life > 0);
   }, [spawnWheel, saveBest]);
 
   // Game loop

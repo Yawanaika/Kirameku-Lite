@@ -26,6 +26,17 @@ interface PowerUp extends Vec { type: "shield" | "multi" | "bomb"; }
 interface Particle extends Vec { vx: number; vy: number; life: number; maxLife: number; color: string; size: number; }
 interface Star { x: number; y: number; speed: number; size: number; alpha: number; }
 
+function makeVec(x: number, y: number): Vec { return { x, y }; }
+function makeBullet(x: number, y: number, dx: number, dy: number, w: number, h: number): Bullet { return { x, y, dx, dy, w, h }; }
+function makeEnemy(x: number, y: number, w: number, h: number, hp: number, maxHp: number, speed: number, type: Enemy["type"], color: string, score: number, t: number): Enemy {
+  return { x, y, w, h, hp, maxHp, speed, type, color, score, t };
+}
+function makePowerUp(x: number, y: number, type: PowerUp["type"]): PowerUp { return { x, y, type }; }
+function makeParticle(x: number, y: number, vx: number, vy: number, life: number, maxLife: number, color: string, size: number): Particle {
+  return { x, y, vx, vy, life, maxLife, color, size };
+}
+function makeStar(x: number, y: number, speed: number, size: number, alpha: number): Star { return { x, y, speed, size, alpha }; }
+
 // ── Helpers ──
 function rand(min: number, max: number) { return min + Math.random() * (max - min); }
 function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)); }
@@ -51,7 +62,7 @@ export default function ShooterGame() {
   const [, setCombo] = useState(0);
 
   const frameRef = useRef<number | null>(null);
-  const playerRef = useRef<Vec>({ x: W / 2 - PLAYER_W / 2, y: H - 60 });
+  const playerRef = useRef<Vec>(makeVec(W / 2 - PLAYER_W / 2, H - 60));
   const bulletsRef = useRef<Bullet[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
   const powerUpsRef = useRef<PowerUp[]>([]);
@@ -79,7 +90,7 @@ export default function ShooterGame() {
 
   // ── Init ──
   const initGame = useCallback(() => {
-    playerRef.current = { x: W / 2 - PLAYER_W / 2, y: H - 60 };
+    playerRef.current = makeVec(W / 2 - PLAYER_W / 2, H - 60);
     bulletsRef.current = [];
     enemiesRef.current = [];
     powerUpsRef.current = [];
@@ -108,10 +119,9 @@ export default function ShooterGame() {
     setGameOver(false);
     setStarted(false);
     // Stars
-    starsRef.current = Array.from({ length: 60 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      speed: 30 + Math.random() * 80, size: 0.5 + Math.random() * 1.5, alpha: 0.2 + Math.random() * 0.5,
-    }));
+    starsRef.current = Array.from({ length: 60 }, () =>
+      makeStar(Math.random() * W, Math.random() * H, 30 + Math.random() * 80, 0.5 + Math.random() * 1.5, 0.2 + Math.random() * 0.5)
+    );
   }, []);
 
 
@@ -120,15 +130,9 @@ export default function ShooterGame() {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 40 + Math.random() * 120;
-      particlesRef.current.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.3 + Math.random() * 0.4,
-        maxLife: 0.5,
-        color,
-        size: 2 + Math.random() * 3,
-      });
+      particlesRef.current.push(
+        makeParticle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.4, 0.5, color, 2 + Math.random() * 3)
+      );
     }
   };
 
@@ -138,10 +142,8 @@ export default function ShooterGame() {
     if (w % 5 === 0 && !bossActive.current) {
       bossActive.current = true;
       const bossHp = 60 + w * 10;
-      enemiesRef.current.push({
-        x: W / 2 - 40, y: -70, ...ENEMY_DEFS.boss,
-        hp: bossHp, maxHp: bossHp, type: "boss", t: 0,
-      });
+      const bossDef = ENEMY_DEFS.boss;
+      enemiesRef.current.push(makeEnemy(W / 2 - 40, -70, bossDef.w, bossDef.h, bossHp, bossHp, bossDef.speed, "boss", bossDef.color, bossDef.score, 0));
       waveEnemiesLeft.current = 1;
       pendingSpawns.current = 0;
     } else {
@@ -158,11 +160,9 @@ export default function ShooterGame() {
           if (gameOverRef.current || waveGeneration.current !== gen) return;
           pendingSpawns.current--;
           waveEnemiesLeft.current++;
-          enemiesRef.current.push({
-            x: rand(10, W - def.w - 10),
-            y: -def.h - rand(0, 60),
-            ...def, maxHp: def.hp, type, t: Math.random() * Math.PI * 2,
-          });
+          enemiesRef.current.push(
+            makeEnemy(rand(10, W - def.w - 10), -def.h - rand(0, 60), def.w, def.h, def.hp, def.hp, def.speed, type, def.color, def.score, Math.random() * Math.PI * 2)
+          );
         }, i * 300);
       }
     }
@@ -455,11 +455,11 @@ export default function ShooterGame() {
       const bx = player.x + PLAYER_W / 2;
       const by = player.y;
       if (multiShotRef.current > 0) {
-        bullets.push({ x: bx, y: by, dx: 0, dy: -BULLET_SPEED, w: 3, h: 12 });
-        bullets.push({ x: bx - 8, y: by + 5, dx: -BULLET_SPEED * 0.15, dy: -BULLET_SPEED, w: 3, h: 10 });
-        bullets.push({ x: bx + 8, y: by + 5, dx: BULLET_SPEED * 0.15, dy: -BULLET_SPEED, w: 3, h: 10 });
+        bullets.push(makeBullet(bx, by, 0, -BULLET_SPEED, 3, 12));
+        bullets.push(makeBullet(bx - 8, by + 5, -BULLET_SPEED * 0.15, -BULLET_SPEED, 3, 10));
+        bullets.push(makeBullet(bx + 8, by + 5, BULLET_SPEED * 0.15, -BULLET_SPEED, 3, 10));
       } else {
-        bullets.push({ x: bx, y: by, dx: 0, dy: -BULLET_SPEED, w: 3, h: 12 });
+        bullets.push(makeBullet(bx, by, 0, -BULLET_SPEED, 3, 12));
       }
     }
 
@@ -500,7 +500,7 @@ export default function ShooterGame() {
           const by = e.y + e.h;
           if (isFinite(bx) && isFinite(by) && isFinite(player.x) && isFinite(player.y)) {
             const angle = Math.atan2(player.y + PLAYER_H / 2 - by, player.x + PLAYER_W / 2 - bx);
-            bullets.push({ x: bx, y: by, dx: Math.cos(angle) * 200, dy: Math.sin(angle) * 200, w: 4, h: 8 });
+            bullets.push(makeBullet(bx, by, Math.cos(angle) * 200, Math.sin(angle) * 200, 4, 8));
           }
         }
       } else if (e.type === "fighter") {
@@ -574,10 +574,9 @@ export default function ShooterGame() {
             // Drop power-up
             if (Math.random() < (e.type === "boss" ? 1 : 0.15)) {
               const types: PowerUp["type"][] = ["shield", "multi", "bomb"];
-              powerUps.push({
-                x: e.x + e.w / 2, y: e.y + e.h / 2,
-                type: types[Math.floor(Math.random() * types.length)],
-              });
+              powerUps.push(
+                makePowerUp(e.x + e.w / 2, e.y + e.h / 2, types[Math.floor(Math.random() * types.length)])
+              );
             }
           }
           break;

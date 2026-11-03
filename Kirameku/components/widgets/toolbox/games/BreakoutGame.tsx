@@ -19,6 +19,10 @@ const BALL_SPEED = 320;
 
 const BRICK_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6"];
 
+function makeBall(x: number, y: number, dx: number, dy: number) {
+  return { x, y, dx, dy };
+}
+
 export default function BreakoutGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
@@ -30,7 +34,7 @@ export default function BreakoutGame() {
   const [level, setLevel] = useState(1);
   const frameRef = useRef<number | null>(null);
   const paddleX = useRef(W / 2 - PADDLE_W / 2);
-  const ballRef = useRef({ x: W / 2, y: H - 80, dx: BALL_SPEED * 0.6, dy: -BALL_SPEED });
+  const ballRef = useRef(makeBall(W / 2, H - 80, BALL_SPEED * 0.6, -BALL_SPEED));
   const bricksRef = useRef<boolean[][]>([]);
   const scoreRef = useRef(0);
   const livesRef = useRef(3);
@@ -47,7 +51,7 @@ export default function BreakoutGame() {
   }, []);
 
   const resetBall = useCallback(() => {
-    ballRef.current = { x: W / 2, y: H - 80, dx: BALL_SPEED * 0.6 * (Math.random() > 0.5 ? 1 : -1), dy: -BALL_SPEED };
+    ballRef.current = makeBall(W / 2, H - 80, BALL_SPEED * 0.6 * (Math.random() > 0.5 ? 1 : -1), -BALL_SPEED);
     paddleX.current = W / 2 - PADDLE_W / 2;
   }, []);
 
@@ -210,8 +214,8 @@ export default function BreakoutGame() {
       bricksRef.current = createBricks(levelRef.current);
       resetBall();
       // Speed up for next level
-      ballRef.current.dx *= 1.1;
-      ballRef.current.dy *= 1.1;
+      const nb = ballRef.current;
+      ballRef.current = makeBall(nb.x, nb.y, nb.dx * 1.1, nb.dy * 1.1);
     }
   }, [resetBall, createBricks, saveBest]);
 

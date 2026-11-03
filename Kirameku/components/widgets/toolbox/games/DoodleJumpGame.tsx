@@ -25,6 +25,20 @@ interface Platform {
   broken: boolean;
 }
 
+function makePlatform(x: number, y: number, type: PlatType, moveDir: number): Platform {
+  return { x, y, type, moveDir, broken: false };
+}
+
+function createJumpState() {
+  return {
+    px: 0, py: 0, pvy: 0, pdir: 0,
+    camY: 0, score: 0, best: 0,
+    started: false, gameOver: false,
+    moveLeft: false, moveRight: false,
+    plats: [] as Platform[],
+  };
+}
+
 export default function DoodleJumpGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
@@ -35,13 +49,7 @@ export default function DoodleJumpGame() {
   const raf = useRef<number | null>(null);
 
   // All game state in refs for synchronous access
-  const state = useRef({
-    px: 0, py: 0, pvy: 0, pdir: 0,
-    camY: 0, score: 0, best: 0,
-    started: false, gameOver: false,
-    moveLeft: false, moveRight: false,
-    plats: [] as Platform[],
-  });
+  const state = useRef(createJumpState());
 
 
   const genPlats = useCallback((fromY: number, toY: number): Platform[] => {
@@ -54,7 +62,7 @@ export default function DoodleJumpGame() {
       if (r < 0.06) type = "spring";
       else if (r < 0.15) type = "breakable";
       else if (r < 0.28) type = "moving";
-      result.push({ x, y, type, moveDir: type === "moving" ? (Math.random() < 0.5 ? 1 : -1) : 0, broken: false });
+      result.push(makePlatform(x, y, type, type === "moving" ? (Math.random() < 0.5 ? 1 : -1) : 0));
       y -= 50 + Math.random() * 40 + Math.abs(y) * 0.003;
     }
     return result;
@@ -76,10 +84,10 @@ export default function DoodleJumpGame() {
     s.moveRight = false;
 
     const plats: Platform[] = [];
-    plats.push({ x: W / 2 - PLAT_W / 2, y: H - 40, type: "normal", moveDir: 0, broken: false });
+    plats.push(makePlatform(W / 2 - PLAT_W / 2, H - 40, "normal", 0));
     let y = H - 100;
     while (y > -800) {
-      plats.push({ x: 10 + Math.random() * (W - PLAT_W - 20), y, type: "normal", moveDir: 0, broken: false });
+      plats.push(makePlatform(10 + Math.random() * (W - PLAT_W - 20), y, "normal", 0));
       y -= 50 + Math.random() * 40;
     }
     s.plats = plats;

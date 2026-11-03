@@ -16,13 +16,16 @@ const SPEED = 160;
 interface Bird { y: number; vy: number; }
 interface Pipe { x: number; gapY: number; passed: boolean; }
 
+function makeBird(y: number, vy: number): Bird { return { y, vy }; }
+function makePipe(x: number, gapY: number): Pipe { return { x, gapY, passed: false }; }
+
 export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
   const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const birdRef = useRef<Bird>({ y: H / 2, vy: 0 });
+  const birdRef = useRef<Bird>(makeBird(H / 2, 0));
   const pipesRef = useRef<Pipe[]>([]);
   const scoreRef = useRef(0);
   const frameRef = useRef<number | null>(null);
@@ -39,7 +42,7 @@ export default function FlappyBirdGame() {
       scoreRef.current = 0;
       setScore(0);
     }
-    birdRef.current.vy = FLAP;
+    birdRef.current = { ...birdRef.current, vy: FLAP };
   }, []);
 
   const draw = useCallback(() => {
@@ -110,36 +113,39 @@ export default function FlappyBirdGame() {
   const tick = useCallback((dt: number) => {
     if (gameOverRef.current) return;
     const bird = birdRef.current;
-    bird.vy += GRAVITY * dt;
-    bird.y += bird.vy * dt;
+    // immutable update via reassignment (React Compiler: ref objects created via factory)
+    const newBirdY = bird.y + (bird.vy + GRAVITY * dt) * dt;
+    const newBirdVY = bird.vy + GRAVITY * dt;
+    birdRef.current = { y: newBirdY, vy: newBirdVY };
 
     // Ground collision
-    if (bird.y + BIRD / 2 >= H - 60) {
-      bird.y = H - 60 - BIRD / 2;
+    if (newBirdY + BIRD / 2 >= H - 60) {
+      birdRef.current = { ...birdRef.current, y: H - 60 - BIRD / 2 };
       gameOverRef.current = true;
       setGameOver(true);
       saveBest((b) => Math.max(b, scoreRef.current));
       return;
     }
     // Ceiling
-    if (bird.y - BIRD / 2 < 0) bird.y = BIRD / 2;
+    if (newBirdY - BIRD / 2 < 0) birdRef.current = { ...birdRef.current, y: BIRD / 2 };
 
     // Pipes
-    const pipes = pipesRef.current;
-    if (pipes.length === 0 || pipes[pipes.length - 1].x < W - 200) {
-      pipes.push({ x: W + 10, gapY: 100 + Math.random() * (H - 280), passed: false });
+    if (pipesRef.current.length === 0 || pipesRef.current[pipesRef.current.length - 1].x < W - 200) {
+      pipesRef.current.push(makePipe(W + 10, 100 + Math.random() * (H - 280)));
     }
 
-    pipes.forEach((p) => {
-      p.x -= SPEED * dt;
-      // Score
-      if (!p.passed && p.x + PIPE_W < W / 3) {
-        p.passed = true;
+    pipesRef.current = pipesRef.current.map((p) => {
+      const newX = p.x - SPEED * dt;
+      if (!p.passed && newX + PIPE_W < W / 3) {
         scoreRef.current++;
         setScore(scoreRef.current);
+        return { ...p, x: newX, passed: true };
       }
-      // Collision
-      const bx = W / 3, by = bird.y;
+      return { ...p, x: newX };
+    });
+    // Collision
+    pipesRef.current.forEach((p) => {
+      const bx = W / 3, by = birdRef.current.y;
       if (bx + BIRD / 2 > p.x && bx - BIRD / 2 < p.x + PIPE_W) {
         if (by - BIRD / 2 < p.gapY - GAP / 2 || by + BIRD / 2 > p.gapY + GAP / 2) {
           gameOverRef.current = true;
@@ -149,7 +155,7 @@ export default function FlappyBirdGame() {
       }
     });
 
-    pipesRef.current = pipes.filter((p) => p.x + PIPE_W > -10);
+    pipesRef.current = pipesRef.current.filter((p) => p.x + PIPE_W > -10);
     draw();
   }, [draw, saveBest]);
 
@@ -182,7 +188,7 @@ export default function FlappyBirdGame() {
   }, [flap]);
 
   const restart = () => {
-    birdRef.current = { y: H / 2, vy: 0 };
+    birdRef.current = makeBird(H / 2, 0);
     pipesRef.current = [];
     scoreRef.current = 0;
     setScore(0);

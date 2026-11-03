@@ -36,6 +36,10 @@ const FOOD_DEFS: Record<string, { points: number; grow: number; color: string; g
   ghost:  { points: 10, grow: 0, color: "#a855f7", glow: "rgba(168,85,247,0.4)", chance: 0.07, label: "👻" },
 };
 
+function makeParticle(x: number, y: number, vx: number, vy: number, life: number, maxLife: number, color: string): Particle {
+  return { x, y, vx, vy, life, maxLife, color };
+}
+
 function randomFood(snake: Pos[], walls: Wall[], foods: Food[]): Food {
   const occupied = new Set([
     ...snake.map((p) => `${p.x},${p.y}`),
@@ -114,15 +118,9 @@ export default function SnakeGame() {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 30 + Math.random() * 60;
-      particlesRef.current.push({
-        x: x * CELL + CELL / 2,
-        y: y * CELL + CELL / 2,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.3 + Math.random() * 0.3,
-        maxLife: 0.4,
-        color,
-      });
+      particlesRef.current.push(
+        makeParticle(x * CELL + CELL / 2, y * CELL + CELL / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.3, 0.4, color)
+      );
     }
   }, []);
 
