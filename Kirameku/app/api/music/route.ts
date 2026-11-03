@@ -47,7 +47,7 @@ const MAX_SONG_IDS = 50;
 /** 歌单可能上千首，逐首换取播放地址太慢，只解析前 N 首。 */
 const MAX_PLAYLIST_TRACKS = 100;
 /** 对网易云的并发请求数，避免一次性打出上百个 eapi 请求。 */
-const RESOLVE_CONCURRENCY = 4;
+const RESOLVE_CONCURRENCY = 6;
 /**
  * 海外部署时的兜底音源：服务器直接找网易云常常拿不到地址（地区版权限制），
  * 但这个公开 Meting 接口会 302 到可播放的 mp3，且重定向发生在用户浏览器侧，
@@ -56,6 +56,11 @@ const RESOLVE_CONCURRENCY = 4;
  */
 const FALLBACK_SOURCE_API = "https://api.injahow.cn/meting";
 const FALLBACK_PROBE_TIMEOUT_MS = 8000;
+/**
+ * 整批曲目的兜底探测预算。歌单可能有上百首、每首都要探测一次，
+ * 超过这个时间就不再探测（该首按不可播放处理），避免请求无限拖长。
+ */
+const FALLBACK_PROBE_BUDGET_MS = 15_000;
 
 const EMPTY_MESSAGE_PLAYLIST =
   "没有从网易云取到歌曲，请确认歌单 ID 是否正确、歌单是否为空。";
@@ -125,7 +130,8 @@ function fallbackSource(urlId: string): string {
 }
 
 /** 探测兜底音源能否解析出可播放地址；拿不准时返回 false，宁可不给坏链接。 */
-async function fallbackPlayable(urlId: string): Promise<boolean> {
+async function fallbackPlayable(urlId: string, deadline: number): Promise<boolean> {
+  if (Date.now() > deadline) return false;
   try {
     const response = await fetch(fallbackSource(urlId), {
       method: "HEAD",
@@ -168,7 +174,11 @@ async function loadTracks(
   return results.flat();
 }
 
-async function resolveTrack(meting: Meting, track: Track): Promise<SongData> {
+async function resolveTrack(
+  meting: Meting,
+  track: Track,
+  probeDeadline: number,
+): Promise<SongData> {
   let src = "";
   try {
     const urlRaw = await meting.url(track.url_id, 320);
@@ -178,7 +188,7 @@ async function resolveTrack(meting: Meting, track: Track): Promise<SongData> {
     // 单首不可播不应拖垮整个歌单，下面统计后会给出提示。
   }
 
-  if (!src && track.url_id && (await fallbackPlayable(track.url_id))) {
+  if (!src && track.url_id && (await fallbackPlayable(track.url_id, probeDeadline))) {
     src = fallbackSource(track.url_id);
   }
 
@@ -222,8 +232,9 @@ async function resolveSongs(target: {
 
   const total = tracks.length;
   const limited = tracks.slice(0, MAX_PLAYLIST_TRACKS);
+  const probeDeadline = Date.now() + FALLBACK_PROBE_BUDGET_MS;
   const resolved = await mapWithConcurrency(limited, RESOLVE_CONCURRENCY, (track) =>
-    resolveTrack(meting, track),
+    resolveTrack(meting, track, probeDeadline),
   );
   const songs = resolved.filter((song) => song.src);
   const skipped = resolved.length - songs.length;
