@@ -130,13 +130,17 @@ function fallbackSource(urlId: string): string {
 }
 
 /**
- * 用公开 Meting 接口换取网易云 CDN 的直达地址。
- * 服务器所在地区直连 geteapi 拿不到地址，但公开接口会 302 到 *.music.126.net 的签名地址，
- * 该签名不绑定请求方 IP，浏览器可以直接播放，所以我们把它解析出来交给前端，
- * 而不是把第三方接口地址塞进 <audio src>。拿不准时返回 null，宁可不给坏链接。
+ * 探测兜底音源能否解析出可播放地址。
+ *
+ * 服务器所在地区直连 geteapi 拿不到地址，但公开 Meting 接口会 302 到 *.music.126.net
+ * 的签名地址；签名不绑定请求方 IP，浏览器可以直接播放。
+ *
+ * 这里只做「能不能播」的判断，最终交给前端的仍是公开接口地址，让浏览器在真正播放时
+ * 现取一次 302：签名地址只有约 20 分钟有效期，缓存 + 长时间停留会拿到过期链接。
+ * 不可播的曲目公开接口回 200 空体，因此只有 3xx 且落在网易云 CDN 才算可播。
  */
-async function fallbackAudioSrc(urlId: string, deadline: number): Promise<string | null> {
-  if (Date.now() > deadline) return null;
+async function fallbackPlayable(urlId: string, deadline: number): Promise<boolean> {
+  if (Date.now() > deadline) return false;
   try {
     const response = await fetch(fallbackSource(urlId), {
       method: "HEAD",
@@ -144,12 +148,11 @@ async function fallbackAudioSrc(urlId: string, deadline: number): Promise<string
       cache: "no-store",
       signal: AbortSignal.timeout(FALLBACK_PROBE_TIMEOUT_MS),
     });
-    if (response.status < 300 || response.status >= 400) return null;
+    if (response.status < 300 || response.status >= 400) return false;
     const location = response.headers.get("location") || "";
-    // 不可播的曲目公开接口回 200 空体；只有 3xx 且落在网易云 CDN 才算真的能播。
-    return /^https:\/\/[^/]*music\.126\.net\//.test(location) ? location : null;
+    return /^https:\/\/[^/]*music\.126\.net\//.test(location);
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -197,8 +200,8 @@ async function resolveTrack(
     // 单首不可播不应拖垮整个歌单，下面统计后会给出提示。
   }
 
-  if (!src && track.url_id) {
-    src = (await fallbackAudioSrc(track.url_id, probeDeadline)) ?? "";
+  if (!src && track.url_id && (await fallbackPlayable(track.url_id, probeDeadline))) {
+    src = fallbackSource(track.url_id);
   }
 
   let cover = "";

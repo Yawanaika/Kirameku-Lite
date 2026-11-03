@@ -137,8 +137,10 @@ describe("GET /api/music", () => {
     const body = await response.json();
 
     expect(body.songs).toHaveLength(1);
-    // 交给前端的是签名后的 CDN 直链，而不是第三方接口地址。
-    expect(body.songs[0].src).toBe("https://m8.music.126.net/fallback.mp3?x=1");
+    // 交给前端的是公开接口地址：播放时浏览器现取 302，避免用到过期的签名直链。
+    expect(body.songs[0].src).toBe(
+      "https://api.injahow.cn/meting/?server=netease&type=url&id=url-30",
+    );
     expect(body.message).toBe("");
   });
 
