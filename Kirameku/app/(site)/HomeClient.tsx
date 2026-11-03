@@ -77,7 +77,8 @@ export default function HomeClient({
                   </LazyMount>
                 </div>
                 <div className="md:col-span-4 h-full flex">
-                  <LazyMount className="h-full" minHeight={220}>
+                  {/* flex 容器里的子项默认按内容宽度收缩，必须显式撑满，否则卡片会比同排其他卡片窄 */}
+                  <LazyMount className="h-full w-full" minHeight={220}>
                     <DogDiary />
                   </LazyMount>
                 </div>
