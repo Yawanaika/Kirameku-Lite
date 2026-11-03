@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { metingPlaylist, metingSong, metingUrl, metingPic, enforceRateLimit } = vi.hoisted(() => ({
   metingPlaylist: vi.fn(),
@@ -51,10 +51,23 @@ function musicRequest(query: string) {
   } as unknown as Parameters<typeof GET>[0];
 }
 
+/** 兜底音源探测：默认认为拿不到，需要时再放开。 */
+function stubFallback(status: number) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(null, { status })),
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   metingUrl.mockResolvedValue(JSON.stringify({ url: "http://m8.music.126.net/a.mp3" }));
   metingPic.mockResolvedValue(JSON.stringify({ url: "http://p3.music.126.net/a.jpg" }));
+  stubFallback(404);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("GET /api/music", () => {
@@ -108,6 +121,32 @@ describe("GET /api/music", () => {
     const cached = await GET(musicRequest("?id=4242"));
     expect((await cached.json()).songs).toHaveLength(1);
     expect(metingPlaylist).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the public meting source when the server cannot resolve a url", async () => {
+    // 海外服务器直连网易云拿不到地址，但公开接口能 302 到可播放文件。
+    stubFallback(302);
+    metingPlaylist.mockResolvedValue(JSON.stringify([track("30")]));
+    metingUrl.mockResolvedValue(JSON.stringify({ url: null }));
+
+    const response = await GET(musicRequest("?id=5150"));
+    const body = await response.json();
+
+    expect(body.songs).toHaveLength(1);
+    expect(body.songs[0].src).toBe(
+      "https://api.injahow.cn/meting/?server=netease&type=url&id=url-30",
+    );
+    expect(body.message).toBe("");
+  });
+
+  it("keeps the diagnostic when the fallback source cannot resolve either", async () => {
+    metingPlaylist.mockResolvedValue(JSON.stringify([track("31")]));
+    metingUrl.mockResolvedValue(JSON.stringify({ url: null }));
+
+    const body = await (await GET(musicRequest("?id=5151"))).json();
+
+    expect(body.songs).toEqual([]);
+    expect(body.message).toContain("不可播放");
   });
 
   it("explains an empty playlist instead of pretending nothing is configured", async () => {

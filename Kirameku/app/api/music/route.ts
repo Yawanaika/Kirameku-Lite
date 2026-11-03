@@ -48,6 +48,15 @@ const MAX_SONG_IDS = 50;
 const MAX_PLAYLIST_TRACKS = 100;
 /** 对网易云的并发请求数，避免一次性打出上百个 eapi 请求。 */
 const RESOLVE_CONCURRENCY = 4;
+/**
+ * 海外部署时的兜底音源：服务器直接找网易云常常拿不到地址（地区版权限制），
+ * 但这个公开 Meting 接口会 302 到可播放的 mp3，且重定向发生在用户浏览器侧，
+ * 签署参数按访客自己的 IP 生成，因此不受服务器所在地区影响。
+ * 只在直连拿不到地址、且它能解析出来时才使用。
+ */
+const FALLBACK_SOURCE_API = "https://api.injahow.cn/meting";
+const FALLBACK_PROBE_TIMEOUT_MS = 8000;
+
 const EMPTY_MESSAGE_PLAYLIST =
   "没有从网易云取到歌曲，请确认歌单 ID 是否正确、歌单是否为空。";
 const EMPTY_MESSAGE_IDS = "没有从网易云取到歌曲，请确认歌曲 ID 是否正确。";
@@ -111,6 +120,24 @@ function toHttps(url: string | undefined): string {
   return (url || "").replace(/^http:\/\//, "https://");
 }
 
+function fallbackSource(urlId: string): string {
+  return `${FALLBACK_SOURCE_API}/?server=netease&type=url&id=${encodeURIComponent(urlId)}`;
+}
+
+/** 探测兜底音源能否解析出可播放地址；拿不准时返回 false，宁可不给坏链接。 */
+async function fallbackPlayable(urlId: string): Promise<boolean> {
+  try {
+    const response = await fetch(fallbackSource(urlId), {
+      method: "HEAD",
+      redirect: "manual",
+      signal: AbortSignal.timeout(FALLBACK_PROBE_TIMEOUT_MS),
+    });
+    return response.status === 200 || (response.status >= 300 && response.status < 400);
+  } catch {
+    return false;
+  }
+}
+
 async function loadTracks(
   meting: Meting,
   target: { playlistId?: string; songIds?: string[] },
@@ -149,6 +176,10 @@ async function resolveTrack(meting: Meting, track: Track): Promise<SongData> {
     src = toHttps(urlData.url);
   } catch {
     // 单首不可播不应拖垮整个歌单，下面统计后会给出提示。
+  }
+
+  if (!src && track.url_id && (await fallbackPlayable(track.url_id))) {
+    src = fallbackSource(track.url_id);
   }
 
   let cover = "";
