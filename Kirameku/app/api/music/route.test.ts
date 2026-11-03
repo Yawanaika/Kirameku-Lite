@@ -51,11 +51,15 @@ function musicRequest(query: string) {
   } as unknown as Parameters<typeof GET>[0];
 }
 
-/** 兜底音源探测：默认认为拿不到，需要时再放开。 */
-function stubFallback(status: number) {
+/**
+ * 兜底音源探测：默认认为拿不到，需要时再放开。
+ * 公开接口可播时 302 到 *.music.126.net，不可播时回 200 空响应，
+ * 所以 location 默认指向网易云 CDN，由 status 决定是否算可播。
+ */
+function stubFallback(status: number, location = "https://m8.music.126.net/fallback.mp3?x=1") {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => new Response(null, { status })),
+    vi.fn(async () => new Response(null, status < 300 || status >= 400 ? { status } : { status, headers: { location } })),
   );
 }
 
@@ -137,6 +141,29 @@ describe("GET /api/music", () => {
       "https://api.injahow.cn/meting/?server=netease&type=url&id=url-30",
     );
     expect(body.message).toBe("");
+  });
+
+  it("ignores a 200 from the fallback source, which means no playable url", async () => {
+    // 公开接口对无版权曲目回 200 空体，这里必须当成不可播，否则会把坏链接给前端。
+    stubFallback(200);
+    metingPlaylist.mockResolvedValue(JSON.stringify([track("32")]));
+    metingUrl.mockResolvedValue(JSON.stringify({ url: null }));
+
+    const body = await (await GET(musicRequest("?id=5152"))).json();
+
+    expect(body.songs).toEqual([]);
+    expect(body.message).toContain("不可播放");
+  });
+
+  it("ignores a redirect that does not point at the netease CDN", async () => {
+    stubFallback(302, "https://example.com/not-music.mp3");
+    metingPlaylist.mockResolvedValue(JSON.stringify([track("33")]));
+    metingUrl.mockResolvedValue(JSON.stringify({ url: null }));
+
+    const body = await (await GET(musicRequest("?id=5153"))).json();
+
+    expect(body.songs).toEqual([]);
+    expect(body.message).toContain("不可播放");
   });
 
   it("keeps the diagnostic when the fallback source cannot resolve either", async () => {

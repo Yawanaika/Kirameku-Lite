@@ -129,7 +129,11 @@ function fallbackSource(urlId: string): string {
   return `${FALLBACK_SOURCE_API}/?server=netease&type=url&id=${encodeURIComponent(urlId)}`;
 }
 
-/** 探测兜底音源能否解析出可播放地址；拿不准时返回 false，宁可不给坏链接。 */
+/**
+ * 探测兜底音源能否解析出可播放地址。
+ * 公开接口可播时会 302 到 *.music.126.net 的带签名地址，不可播时回 200 空响应，
+ * 因此只有「3xx 且 Location 指向网易云 CDN」才算可播；拿不准一律 false，宁可不给坏链接。
+ */
 async function fallbackPlayable(urlId: string, deadline: number): Promise<boolean> {
   if (Date.now() > deadline) return false;
   try {
@@ -138,7 +142,9 @@ async function fallbackPlayable(urlId: string, deadline: number): Promise<boolea
       redirect: "manual",
       signal: AbortSignal.timeout(FALLBACK_PROBE_TIMEOUT_MS),
     });
-    return response.status === 200 || (response.status >= 300 && response.status < 400);
+    if (response.status < 300 || response.status >= 400) return false;
+    const location = response.headers.get("location") || "";
+    return /^https:\/\/[^/]*music\.126\.net\//.test(location);
   } catch {
     return false;
   }
