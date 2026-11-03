@@ -60,7 +60,6 @@ export default function SeasonalEffect() {
     for (let i = 0; i < maxParticles; i++) {
       const x = Math.random() * canvas.width;
       const y = Math.random() * canvas.height;
-      const speed = 0.3 + Math.random() * 0.6;
       let p: Particle;
 
       switch (s) {

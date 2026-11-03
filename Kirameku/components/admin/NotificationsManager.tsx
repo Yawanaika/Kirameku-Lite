@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Loader2,
   Mail,
@@ -182,17 +182,16 @@ function ChannelCard({
   channel: ChannelView;
   onSaved: () => void;
 }) {
-  const [values, setValues] = useState(() => initialValues(channel));
-  const [enabled, setEnabled] = useState(channel.enabled);
+  // 表单值 = 用户草稿；草稿为 null 时回落到服务端下发的值。
+  // 这样不必用 effect 在 props 变化时同步 state（那是级联渲染的常见来源）。
+  const [draft, setDraft] = useState<Record<string, string | boolean> | null>(null);
+  const [enabledDraft, setEnabledDraft] = useState<boolean | null>(null);
+  const values = draft ?? initialValues(channel);
+  const enabled = enabledDraft ?? channel.enabled;
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    setValues(initialValues(channel));
-    setEnabled(channel.enabled);
-  }, [channel]);
 
   const Icon = CHANNEL_ICONS[channel.type];
 
@@ -218,6 +217,9 @@ function ChannelCard({
         body: JSON.stringify({ enabled, config }),
       });
       setNotice("已保存");
+      // 保存成功后丢弃草稿，改回服务端下发的值
+      setDraft(null);
+      setEnabledDraft(null);
       onSaved();
     } catch (reason) {
       setFailure(describeAdminError(reason));
@@ -276,7 +278,7 @@ function ChannelCard({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setEnabled((current) => !current)}
+          onClick={() => setEnabledDraft(!enabled)}
         >
           {enabled ? "停用" : "启用"}
         </Button>
@@ -299,7 +301,10 @@ function ChannelCard({
                 channel={channel}
                 value={values[field.key] ?? ""}
                 onChange={(next) =>
-                  setValues((current) => ({ ...current, [field.key]: next }))
+                  setDraft((current) => ({
+                    ...(current ?? initialValues(channel)),
+                    [field.key]: next,
+                  }))
                 }
               />
               {field.help ? (
@@ -333,6 +338,29 @@ function ChannelCard({
   );
 }
 
+interface RuleDraft {
+  enabled: boolean;
+  selected: ChannelType[];
+  cooldown: string;
+  settings: Record<string, string>;
+}
+
+/** 服务端规则 → 表单初值。草稿被清空时用它回落。 */
+function ruleDraftFrom(rule: RuleView): RuleDraft {
+  const settings: Record<string, string> = {};
+  for (const threshold of rule.thresholds) {
+    const stored = rule.settings[threshold.key];
+    settings[threshold.key] =
+      typeof stored === "number" ? String(stored) : String(threshold.default);
+  }
+  return {
+    enabled: rule.enabled,
+    selected: rule.channels,
+    cooldown: String(rule.cooldown_seconds),
+    settings,
+  };
+}
+
 function RuleCard({
   rule,
   channels,
@@ -342,41 +370,24 @@ function RuleCard({
   channels: ChannelView[];
   onSaved: () => void;
 }) {
-  const [enabled, setEnabled] = useState(rule.enabled);
-  const [selected, setSelected] = useState<ChannelType[]>(rule.channels);
-  const [cooldown, setCooldown] = useState(String(rule.cooldown_seconds));
-  const [settings, setSettings] = useState<Record<string, string>>(() => {
-    const next: Record<string, string> = {};
-    for (const threshold of rule.thresholds) {
-      const stored = rule.settings[threshold.key];
-      next[threshold.key] =
-        typeof stored === "number" ? String(stored) : String(threshold.default);
-    }
-    return next;
-  });
+  // 表单草稿；为 null 时回落服务端下发的规则值（避免用 effect 同步 props）
+  const [draft, setDraft] = useState<RuleDraft | null>(null);
+  const values = draft ?? ruleDraftFrom(rule);
+  const { enabled, selected, cooldown, settings } = values;
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  useEffect(() => {
-    setEnabled(rule.enabled);
-    setSelected(rule.channels);
-    setCooldown(String(rule.cooldown_seconds));
-    const next: Record<string, string> = {};
-    for (const threshold of rule.thresholds) {
-      const stored = rule.settings[threshold.key];
-      next[threshold.key] =
-        typeof stored === "number" ? String(stored) : String(threshold.default);
-    }
-    setSettings(next);
-  }, [rule]);
+  function patch(next: Partial<RuleDraft>) {
+    setDraft({ ...values, ...next });
+  }
 
   function toggleChannel(type: ChannelType) {
-    setSelected((current) =>
-      current.includes(type)
-        ? current.filter((item) => item !== type)
-        : [...current, type],
-    );
+    patch({
+      selected: selected.includes(type)
+        ? selected.filter((item) => item !== type)
+        : [...selected, type],
+    });
   }
 
   const unavailable = selected.filter((type) => {
@@ -408,6 +419,7 @@ function RuleCard({
         }),
       });
       setNotice("已保存");
+      setDraft(null);
       onSaved();
     } catch (reason) {
       setFailure(describeAdminError(reason));
@@ -442,7 +454,7 @@ function RuleCard({
             type="button"
             role="switch"
             aria-checked={enabled}
-            onClick={() => setEnabled((current) => !current)}
+            onClick={() => patch({ enabled: !enabled })}
             className={`relative h-5 w-9 rounded-full transition ${
               enabled ? "bg-sky-400" : "bg-slate-900/[0.08] dark:bg-white/15"
             }`}
@@ -499,10 +511,12 @@ function RuleCard({
                   step={threshold.step}
                   value={settings[threshold.key] ?? ""}
                   onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      [threshold.key]: event.target.value,
-                    }))
+                    patch({
+                      settings: {
+                        ...settings,
+                        [threshold.key]: event.target.value,
+                      },
+                    })
                   }
                 />
                 {threshold.help ? (
@@ -525,7 +539,7 @@ function RuleCard({
               inputMode="numeric"
               min={0}
               value={cooldown}
-              onChange={(event) => setCooldown(event.target.value)}
+              onChange={(event) => patch({ cooldown: event.target.value })}
             />
             <p className="text-[11px] text-slate-600">
               同一预警在冷却时间内不会重复推送。
@@ -565,16 +579,15 @@ function DispatchCard({
   const [body, setBody] = useState(
     "如果你看到这条消息，说明预警通知链路已经打通。",
   );
-  const [selected, setSelected] = useState<ChannelType[]>([]);
+  // 默认推送渠道 = 当前已启用的渠道；用户点选后以草稿为准，
+  // 这样不必用 effect 把 props 同步进 state。
+  const [selectedDraft, setSelectedDraft] = useState<ChannelType[] | null>(null);
+  const selected =
+    selectedDraft ??
+    channels.filter((item) => item.enabled).map((item) => item.type);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelected(
-      channels.filter((item) => item.enabled).map((item) => item.type),
-    );
-  }, [channels]);
 
   async function submit() {
     setSending(true);
@@ -669,10 +682,10 @@ function DispatchCard({
                   key={channel.type}
                   type="button"
                   onClick={() =>
-                    setSelected((current) =>
-                      current.includes(channel.type)
-                        ? current.filter((item) => item !== channel.type)
-                        : [...current, channel.type],
+                    setSelectedDraft(
+                      selected.includes(channel.type)
+                        ? selected.filter((item) => item !== channel.type)
+                        : [...selected, channel.type],
                     )
                   }
                   className={`rounded-lg border px-2.5 py-1 text-xs transition ${

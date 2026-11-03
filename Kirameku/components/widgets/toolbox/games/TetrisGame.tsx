@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const COLS = 10;
 const ROWS = 20;
@@ -84,7 +85,7 @@ export default function TetrisGame() {
   const [next, setNext] = useState<Tetromino>(randomType);
   const [score, setScore] = useState(0);
   const [lines, setLines] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [paused, setPaused] = useState(false);
   const dropRef = useRef<number | null>(null);
@@ -97,27 +98,18 @@ export default function TetrisGame() {
   const gameOverRef = useRef(false);
   const pausedRef = useRef(false);
 
-  gridRef.current = grid;
-  currentRef.current = current;
-  nextRef.current = next;
-  gameOverRef.current = gameOver;
-  pausedRef.current = paused;
+  // 把最新 state 镜像进 ref，供 interval / 键盘回调读取。
+  // 必须在 effect 里做：渲染期写 ref 属于副作用（React 19 也不允许）。
+  useEffect(() => {
+    gridRef.current = grid;
+    currentRef.current = current;
+    nextRef.current = next;
+    gameOverRef.current = gameOver;
+    pausedRef.current = paused;
+  });
 
   const level = Math.floor(lines / 10);
   const speed = Math.max(100, 500 - level * 40);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
-
-  const saveBest = useCallback((s: number) => {
-    setBest((b) => {
-      const nb = Math.max(b, s);
-      localStorage.setItem(STORAGE_KEY, String(nb));
-      return nb;
-    });
-  }, []);
 
   const spawn = useCallback((g: (Tetromino | null)[][], nextType: Tetromino) => {
     const newPiece: Piece = { type: nextType, rotation: 0, row: 0, col: 3 };
@@ -230,8 +222,14 @@ export default function TetrisGame() {
     const dx = e.changedTouches[0].clientX - touchStart.current.x;
     const dy = e.changedTouches[0].clientY - touchStart.current.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { hardDrop(); touchStart.current = null; return; }
-    if (Math.abs(dx) > Math.abs(dy)) { dx > 0 ? moveRight() : moveLeft(); }
-    else { dy > 0 ? hardDrop() : rotate(); }
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0) moveRight();
+      else moveLeft();
+    } else if (dy > 0) {
+      hardDrop();
+    } else {
+      rotate();
+    }
     touchStart.current = null;
   };
 

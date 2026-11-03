@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-doodle-jump-best";
 const W = 320;
@@ -27,7 +28,7 @@ interface Platform {
 export default function DoodleJumpGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
 
@@ -42,10 +43,6 @@ export default function DoodleJumpGame() {
     plats: [] as Platform[],
   });
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) { const v = Number(saved); state.current.best = v; setBest(v); }
-  }, []);
 
   const genPlats = useCallback((fromY: number, toY: number): Platform[] => {
     const result: Platform[] = [];
@@ -63,7 +60,8 @@ export default function DoodleJumpGame() {
     return result;
   }, []);
 
-  const initGame = useCallback(() => {
+  /** 只重置 ref 里的游戏状态（可在挂载时安全调用，不触发 setState） */
+  const resetState = useCallback(() => {
     if (raf.current) { cancelAnimationFrame(raf.current); raf.current = null; }
     const s = state.current;
     s.px = W / 2 - PW / 2;
@@ -85,14 +83,9 @@ export default function DoodleJumpGame() {
       y -= 50 + Math.random() * 40;
     }
     s.plats = plats;
-
-    setScore(0);
-    setGameOver(false);
-    setStarted(false);
-    draw();
   }, []);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  useEffect(() => { resetState(); }, [resetState]);
 
   const draw = useCallback(() => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -164,6 +157,15 @@ export default function DoodleJumpGame() {
     ctx.fillText(String(s.score), 12, 30);
   }, []);
 
+  // 重新开始：重置状态、清空 HUD 并立即重绘
+  const initGame = useCallback(() => {
+    resetState();
+    setScore(0);
+    setGameOver(false);
+    setStarted(false);
+    draw();
+  }, [resetState, draw]);
+
   // Main loop
   useEffect(() => {
     if (!started || gameOver) { draw(); return; }
@@ -234,8 +236,7 @@ export default function DoodleJumpGame() {
         setGameOver(true);
         if (s.score > s.best) {
           s.best = s.score;
-          setBest(s.score);
-          localStorage.setItem(STORAGE_KEY, String(s.score));
+          saveBest((b) => Math.max(b, s.score));
         }
         return;
       }
@@ -245,7 +246,7 @@ export default function DoodleJumpGame() {
     };
     raf.current = requestAnimationFrame(loop);
     return () => { if (raf.current) { cancelAnimationFrame(raf.current); raf.current = null; } };
-  }, [started, gameOver, draw, genPlats]);
+  }, [started, gameOver, draw, genPlats, saveBest]);
 
   // Keyboard
   useEffect(() => {

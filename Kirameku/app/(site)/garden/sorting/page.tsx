@@ -236,28 +236,28 @@ export default function SortingPage() {
   const stepsRef = useRef<SortStep[]>([]);
   const stepIdxRef = useRef(0);
   const highlightsRef = useRef<Map<number, string>>(new Map());
-  const runningRef = useRef(false);
-  const speedRef = useRef(8);
-
-  runningRef.current = running;
-  speedRef.current = speed;
-
   const genArray = useCallback((n: number) => {
     return Array.from({ length: n }, () => Math.floor(Math.random() * 95) + 5);
   }, []);
 
-  const initArray = useCallback(() => {
+  /** 只重建数据（不 setState，可在挂载/尺寸变化时安全调用） */
+  const resetData = useCallback(() => {
     arrRef.current = genArray(size);
     stepsRef.current = [];
     stepIdxRef.current = 0;
     highlightsRef.current = new Map();
+  }, [size, genArray]);
+
+  /** 用户点击「重新生成」：重建数据并清空统计 */
+  const initArray = useCallback(() => {
+    resetData();
     setRunning(false);
     setDone(false);
     setComparisons(0);
     setSwaps(0);
-  }, [size, genArray]);
+  }, [resetData]);
 
-  useEffect(() => { initArray(); }, [initArray]);
+  useEffect(() => { resetData(); }, [resetData]);
 
   // draw loop
   useEffect(() => {
@@ -322,27 +322,7 @@ export default function SortingPage() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
   }, []);
 
-  // playback loop
-  useEffect(() => {
-    if (!running) return;
-    let timer = 0;
-    function tick() {
-      if (!runningRef.current) return;
-      const steps = stepsRef.current;
-      if (stepIdxRef.current >= steps.length) {
-        setRunning(false);
-        setDone(true);
-        return;
-      }
-      applyStep(steps[stepIdxRef.current]);
-      stepIdxRef.current++;
-      timer = window.setTimeout(tick, Math.max(5, 2000 / speedRef.current));
-    }
-    tick();
-    return () => clearTimeout(timer);
-  }, [running]);
-
-  function applyStep(step: SortStep) {
+  const applyStep = useCallback((step: SortStep) => {
     const highlights = highlightsRef.current;
     // clear previous non-sorted highlights
     for (const [k, v] of highlights) {
@@ -375,7 +355,26 @@ export default function SortingPage() {
         for (const i of step.indices) highlights.set(i, COLORS.pivot);
         break;
     }
-  }
+  }, []);
+
+  // playback loop
+  useEffect(() => {
+    if (!running) return;
+    let timer = 0;
+    function tick() {
+      const steps = stepsRef.current;
+      if (stepIdxRef.current >= steps.length) {
+        setRunning(false);
+        setDone(true);
+        return;
+      }
+      applyStep(steps[stepIdxRef.current]);
+      stepIdxRef.current++;
+      timer = window.setTimeout(tick, Math.max(5, 2000 / speed));
+    }
+    tick();
+    return () => clearTimeout(timer);
+  }, [running, speed, applyStep]);
 
   function startSort() {
     if (running) return;

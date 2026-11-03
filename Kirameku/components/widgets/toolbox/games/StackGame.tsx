@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-stack-best";
 const W = 320;
@@ -25,10 +26,10 @@ interface FallingPiece {
 export default function StackGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const [combo, setCombo] = useState(0);
+  const [, setCombo] = useState(0);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -44,10 +45,6 @@ export default function StackGame() {
   const perfectFlash = useRef(0);
   const speedRef = useRef(2);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const initGame = useCallback(() => {
     const baseW = W * 0.6;
@@ -69,7 +66,12 @@ export default function StackGame() {
     setStarted(false);
   }, []);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  // 首次挂载只铺设底部方块与待落方块：此时各 state 已是初始值，不必再 setState
+  useEffect(() => {
+    const baseW = W * 0.6;
+    blocksRef.current = [{ x: (W - baseW) / 2, w: baseW, color: COLORS[0] }];
+    currentRef.current = { x: -baseW, w: baseW, color: COLORS[1] };
+  }, []);
 
   const placeBlock = useCallback(() => {
     if (gameOverRef.current || !startedRef.current) return;
@@ -85,11 +87,7 @@ export default function StackGame() {
       // Missed completely
       gameOverRef.current = true;
       setGameOver(true);
-      setBest((b) => {
-        const nb = Math.max(b, scoreRef.current);
-        localStorage.setItem(STORAGE_KEY, String(nb));
-        return nb;
-      });
+      saveBest((b) => Math.max(b, scoreRef.current));
       return;
     }
 
@@ -151,7 +149,7 @@ export default function StackGame() {
       w: nextW,
       color: nextColor,
     };
-  }, []);
+  }, [saveBest]);
 
   const draw = useCallback(() => {
     const ctx = canvasRef.current?.getContext("2d");

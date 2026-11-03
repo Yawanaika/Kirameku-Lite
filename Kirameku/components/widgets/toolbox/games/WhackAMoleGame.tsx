@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-whack-mole-best";
-const GRID_ROWS = 3;
 const GRID_COLS = 3;
 const GAME_DURATION = 30;
 
@@ -18,7 +18,7 @@ interface Mole {
 export default function WhackAMoleGame() {
   const [moles, setMoles] = useState<Mole[]>(() => Array(9).fill(null).map(() => ({ state: "idle", timer: 0, type: "normal" })));
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
@@ -36,10 +36,6 @@ export default function WhackAMoleGame() {
   const spawnTimerRef = useRef(0);
   const difficultyRef = useRef(0);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const initGame = useCallback(() => {
     const empty = Array(9).fill(null).map(() => ({ state: "idle", timer: 0, type: "normal" } as Mole));
@@ -60,7 +56,7 @@ export default function WhackAMoleGame() {
     setStarted(false);
   }, []);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  // 首次挂载无需 initGame：各 state 与 ref 的声明初值已等同于 initGame 的重置结果
 
   const spawnMole = useCallback(() => {
     const idleIndices = molesRef.current
@@ -89,11 +85,7 @@ export default function WhackAMoleGame() {
       gameOverRef.current = true;
       setGameOver(true);
       setTimeLeft(0);
-      setBest((b) => {
-        const nb = Math.max(b, scoreRef.current);
-        localStorage.setItem(STORAGE_KEY, String(nb));
-        return nb;
-      });
+      saveBest((b) => Math.max(b, scoreRef.current));
       return;
     }
     setTimeLeft(Math.ceil(timeRef.current));
@@ -143,7 +135,7 @@ export default function WhackAMoleGame() {
       }
     }
     if (changed) setMoles([...molesRef.current]);
-  }, [spawnMole]);
+  }, [spawnMole, saveBest]);
 
   useEffect(() => {
     if (gameOver || !started) return;

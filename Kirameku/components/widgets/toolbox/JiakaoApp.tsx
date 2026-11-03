@@ -18,6 +18,8 @@ interface Question {
 
 export default function JiakaoApp() {
   const [subject, setSubject] = useState<1 | 4>(1);
+  // 同一科目也要能「换一题」，用递增的 nonce 驱动 effect 重新取题
+  const [nonce, setNonce] = useState(0);
   const [q, setQ] = useState<Question | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -25,21 +27,35 @@ export default function JiakaoApp() {
   const [correct, setCorrect] = useState(0);
   const [total, setTotal] = useState(0);
 
-  const fetchQ = useCallback(async (sub: 1 | 4) => {
+  /** 用户主动切换/刷新：先进入 loading 并清空上一题的作答状态（subject 变化会驱动下面的 effect 重新取题） */
+  const reload = useCallback((sub: 1 | 4) => {
     setLoading(true);
     setSelected(null);
     setShowResult(false);
-    try {
-      const res = await fetch(`${API}?subject=${sub}`);
-      const json = await res.json();
-      if (json.code === 200 && json.data) {
-        setQ(json.data);
-      }
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    setSubject(sub);
+    setNonce((n) => n + 1);
   }, []);
 
-  useEffect(() => { fetchQ(subject); }, [subject, fetchQ]);
+  // 取题：请求逻辑直接放在 effect 里，cancelled 标记避免快速切换时旧结果覆盖新题
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API}?subject=${subject}`);
+        const json = await res.json();
+        if (!cancelled && json.code === 200 && json.data) {
+          setQ(json.data);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subject, nonce]);
 
   const isChoice = q?.option1;
 
@@ -51,7 +67,7 @@ export default function JiakaoApp() {
     if (ans === q?.answer) setCorrect((c) => c + 1);
   };
 
-  const getOptionStyle = (opt: string, label: string) => {
+  const getOptionStyle = (opt: string) => {
     if (!showResult) {
       return selected === opt
         ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20"
@@ -82,7 +98,7 @@ export default function JiakaoApp() {
             <button
               key={s}
               type="button"
-              onClick={() => setSubject(s as 1 | 4)}
+              onClick={() => reload(s as 1 | 4)}
               className={`px-3 py-1 text-[10px] font-bold rounded-md transition-colors ${
                 subject === s
                   ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
@@ -126,7 +142,7 @@ export default function JiakaoApp() {
                     key={opt}
                     type="button"
                     onClick={() => handleAnswer(label)}
-                    className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${getOptionStyle(opt!, label)}`}
+                    className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${getOptionStyle(opt!)}`}
                   >
                     <span className="font-bold mr-1">{label}.</span>{text}
                   </button>
@@ -165,7 +181,7 @@ export default function JiakaoApp() {
           {/* 下一题 */}
           <button
             type="button"
-            onClick={() => fetchQ(subject)}
+            onClick={() => reload(subject)}
             className="w-full py-2 rounded-lg bg-indigo-500 text-white text-xs font-bold hover:bg-indigo-600 transition-colors"
           >
             下一题

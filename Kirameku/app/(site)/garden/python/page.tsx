@@ -39,6 +39,20 @@ for key, value in info.items():
     print(f"  {key}: {value}")
 `;
 
+/** Pyodide 只在浏览器由 CDN 注入，这里按用到的 API 声明最小类型 */
+interface PyodideInstance {
+  runPython(code: string): unknown;
+  runPythonAsync(code: string): Promise<unknown>;
+}
+
+interface PyodideWindow extends Window {
+  loadPyodide?: (options: { indexURL: string }) => Promise<PyodideInstance>;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function PythonPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -46,7 +60,7 @@ export default function PythonPage() {
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const pyodideRef = useRef<any>(null);
+  const pyodideRef = useRef<PyodideInstance | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   // init pyodide
@@ -56,7 +70,9 @@ export default function PythonPage() {
     script.async = true;
     script.onload = async () => {
       try {
-        const pyodide = await (window as any).loadPyodide({
+        const loadPyodide = (window as PyodideWindow).loadPyodide;
+        if (!loadPyodide) throw new Error("pyodide 未加载");
+        const pyodide = await loadPyodide({
           indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/",
         });
         pyodideRef.current = pyodide;
@@ -71,13 +87,49 @@ export default function PythonPage() {
     return () => { document.head.removeChild(script); };
   }, []);
 
+  // 运行状态镜像到 ref，让 runCode 保持稳定身份（可以被只创建一次的 CodeMirror keymap 引用）
+  const runningRef = useRef(running);
+  useEffect(() => {
+    runningRef.current = running;
+  }, [running]);
+
+  const runCode = useCallback(async () => {
+    if (!pyodideRef.current || runningRef.current) return;
+    const code = viewRef.current?.state.doc.toString() ?? "";
+    setRunning(true);
+    setOutput("运行中...\n");
+    try {
+      const pyodide = pyodideRef.current;
+      pyodide.runPython(`
+import sys, io
+__stdout_capture = io.StringIO()
+sys.stdout = __stdout_capture
+sys.stderr = __stdout_capture
+`);
+      try {
+        await pyodide.runPythonAsync(code);
+      } catch (e) {
+        const captured = String(pyodide.runPython("__stdout_capture.getvalue()") ?? "");
+        setOutput((captured ? captured + "\n" : "") + `错误: ${errorText(e)}`);
+        setRunning(false);
+        return;
+      }
+      const captured = String(pyodide.runPython("__stdout_capture.getvalue()") ?? "");
+      setOutput(captured || "(无输出)");
+      pyodide.runPython("sys.stdout = sys.__stdout__; sys.stderr = sys.__stderr__");
+    } catch (e) {
+      setOutput(`错误: ${errorText(e)}`);
+    }
+    setRunning(false);
+  }, []);
+
   // init codemirror
   useEffect(() => {
     if (!editorRef.current) return;
 
     const runKeymap = keymap.of([{
       key: "Mod-Enter",
-      run: () => { runCodeRef.current(); return true; },
+      run: () => { void runCode(); return true; },
     }]);
 
     const state = EditorState.create({
@@ -101,40 +153,7 @@ export default function PythonPage() {
     viewRef.current = view;
 
     return () => { view.destroy(); };
-  }, []);
-
-  const runCode = useCallback(async () => {
-    if (!pyodideRef.current || running) return;
-    const code = viewRef.current?.state.doc.toString() ?? "";
-    setRunning(true);
-    setOutput("运行中...\n");
-    try {
-      const pyodide = pyodideRef.current;
-      pyodide.runPython(`
-import sys, io
-__stdout_capture = io.StringIO()
-sys.stdout = __stdout_capture
-sys.stderr = __stdout_capture
-`);
-      try {
-        await pyodide.runPythonAsync(code);
-      } catch (e: any) {
-        const captured = pyodide.runPython("__stdout_capture.getvalue()");
-        setOutput((captured ? captured + "\n" : "") + `错误: ${e.message}`);
-        setRunning(false);
-        return;
-      }
-      const captured = pyodide.runPython("__stdout_capture.getvalue()");
-      setOutput(captured || "(无输出)");
-      pyodide.runPython("sys.stdout = sys.__stdout__; sys.stderr = sys.__stderr__");
-    } catch (e: any) {
-      setOutput(`错误: ${e.message}`);
-    }
-    setRunning(false);
-  }, [running]);
-
-  const runCodeRef = useRef(runCode);
-  runCodeRef.current = runCode;
+  }, [runCode]);
 
   useEffect(() => {
     if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;

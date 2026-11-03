@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-shooter-best";
 const W = 360;
@@ -42,15 +43,12 @@ const ENEMY_DEFS: Record<string, { w: number; h: number; hp: number; speed: numb
 export default function ShooterGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    return saved ? Number(saved) : 0;
-  });
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY, 1000);
   const [lives, setLives] = useState(3);
   const [wave, setWave] = useState(1);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const [combo, setCombo] = useState(0);
+  const [, setCombo] = useState(0);
 
   const frameRef = useRef<number | null>(null);
   const playerRef = useRef<Vec>({ x: W / 2 - PLAYER_W / 2, y: H - 60 });
@@ -535,11 +533,7 @@ export default function ShooterGame() {
           if (livesRef.current <= 0) {
             gameOverRef.current = true;
             setGameOver(true);
-            setBest((b) => {
-              const nb = Math.max(b, scoreRef.current);
-              localStorage.setItem(STORAGE_KEY, String(nb));
-              return nb;
-            });
+            saveBest((b) => Math.max(b, scoreRef.current));
             return;
           }
         }
@@ -607,11 +601,7 @@ export default function ShooterGame() {
           if (livesRef.current <= 0) {
             gameOverRef.current = true;
             setGameOver(true);
-            setBest((b2) => {
-              const nb = Math.max(b2, scoreRef.current);
-              localStorage.setItem(STORAGE_KEY, String(nb));
-              return nb;
-            });
+            saveBest((b2) => Math.max(b2, scoreRef.current));
             return;
           }
         }
@@ -641,7 +631,7 @@ export default function ShooterGame() {
       pt.life -= dt;
       if (pt.life <= 0) particles.splice(i, 1);
     }
-  }, [spawnWave]);
+  }, [spawnWave, saveBest]);
 
   // ── Game loop ──
   useEffect(() => {

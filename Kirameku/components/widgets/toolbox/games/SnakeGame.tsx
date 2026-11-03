@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const GRID = 20;
 const CELL = 18;
@@ -87,7 +88,7 @@ export default function SnakeGame() {
   const particlesRef = useRef<Particle[]>([]);
   const scoreRef = useRef(0);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [running, setRunning] = useState(true);
   const [started, setStarted] = useState(false);
@@ -95,15 +96,13 @@ export default function SnakeGame() {
   const tickRef = useRef<number | null>(null);
   const ghostRef = useRef(0);
   const slowRef = useRef(0);
+  // 渲染需要的镜像值：ref 本身不参与渲染（游戏循环里的实时值）
+  const [snakeLen, setSnakeLen] = useState(1);
+  const [powerups, setPowerups] = useState({ ghost: 0, slow: 0 });
   const comboRef = useRef(0);
   const comboTimerRef = useRef(0);
   const wallTimerRef = useRef(0);
   const animRef = useRef(0);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const getSpeed = useCallback(() => {
     const scoreBonus = Math.min(scoreRef.current / 10, 40);
@@ -312,11 +311,7 @@ export default function SnakeGame() {
         const def = FOOD_DEFS[f.type];
         scoreRef.current += def.points;
         setScore(scoreRef.current);
-        setBest((b) => {
-          const nb = Math.max(b, scoreRef.current);
-          localStorage.setItem(STORAGE_KEY, String(nb));
-          return nb;
-        });
+        saveBest((b) => Math.max(b, scoreRef.current));
         spawnParticles(head.x, head.y, def.color);
 
         // Combo
@@ -326,6 +321,10 @@ export default function SnakeGame() {
         // Apply effects
         if (f.type === "slow") slowRef.current = 5;
         if (f.type === "ghost") ghostRef.current = 6;
+        setPowerups({
+          ghost: Math.ceil(ghostRef.current),
+          slow: Math.ceil(slowRef.current),
+        });
 
         // Grow
         for (let g = 0; g < def.grow; g++) newSnake.push({ ...newSnake[newSnake.length - 1] });
@@ -339,7 +338,8 @@ export default function SnakeGame() {
     if (!ate) newSnake.pop();
 
     snakeRef.current = newSnake;
-  }, [spawnParticles]);
+    setSnakeLen(newSnake.length);
+  }, [spawnParticles, saveBest]);
 
   // Game loop
   useEffect(() => {
@@ -359,8 +359,16 @@ export default function SnakeGame() {
       }
 
       // Update power-up timers
+      const prevGhost = Math.ceil(ghostRef.current);
+      const prevSlow = Math.ceil(slowRef.current);
       if (ghostRef.current > 0) ghostRef.current = Math.max(0, ghostRef.current - dt);
       if (slowRef.current > 0) slowRef.current = Math.max(0, slowRef.current - dt);
+      // 只在整秒变化时才同步到 state，避免每帧重渲染
+      const nextGhost = Math.ceil(ghostRef.current);
+      const nextSlow = Math.ceil(slowRef.current);
+      if (nextGhost !== prevGhost || nextSlow !== prevSlow) {
+        setPowerups({ ghost: nextGhost, slow: nextSlow });
+      }
       comboTimerRef.current -= dt;
       if (comboTimerRef.current <= 0) comboRef.current = 0;
 
@@ -450,6 +458,8 @@ export default function SnakeGame() {
     scoreRef.current = 0;
     ghostRef.current = 0;
     slowRef.current = 0;
+    setPowerups({ ghost: 0, slow: 0 });
+    setSnakeLen(1);
     comboRef.current = 0;
     comboTimerRef.current = 0;
     wallTimerRef.current = 0;
@@ -477,7 +487,7 @@ export default function SnakeGame() {
         </div>
         <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5 text-center">
           <div className="text-[9px] text-slate-400 font-bold">长度</div>
-          <div className="text-sm font-black text-green-500">{snakeRef.current.length}</div>
+          <div className="text-sm font-black text-green-500">{snakeLen}</div>
         </div>
         <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1.5 text-center">
           <div className="text-[9px] text-slate-400 font-bold">最高</div>
@@ -507,7 +517,7 @@ export default function SnakeGame() {
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 text-center space-y-3">
               <div className="text-lg font-black text-slate-800 dark:text-white">游戏结束</div>
-              <div className="text-sm text-slate-500">得分：{score} · 长度：{snakeRef.current.length}</div>
+              <div className="text-sm text-slate-500">得分：{score} · 长度：{snakeLen}</div>
               <button type="button" onClick={restart}
                 className="px-6 py-2 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 active:scale-95 transition-all">
                 再来一局
@@ -519,11 +529,11 @@ export default function SnakeGame() {
 
       {/* Power-up status */}
       <div className="flex items-center justify-center gap-3 w-full text-[10px]">
-        {ghostRef.current > 0 && (
-          <span className="text-purple-500 font-bold">👻 穿墙 {ghostRef.current.toFixed(0)}s</span>
+        {powerups.ghost > 0 && (
+          <span className="text-purple-500 font-bold">👻 穿墙 {powerups.ghost}s</span>
         )}
-        {slowRef.current > 0 && (
-          <span className="text-blue-500 font-bold">❄ 减速 {slowRef.current.toFixed(0)}s</span>
+        {powerups.slow > 0 && (
+          <span className="text-blue-500 font-bold">❄ 减速 {powerups.slow}s</span>
         )}
       </div>
 

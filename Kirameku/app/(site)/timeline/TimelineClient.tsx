@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- 图片地址来自后台配置或第三方接口，域名不可预知，按 lib/image.ts 的约定绕过 next/image 优化器 */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -82,17 +83,19 @@ function buildRiverPath(
 export default function TimelineClient({ posts }: { posts: PostItem[] }) {
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
-  const dragXRef = useRef(0);
+  // 拖拽位移与视口宽度都要参与渲染（裁剪范围、拖拽约束），因此用 state 而不是 ref。
+  // 拖动时每帧写 ref、再用 rAF 合并成一次 setState，避免每帧重渲染整条时间轴。
+  const [dragX, setDragX] = useState(0);
+  const pendingDragXRef = useRef(0);
   const didDrag = useRef(false);
-  const [visibleRangeKey, setVisibleRangeKey] = useState(0);
+  const [viewWidth, setViewWidth] = useState(1200);
   const rafRef = useRef<number>(0);
-  const viewWidthRef = useRef(1200);
 
   useEffect(() => {
     const check = () => {
       const vw = window.innerWidth;
       setIsMobile(vw < 768);
-      viewWidthRef.current = vw;
+      setViewWidth(vw);
     };
     check();
     window.addEventListener("resize", check);
@@ -153,8 +156,6 @@ export default function TimelineClient({ posts }: { posts: PostItem[] }) {
 
   // 可视区域裁剪：只渲染屏幕范围 ± 2 张卡片
   const visibleRange = useMemo(() => {
-    const dragX = dragXRef.current;
-    const viewWidth = viewWidthRef.current;
     const visibleLeft = -dragX - PADDING - (CARD_W + CARD_GAP) * 2;
     const visibleRight = -dragX + viewWidth + PADDING + (CARD_W + CARD_GAP) * 2;
     const startIdx = Math.max(0, Math.floor(visibleLeft / (CARD_W + CARD_GAP)));
@@ -163,13 +164,13 @@ export default function TimelineClient({ posts }: { posts: PostItem[] }) {
       Math.ceil(visibleRight / (CARD_W + CARD_GAP)) + 1,
     );
     return { startIdx, endIdx };
-  }, [visibleRangeKey, sorted.length, CARD_W, CARD_GAP, PADDING]);
+  }, [dragX, viewWidth, sorted.length, CARD_W, CARD_GAP, PADDING]);
 
   // 拖拽更新用 requestAnimationFrame 节流
   const scheduleUpdate = useCallback(() => {
     if (rafRef.current) return;
     rafRef.current = requestAnimationFrame(() => {
-      setVisibleRangeKey((k) => k + 1);
+      setDragX(pendingDragXRef.current);
       rafRef.current = 0;
     });
   }, []);
@@ -229,12 +230,12 @@ export default function TimelineClient({ posts }: { posts: PostItem[] }) {
           dragMomentum
           dragElastic={0.1}
           dragConstraints={{
-            left: -(totalWidth - viewWidthRef.current),
+            left: -(totalWidth - viewWidth),
             right: 0,
           }}
-          initial={{ x: -(PADDING - (viewWidthRef.current - CARD_W) / 2) }}
+          initial={{ x: -(PADDING - (viewWidth - CARD_W) / 2) }}
           onDrag={(_, info) => {
-            dragXRef.current = info.offset.x;
+            pendingDragXRef.current = info.offset.x;
             scheduleUpdate();
           }}
           onDragStart={() => {

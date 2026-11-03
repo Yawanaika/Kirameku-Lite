@@ -36,7 +36,7 @@ export default function JsonPage() {
   const [indent, setIndent] = useState(2);
   const [stats, setStats] = useState({ keys: 0, arrays: 0, depth: 0 });
 
-  function analyze(obj: any, depth = 0): { keys: number; arrays: number; depth: number } {
+  function analyze(obj: unknown, depth = 0): { keys: number; arrays: number; depth: number } {
     let keys = 0, arrays = 0, maxDepth = depth;
     if (Array.isArray(obj)) {
       arrays++;
@@ -45,9 +45,9 @@ export default function JsonPage() {
         keys += r.keys; arrays += r.arrays; maxDepth = Math.max(maxDepth, r.depth);
       }
     } else if (obj && typeof obj === "object") {
-      for (const k of Object.keys(obj)) {
+      for (const value of Object.values(obj)) {
         keys++;
-        const r = analyze(obj[k], depth + 1);
+        const r = analyze(value, depth + 1);
         keys += r.keys; arrays += r.arrays; maxDepth = Math.max(maxDepth, r.depth);
       }
     }
@@ -60,8 +60,8 @@ export default function JsonPage() {
       const parsed = JSON.parse(input);
       setOutput(JSON.stringify(parsed, null, indent));
       setStats(analyze(parsed));
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       setOutput("");
     }
   }
@@ -72,8 +72,8 @@ export default function JsonPage() {
       const parsed = JSON.parse(input);
       setOutput(JSON.stringify(parsed));
       setStats(analyze(parsed));
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
       setOutput("");
     }
   }
@@ -83,8 +83,8 @@ export default function JsonPage() {
       setError("");
       const parsed = JSON.parse(input);
       setOutput(JSON.stringify(JSON.stringify(parsed)));
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -98,8 +98,8 @@ export default function JsonPage() {
       } else {
         setOutput(JSON.stringify(unescaped, null, indent));
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 

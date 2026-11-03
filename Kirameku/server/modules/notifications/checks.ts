@@ -381,7 +381,7 @@ export async function runNotificationChecks(
   const outcomes: CheckOutcome[] = [];
   const errors: string[] = [];
 
-  const fallback = (eventKey: string): RuleRuntimeState => ({
+  const fallback = (_eventKey: string): RuleRuntimeState => ({
     enabled: true,
     channels: [],
     thresholds: {},

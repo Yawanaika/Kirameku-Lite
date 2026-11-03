@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-flappy-best";
 const W = 320;
@@ -18,7 +19,7 @@ interface Pipe { x: number; gapY: number; passed: boolean; }
 export default function FlappyBirdGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
   const birdRef = useRef<Bird>({ y: H / 2, vy: 0 });
@@ -28,10 +29,6 @@ export default function FlappyBirdGame() {
   const gameOverRef = useRef(false);
   const startedRef = useRef(false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const flap = useCallback(() => {
     if (gameOverRef.current) return;
@@ -121,11 +118,7 @@ export default function FlappyBirdGame() {
       bird.y = H - 60 - BIRD / 2;
       gameOverRef.current = true;
       setGameOver(true);
-      setBest((b) => {
-        const nb = Math.max(b, scoreRef.current);
-        localStorage.setItem(STORAGE_KEY, String(nb));
-        return nb;
-      });
+      saveBest((b) => Math.max(b, scoreRef.current));
       return;
     }
     // Ceiling
@@ -151,18 +144,14 @@ export default function FlappyBirdGame() {
         if (by - BIRD / 2 < p.gapY - GAP / 2 || by + BIRD / 2 > p.gapY + GAP / 2) {
           gameOverRef.current = true;
           setGameOver(true);
-          setBest((b) => {
-            const nb = Math.max(b, scoreRef.current);
-            localStorage.setItem(STORAGE_KEY, String(nb));
-            return nb;
-          });
+          saveBest((b) => Math.max(b, scoreRef.current));
         }
       }
     });
 
     pipesRef.current = pipes.filter((p) => p.x + PIPE_W > -10);
     draw();
-  }, [draw]);
+  }, [draw, saveBest]);
 
   useEffect(() => {
     draw();

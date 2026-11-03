@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const ROWS = 8;
 const COLS = 8;
@@ -9,7 +10,6 @@ const STORAGE_KEY = "game-match3-best";
 type GemType = 0 | 1 | 2 | 3 | 4 | 5;
 
 const GEM_EMOJIS = ["🔴","🟢","🔵","🟡","🟣","🟠"];
-const GEM_COLORS = ["#ef4444","#22c55e","#3b82f6","#eab308","#a855f7","#f97316"];
 
 interface Gem {
   type: GemType;
@@ -102,20 +102,18 @@ export default function Match3Game() {
   const [grid, setGrid] = useState<Gem[][]>(createGrid);
   const [selected, setSelected] = useState<[number, number] | null>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [moves, setMoves] = useState(30);
   const [gameOver, setGameOver] = useState(false);
   const [combo, setCombo] = useState(0);
   const [animating, setAnimating] = useState(false);
-  const matchedRef = useRef<Set<string>>(new Set());
   const [matchedCells, setMatchedCells] = useState<Set<string>>(new Set());
   const scoreRef = useRef(0);
   const movesRef = useRef(30);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
+
+  // 级联回调需要拿到「最新的」processMatches，用 ref 承接以打破自引用
+  const processMatchesRef = useRef<(g: Gem[][], chain?: number) => void>(() => {});
 
   const processMatches = useCallback((g: Gem[][], chain: number = 1) => {
     const { matched, points } = findMatches(g);
@@ -142,9 +140,13 @@ export default function Match3Game() {
       setScore(scoreRef.current);
 
       // Check for cascades
-      setTimeout(() => processMatches(g, chain + 1), 200);
+      setTimeout(() => processMatchesRef.current(g, chain + 1), 200);
     }, 300);
   }, []);
+
+  useEffect(() => {
+    processMatchesRef.current = processMatches;
+  }, [processMatches]);
 
   const handleCellClick = (r: number, c: number) => {
     if (animating || gameOver) return;
@@ -183,11 +185,7 @@ export default function Match3Game() {
         if (movesRef.current <= 0) {
           setTimeout(() => {
             setGameOver(true);
-            setBest((b) => {
-              const nb = Math.max(b, scoreRef.current);
-              localStorage.setItem(STORAGE_KEY, String(nb));
-              return nb;
-            });
+            saveBest((b) => Math.max(b, scoreRef.current));
           }, 1000);
         }
       } else {

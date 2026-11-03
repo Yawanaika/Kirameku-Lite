@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-watermelon-best";
 const W = 320;
@@ -77,7 +78,7 @@ function resolveCollision(a: Fruit, b: Fruit) {
 export default function WatermelonGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const fruitsRef = useRef<Fruit[]>([]);
   const scoreRef = useRef(0);
@@ -90,8 +91,6 @@ export default function WatermelonGame() {
   const nextTypeRef = useRef(0);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
     dropType.current = Math.floor(Math.random() * 5);
     nextTypeRef.current = Math.floor(Math.random() * 5);
   }, []);
@@ -253,13 +252,9 @@ export default function WatermelonGame() {
     if (dangerFruits.length >= 2) {
       gameOverRef.current = true;
       setGameOver(true);
-      setBest((b) => {
-        const nb = Math.max(b, scoreRef.current);
-        localStorage.setItem(STORAGE_KEY, String(nb));
-        return nb;
-      });
+      saveBest((b) => Math.max(b, scoreRef.current));
     }
-  }, []);
+  }, [saveBest]);
 
   useEffect(() => {
     let lastTime = performance.now();

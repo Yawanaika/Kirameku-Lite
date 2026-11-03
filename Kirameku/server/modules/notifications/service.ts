@@ -26,7 +26,6 @@ import {
   type InternalNotifyInput,
   type LogListQuery,
   type LogView,
-  type NotificationLevel,
   type NotificationMessage,
   type NotificationsState,
   type NotifyResult,
@@ -117,13 +116,6 @@ function isFilled(config: ChannelConfig, key: string): boolean {
 
 function isConfigured(type: ChannelType, config: ChannelConfig): boolean {
   return requiredFields(type).every((key) => isFilled(config, key));
-}
-
-function levelOf(value: string | null): NotificationLevel {
-  if (value === "info" || value === "warning" || value === "critical") {
-    return value;
-  }
-  return "warning";
 }
 
 export function createNotificationsService(db: AppDatabase) {

@@ -44,14 +44,6 @@ const DIM_COLORS: Record<string, string> = {
   health: "text-green-500",
 };
 
-const DIM_BG: Record<string, string> = {
-  all: "bg-indigo-500",
-  love: "bg-pink-500",
-  work: "bg-sky-500",
-  money: "bg-amber-500",
-  health: "bg-green-500",
-};
-
 interface FortuneData {
   fortune: Record<string, number>;
   fortunetext: Record<string, string>;
@@ -85,22 +77,35 @@ export default function HoroscopeApp() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  /** 用户切换星座/时间：先进入 loading 并清空详情 */
+  const reload = useCallback((next: { sign?: string; time?: TimeType }) => {
     setLoading(true);
     setDetail(null);
-    try {
-      const res = await fetch(`${API}?type=${sign}&time=${time}`);
-      const json = await res.json();
-      if (json.code === 200 && json.data) {
-        setData(json.data);
+    if (next.sign) setSign(next.sign);
+    if (next.time) setTime(next.time);
+  }, []);
+
+  // 取运势：请求逻辑直接放在 effect 里，并用 cancelled 标记防止
+  // 星座/时间快速切换时旧请求覆盖新结果。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API}?type=${sign}&time=${time}`);
+        const json = await res.json();
+        if (!cancelled && json.code === 200 && json.data) {
+          setData(json.data);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [sign, time]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const currentSign = SIGNS.find((s) => s.id === sign);
 
   return (
     <div className="flex flex-col gap-2">
@@ -110,7 +115,7 @@ export default function HoroscopeApp() {
           <button
             key={s.id}
             type="button"
-            onClick={() => setSign(s.id)}
+            onClick={() => reload({ sign: s.id })}
             className={`shrink-0 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors ${
               sign === s.id
                 ? "bg-indigo-50 dark:bg-indigo-900/20"
@@ -129,7 +134,7 @@ export default function HoroscopeApp() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setTime(t.id)}
+            onClick={() => reload({ time: t.id })}
             className={`flex-1 text-[10px] font-bold py-1 rounded-md transition-colors ${
               time === t.id
                 ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"

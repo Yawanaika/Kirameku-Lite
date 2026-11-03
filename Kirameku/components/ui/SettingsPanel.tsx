@@ -7,7 +7,7 @@ import { useEffects } from "@/components/providers/EffectProvider";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 import { bypassImageOptimization } from "@/lib/image";
 
-export default function SettingsPanel({ onClose }: { onClose: () => void }) {
+export default function SettingsPanel({ onClose: _onClose }: { onClose: () => void }) {
   const { bgImage, bgBlur, setBgImage, setBgBlur } = useBackground();
   const { clickEffect, mouseTrail, seasonalEffect, sparkleEffect, toggleClickEffect, toggleMouseTrail, toggleSeasonalEffect, toggleSparkleEffect } = useEffects();
   const { appearance } = useSiteSettings();

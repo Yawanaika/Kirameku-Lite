@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-coin-catcher-best";
 const W = 360;
@@ -53,11 +54,11 @@ function randomItemType(score: number): ItemType {
 export default function CoinCatcherGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const [combo, setCombo] = useState(0);
+  const [, setCombo] = useState(0);
 
   const frameRef = useRef<number | null>(null);
   const basketX = useRef(W / 2 - BASKET_W / 2);
@@ -75,10 +76,6 @@ export default function CoinCatcherGame() {
   const starRef = useRef(0); // double points timer
   const timeRef = useRef(0);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const initGame = useCallback(() => {
     basketX.current = W / 2 - BASKET_W / 2;
@@ -100,7 +97,7 @@ export default function CoinCatcherGame() {
     setStarted(false);
   }, []);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  // 首次挂载无需 initGame：各 state 与 ref 的声明初值已等同于 initGame 的重置结果
 
   const spawnParticles = (x: number, y: number, color: string, count = 8) => {
     for (let i = 0; i < count; i++) {
@@ -283,11 +280,7 @@ export default function CoinCatcherGame() {
           if (livesRef.current <= 0) {
             gameOverRef.current = true;
             setGameOver(true);
-            setBest((b) => {
-              const nb = Math.max(b, scoreRef.current);
-              localStorage.setItem(STORAGE_KEY, String(nb));
-              return nb;
-            });
+            saveBest((b) => Math.max(b, scoreRef.current));
             return;
           }
         } else if (item.type === "star") {
@@ -333,7 +326,7 @@ export default function CoinCatcherGame() {
       pt.life -= dt;
       if (pt.life <= 0) particlesRef.current.splice(i, 1);
     }
-  }, []);
+  }, [saveBest]);
 
   useEffect(() => {
     draw();

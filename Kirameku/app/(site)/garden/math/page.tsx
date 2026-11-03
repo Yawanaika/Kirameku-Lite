@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
+import type { FunctionPlotDatum } from "function-plot";
 import { motion } from "framer-motion";
 
 const fadeIn = {
@@ -32,7 +33,6 @@ const PRESETS: Preset[] = [
 
 export default function MathPage() {
   const plotRef = useRef<HTMLDivElement>(null);
-  const fnPlotRef = useRef<any>(null);
   const [expr, setExpr] = useState("sin(x)");
   const [showDerivative, setShowDerivative] = useState(false);
   const [derivativeExpr, setDerivativeExpr] = useState("cos(x)");
@@ -48,7 +48,7 @@ export default function MathPage() {
     const width = plotRef.current.clientWidth - 40;
     const height = plotRef.current.clientHeight - 40;
 
-    const data: any[] = [
+    const data: FunctionPlotDatum[] = [
       { fn: expr, color: "#38bdf8", graphType: "polyline" },
     ];
 
@@ -62,12 +62,13 @@ export default function MathPage() {
         range: integralRange,
         closed: true,
         color: "rgba(56,189,248,0.15)",
-        graphType: "area",
+        // 积分面积：function-plot 没有 "area" 类型，靠 polyline + closed 填充到 x 轴
+        graphType: "polyline",
       });
     }
 
     try {
-      fnPlotRef.current = fnPlot({
+      fnPlot({
         target: plotRef.current,
         width,
         height,

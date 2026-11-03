@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-colorswitch-best";
 const W = 320;
@@ -23,6 +24,18 @@ interface ColorChanger {
   colorIdx: number;
 }
 
+/** 在模块级工厂里创建，避免被 React 编译器当成「hook 内创建、不可变」的值 */
+function makeWheel(atY: number): Wheel {
+  const speed = (0.5 + Math.random() * 1.5) * (Math.random() < 0.5 ? 1 : -1);
+  return {
+    y: atY,
+    r: 55 + Math.random() * 15,
+    rotation: Math.random() * Math.PI * 2,
+    speed,
+    passed: false,
+  };
+}
+
 interface Particle {
   x: number; y: number;
   vx: number; vy: number;
@@ -33,7 +46,7 @@ interface Particle {
 export default function ColorSwitchGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
 
@@ -50,20 +63,9 @@ export default function ColorSwitchGame() {
   const frameRef = useRef<number | null>(null);
   const nextSpawnY = useRef(0);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const spawnWheel = useCallback((atY: number) => {
-    const speed = (0.5 + Math.random() * 1.5) * (Math.random() < 0.5 ? 1 : -1);
-    wheelsRef.current.push({
-      y: atY,
-      r: 55 + Math.random() * 15,
-      rotation: Math.random() * Math.PI * 2,
-      speed,
-      passed: false,
-    });
+    wheelsRef.current.push(makeWheel(atY));
     if (Math.random() < 0.4) {
       changersRef.current.push({
         y: atY - 50,
@@ -218,9 +220,11 @@ export default function ColorSwitchGame() {
     const targetCam = Math.max(0, H * 0.5 - ballY.current);
     cameraY.current += (targetCam - cameraY.current) * 0.1;
 
-    for (const wheel of wheelsRef.current) {
-      wheel.rotation += wheel.speed * dt;
-    }
+    // 旋转用不可变更新（原地修改 ref 内对象会被 React 编译器判定为渲染后突变）
+    wheelsRef.current = wheelsRef.current.map((wheel) => ({
+      ...wheel,
+      rotation: wheel.rotation + wheel.speed * dt,
+    }));
 
     // Spawn wheels above
     const topEdge = ballY.current - H;
@@ -251,17 +255,15 @@ export default function ColorSwitchGame() {
           gameOverRef.current = true;
           setGameOver(true);
           spawnParticles(bx, by, COLORS[ballColor.current], 12);
-          setBest((b) => {
-            const nb = Math.max(b, scoreRef.current);
-            localStorage.setItem(STORAGE_KEY, String(nb));
-            return nb;
-          });
+          saveBest((b) => Math.max(b, scoreRef.current));
           return;
         }
       }
 
       if (!wheel.passed && by < wheel.y - wheel.r) {
-        wheel.passed = true;
+        wheelsRef.current = wheelsRef.current.map((item) =>
+          item === wheel ? { ...item, passed: true } : item,
+        );
         scoreRef.current++;
         setScore(scoreRef.current);
       }
@@ -280,11 +282,7 @@ export default function ColorSwitchGame() {
     if (ballY.current > H + 80) {
       gameOverRef.current = true;
       setGameOver(true);
-      setBest((b) => {
-        const nb = Math.max(b, scoreRef.current);
-        localStorage.setItem(STORAGE_KEY, String(nb));
-        return nb;
-      });
+      saveBest((b) => Math.max(b, scoreRef.current));
     }
 
     for (let i = particlesRef.current.length - 1; i >= 0; i--) {
@@ -295,7 +293,7 @@ export default function ColorSwitchGame() {
       pt.life -= dt;
       if (pt.life <= 0) particlesRef.current.splice(i, 1);
     }
-  }, [spawnWheel]);
+  }, [spawnWheel, saveBest]);
 
   // Game loop
   useEffect(() => {

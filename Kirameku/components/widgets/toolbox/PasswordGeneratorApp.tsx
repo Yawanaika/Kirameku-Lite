@@ -79,7 +79,7 @@ export default function PasswordGeneratorApp() {
       if (options.symbols) required.push(CHAR_SETS.symbols[Math.floor(Math.random() * CHAR_SETS.symbols.length)]);
 
       const arr2 = result.split("");
-      required.forEach((c, i) => {
+      required.forEach((c) => {
         const pos = Math.floor(Math.random() * arr2.length);
         arr2[pos] = c;
       });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import QRCode from "qrcode";
 
@@ -30,22 +30,30 @@ export default function QRCodePage() {
   const [margin, setMargin] = useState(true);
   const [error, setError] = useState("");
 
-  const generate = useCallback(async () => {
-    if (!canvasRef.current || !text.trim()) return;
-    setError("");
-    try {
-      await QRCode.toCanvas(canvasRef.current, text, {
-        width: size,
-        margin: margin ? 4 : 1,
-        color: { dark: fgColor, light: bgColor },
-        errorCorrectionLevel: ecLevel,
-      });
-    } catch (e: any) {
-      setError(e.message || "生成失败");
-    }
+  // 任一参数变化就重绘二维码；绘制逻辑放在 effect 内，错误状态随之更新
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !text.trim()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await QRCode.toCanvas(canvas, text, {
+          width: size,
+          margin: margin ? 4 : 1,
+          color: { dark: fgColor, light: bgColor },
+          errorCorrectionLevel: ecLevel,
+        });
+        if (!cancelled) setError("");
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error && e.message ? e.message : "生成失败");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [text, fgColor, bgColor, size, ecLevel, margin]);
-
-  useEffect(() => { generate(); }, [generate]);
 
   function downloadPNG() {
     if (!canvasRef.current) return;

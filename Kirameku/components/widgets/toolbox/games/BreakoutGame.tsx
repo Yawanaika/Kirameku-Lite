@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-breakout-best";
 const W = 360;
@@ -21,7 +22,7 @@ const BRICK_COLORS = ["#ef4444","#f97316","#eab308","#22c55e","#3b82f6","#8b5cf6
 export default function BreakoutGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [lives, setLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
@@ -39,10 +40,6 @@ export default function BreakoutGame() {
   const startedRef = useRef(false);
   const dragRef = useRef<{ offsetX: number } | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-  }, []);
 
   const createBricks = useCallback((lvl: number) => {
     const rows = Math.min(BRICK_ROWS + Math.floor(lvl / 3), 8);
@@ -71,7 +68,11 @@ export default function BreakoutGame() {
     resetBall();
   }, [createBricks, resetBall]);
 
-  useEffect(() => { initGame(); }, [initGame]);
+  // 首次挂载只需生成砖块与发球方向：此时各 state 已是初始值，不必再 setState
+  useEffect(() => {
+    bricksRef.current = createBricks(1);
+    resetBall();
+  }, [createBricks, resetBall]);
 
   const draw = useCallback(() => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -145,11 +146,7 @@ export default function BreakoutGame() {
       if (livesRef.current <= 0) {
         gameOverRef.current = true;
         setGameOver(true);
-        setBest((b) => {
-          const nb = Math.max(b, scoreRef.current);
-          localStorage.setItem(STORAGE_KEY, String(nb));
-          return nb;
-        });
+        saveBest((b) => Math.max(b, scoreRef.current));
         return;
       }
       resetBall();
@@ -216,7 +213,7 @@ export default function BreakoutGame() {
       ballRef.current.dx *= 1.1;
       ballRef.current.dy *= 1.1;
     }
-  }, [resetBall, createBricks]);
+  }, [resetBall, createBricks, saveBest]);
 
   useEffect(() => {
     draw();

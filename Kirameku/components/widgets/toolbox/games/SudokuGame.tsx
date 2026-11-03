@@ -65,7 +65,6 @@ function generatePuzzle(clues: number): { puzzle: number[][]; solution: number[]
   const toRemove = 81 - clues;
   for (const [r, c] of cells) {
     if (removed >= toRemove) break;
-    const backup = puzzle[r][c];
     puzzle[r][c] = 0;
     removed++;
   }

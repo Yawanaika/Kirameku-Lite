@@ -35,14 +35,16 @@ export default function ClockApp() {
     return () => { if (swRef.current) clearInterval(swRef.current); };
   }, [swRunning]);
 
-  // 倒计时逻辑
+  // 倒计时逻辑：归零时的停表放在 tick 回调里完成（不要在 effect 同步阶段 setState）
   useEffect(() => {
-    if (timerRunning && timerLeft > 0) {
-      timerRef.current = setInterval(() => setTimerLeft((p) => p - 1), 1000);
-    } else if (timerLeft === 0) {
-      setTimerRunning(false);
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    if (!timerRunning) return;
+    const id = window.setInterval(() => {
+      const next = Math.max(0, timerLeft - 1);
+      setTimerLeft(next);
+      if (next === 0) setTimerRunning(false);
+    }, 1000);
+    timerRef.current = id as unknown as NodeJS.Timeout;
+    return () => window.clearInterval(id);
   }, [timerRunning, timerLeft]);
 
   const formatSw = (ms: number) => {

@@ -12,10 +12,8 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
-import { postsData } from "@/data/posts";
-import { chattersData } from "@/data/chatters";
 import { getPosts, getPostsCount, type PostItem } from "@/lib/api/posts";
-import { getChatters, getChattersCount, type ChatterItem } from "@/lib/api/chatters";
+import { getChatters, getChattersCount } from "@/lib/api/chatters";
 import { getMessages } from "@/lib/api/messages";
 import { getAlbums } from "@/lib/api/albums";
 
@@ -70,10 +68,6 @@ const techStack = [
   { name: "PostgreSQL", color: "#336791", side: "后端" },
   { name: "Uvicorn", color: "#1e293b", side: "后端" },
 ];
-
-const recentPosts = [...postsData.slice(0, 3), ...chattersData.slice(0, 3)]
-  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  .slice(0, 6);
 
 /* ── animation ── */
 const container = {

@@ -114,7 +114,7 @@ export default function ColorPage() {
     ];
   }
 
-  const CopyBtn = ({ text, label }: { text: string; label: string }) => (
+  const copyButton = (text: string, label: string) => (
     <button onClick={() => copy(text, label)} className="text-[10px] text-slate-400 hover:text-sky-500 transition-colors">
       {copied === label ? "已复制!" : "复制"}
     </button>
@@ -161,19 +161,19 @@ export default function ColorPage() {
           <div className="bg-white/70 dark:bg-slate-800/50 backdrop-blur-md rounded-xl p-4 border border-slate-200/50 dark:border-white/5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400 font-mono">HEX</span>
-              <CopyBtn text={hex} label="hex" />
+              {copyButton(hex, "hex")}
             </div>
             <p className="text-sm font-mono text-slate-700 dark:text-slate-200">{hex}</p>
 
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400 font-mono">RGB</span>
-              <CopyBtn text={`rgb(${rgb.join(", ")})`} label="rgb" />
+              {copyButton(`rgb(${rgb.join(", ")})`, "rgb")}
             </div>
             <p className="text-sm font-mono text-slate-700 dark:text-slate-200">rgb({rgb.join(", ")})</p>
 
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400 font-mono">HSL</span>
-              <CopyBtn text={`hsl(${hsl[0]}, ${hsl[1]}%, ${hsl[2]}%)`} label="hsl" />
+              {copyButton(`hsl(${hsl[0]}, ${hsl[1]}%, ${hsl[2]}%)`, "hsl")}
             </div>
             <p className="text-sm font-mono text-slate-700 dark:text-slate-200">hsl({hsl[0]}, {hsl[1]}%, {hsl[2]}%)</p>
           </div>

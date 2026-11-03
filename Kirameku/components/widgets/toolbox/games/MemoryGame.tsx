@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -44,14 +44,16 @@ export default function MemoryGame() {
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
   const [started, setStarted] = useState(false);
-  const [won, setWon] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const timeRef = useRef(0);
   const lockRef = useRef(false);
   const [bests, setBests] = useState<Record<string, { moves: number; time: number }>>(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
   });
 
-  const { rows, cols } = CONFIG[difficulty];
+  const { cols } = CONFIG[difficulty];
+  // 通关状态直接由牌面推导，不再用一份 state + effect 同步（避免 effect 里 setState）
+  const won = cards.length > 0 && cards.every((c) => c.matched);
 
   const stopTimer = () => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -60,7 +62,10 @@ export default function MemoryGame() {
   const startTimer = () => {
     if (timerRef.current) return;
     setStarted(true);
-    timerRef.current = window.setInterval(() => setTime((t) => t + 1), 1000);
+    timerRef.current = window.setInterval(() => {
+      timeRef.current += 1;
+      setTime(timeRef.current);
+    }, 1000);
   };
 
   const saveBest = (m: number, t: number) => {
@@ -82,14 +87,11 @@ export default function MemoryGame() {
     setFlipped([]);
     setMoves(0);
     setTime(0);
+    timeRef.current = 0;
     setStarted(false);
-    setWon(false);
     stopTimer();
     lockRef.current = false;
   };
-
-  const flippedRef = useRef<number[]>([]);
-  flippedRef.current = flipped;
 
   const handleFlip = (id: number) => {
     if (lockRef.current || won) return;
@@ -101,7 +103,7 @@ export default function MemoryGame() {
     // Immediately flip the card visually
     setCards((prev) => prev.map((c) => c.id === id ? { ...c, flipped: true } : c));
 
-    const newFlipped = [...flippedRef.current, id];
+    const newFlipped = [...flipped, id];
     setFlipped(newFlipped);
 
     if (newFlipped.length === 2) {
@@ -115,12 +117,18 @@ export default function MemoryGame() {
       const isMatch = c1 && c1.emoji === c2.emoji;
 
       if (isMatch) {
+        // 这一对是最后两张未匹配的牌 → 通关，停表并记录成绩
+        const completesGame = cards.every((c) => c.matched || c.id === first || c.id === second);
         setTimeout(() => {
           setCards((prev) => prev.map((c) =>
             c.id === first || c.id === second ? { ...c, matched: true } : c
           ));
           setFlipped([]);
           lockRef.current = false;
+          if (completesGame) {
+            stopTimer();
+            saveBest(moves + 1, timeRef.current);
+          }
         }, 300);
       } else {
         setTimeout(() => {
@@ -133,15 +141,6 @@ export default function MemoryGame() {
       }
     }
   };
-
-  // Check win
-  useEffect(() => {
-    if (cards.length > 0 && cards.every((c) => c.matched)) {
-      setWon(true);
-      stopTimer();
-      saveBest(moves, time);
-    }
-  }, [cards, moves, time]);
 
   useEffect(() => {
     return () => stopTimer();

@@ -8,11 +8,6 @@ const fadeIn = {
   show: { opacity: 1, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 20 } },
 };
 
-const COLORS = [
-  "#38bdf8", "#818cf8", "#c084fc", "#f472b6",
-  "#fb923c", "#facc15", "#34d399", "#22d3ee",
-];
-
 export default function KaleidoscopePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [segments, setSegments] = useState(8);
@@ -24,7 +19,7 @@ export default function KaleidoscopePage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let raf = 0;
-    let mouse = { x: 0, y: 0, px: 0, py: 0, down: false };
+    const mouse = { x: 0, y: 0, px: 0, py: 0, down: false };
     let autoAngle = 0;
 
     function resize() {

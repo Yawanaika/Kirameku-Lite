@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+
+const subscribeNever = () => () => {};
+const canObserveOnClient = () => typeof IntersectionObserver !== "undefined";
+const canObserveOnServer = () => true;
 
 /**
  * Mount below-the-fold client widgets only when they approach the viewport.
@@ -17,15 +21,17 @@ export default function LazyMount({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  // 服务端与首次水合先按「支持 IntersectionObserver」渲染骨架，客户端拿到真实值后再决定，
+  // 这样既能给不支持的老浏览器直接出内容，又不会因为渲染期读取浏览器能力而产生水合不一致。
+  const canObserve = useSyncExternalStore(
+    subscribeNever,
+    canObserveOnClient,
+    canObserveOnServer,
+  );
 
   useEffect(() => {
     const element = ref.current;
-    if (!element) return;
-
-    if (typeof IntersectionObserver === "undefined") {
-      setMounted(true);
-      return;
-    }
+    if (!element || !canObserve) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -38,15 +44,15 @@ export default function LazyMount({
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [canObserve]);
 
   return (
     <div
       ref={ref}
       className={className}
-      style={mounted ? undefined : { minHeight }}
+      style={mounted || !canObserve ? undefined : { minHeight }}
     >
-      {mounted ? children : null}
+      {mounted || !canObserve ? children : null}
     </div>
   );
 }

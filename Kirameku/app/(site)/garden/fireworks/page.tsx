@@ -21,7 +21,7 @@ export default function FireworksPage() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     let raf = 0;
-    let particles: Particle[] = [];
+    const particles: Particle[] = [];
 
     function resize() {
       canvas!.width = canvas!.clientWidth * devicePixelRatio;

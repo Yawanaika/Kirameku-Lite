@@ -3,29 +3,41 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+/** 只做网络请求，返回文案（不在组件内持有 state，便于在 effect 中安全调用） */
+async function requestDiary(): Promise<string> {
+  try {
+    const res = await fetch("https://v2.xxapi.cn/api/dog");
+    const json = await res.json();
+    if (json.code === 200 && json.data) return json.data as string;
+  } catch {
+    /* fallthrough */
+  }
+  return "获取失败，点击刷新重试~";
+}
+
 export default function DogDiary() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
+  /** 手动换一条：带 loading 态 */
   const fetchDiary = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await fetch("https://v2.xxapi.cn/api/dog");
-      const json = await res.json();
-      if (json.code === 200 && json.data) {
-        setText(json.data);
-      }
-    } catch {
-      setText("获取失败，点击刷新重试~");
-    } finally {
-      setLoading(false);
-    }
+    const next = await requestDiary();
+    setText(next);
+    setLoading(false);
   }, []);
 
+  // 挂载时取一条；cancelled 防止卸载后 setState
   useEffect(() => {
-    fetchDiary();
-  }, [fetchDiary]);
+    let cancelled = false;
+    void requestDiary().then((next) => {
+      if (!cancelled) setText(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>

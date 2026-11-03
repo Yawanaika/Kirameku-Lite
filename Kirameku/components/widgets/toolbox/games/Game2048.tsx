@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const SIZE = 4;
 const STORAGE_KEY = "game-2048-best";
@@ -23,7 +24,7 @@ function addRandom(grid: number[][]): number[][] {
 
 // 向左滑动一行：去掉空位，相邻相同合并
 function slideRowLeft(row: number[]): { row: number[]; score: number } {
-  let arr = row.filter((v) => v !== 0);
+  const arr = row.filter((v) => v !== 0);
   let score = 0;
   for (let i = 0; i < arr.length - 1; i++) {
     if (arr[i] === arr[i + 1]) {
@@ -131,18 +132,14 @@ function getStyle(v: number) {
 }
 
 export default function Game2048() {
-  const [grid, setGrid] = useState<number[][]>(createEmpty);
+  // 初始棋盘直接种两个随机格：用惰性初始化替代「挂载后 effect 里 setGrid」
+  const [grid, setGrid] = useState<number[][]>(() => addRandom(addRandom(createEmpty())));
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY);
   const [gameOver, setGameOver] = useState(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) setBest(Number(saved));
-    const g = addRandom(addRandom(createEmpty()));
-    setGrid(g);
-  }, []);
+
 
   const doMove = useCallback((dir: "left" | "right" | "up" | "down") => {
     setGrid((prev) => {
@@ -157,17 +154,13 @@ export default function Game2048() {
       const added = addRandom(result.grid);
       setScore((s) => {
         const next = s + result.score;
-        setBest((b) => {
-          const newBest = Math.max(b, next);
-          localStorage.setItem(STORAGE_KEY, String(newBest));
-          return newBest;
-        });
+        saveBest((b) => Math.max(b, next));
         return next;
       });
       if (!canMove(added)) setGameOver(true);
       return added;
     });
-  }, []);
+  }, [saveBest]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

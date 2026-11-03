@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, ReactNode } from "react";
+import { useStoredBoolean } from "@/lib/client-storage";
 
 interface EffectContextType {
   clickEffect: boolean;
@@ -25,50 +26,17 @@ const EffectContext = createContext<EffectContextType>({
 });
 
 export function EffectProvider({ children }: { children: ReactNode }) {
-  const [clickEffect, setClickEffect] = useState(true);
-  const [mouseTrail, setMouseTrail] = useState(false);
-  const [seasonalEffect, setSeasonalEffect] = useState(false);
-  const [sparkleEffect, setSparkleEffect] = useState(false);
+  // 开关状态直接存在 localStorage 里，useStoredBoolean 负责读取与跨标签页同步，
+  // 不需要先渲染默认值再在 effect 里纠正。
+  const [clickEffect, setClickEffect] = useStoredBoolean("clickEffect", true);
+  const [mouseTrail, setMouseTrail] = useStoredBoolean("mouseTrail");
+  const [seasonalEffect, setSeasonalEffect] = useStoredBoolean("seasonalEffect");
+  const [sparkleEffect, setSparkleEffect] = useStoredBoolean("sparkleEffect");
 
-  // 从 localStorage 恢复状态
-  useEffect(() => {
-    const savedClick = localStorage.getItem("clickEffect");
-    const savedTrail = localStorage.getItem("mouseTrail");
-    const savedSeasonal = localStorage.getItem("seasonalEffect");
-    const savedSparkle = localStorage.getItem("sparkleEffect");
-    if (savedClick !== null) setClickEffect(savedClick === "true");
-    if (savedTrail !== null) setMouseTrail(savedTrail === "true");
-    if (savedSeasonal !== null) setSeasonalEffect(savedSeasonal === "true");
-    if (savedSparkle !== null) setSparkleEffect(savedSparkle === "true");
-  }, []);
-
-  const toggleClickEffect = () => {
-    setClickEffect((prev) => {
-      localStorage.setItem("clickEffect", String(!prev));
-      return !prev;
-    });
-  };
-
-  const toggleMouseTrail = () => {
-    setMouseTrail((prev) => {
-      localStorage.setItem("mouseTrail", String(!prev));
-      return !prev;
-    });
-  };
-
-  const toggleSeasonalEffect = () => {
-    setSeasonalEffect((prev) => {
-      localStorage.setItem("seasonalEffect", String(!prev));
-      return !prev;
-    });
-  };
-
-  const toggleSparkleEffect = () => {
-    setSparkleEffect((prev) => {
-      localStorage.setItem("sparkleEffect", String(!prev));
-      return !prev;
-    });
-  };
+  const toggleClickEffect = () => setClickEffect((prev) => !prev);
+  const toggleMouseTrail = () => setMouseTrail((prev) => !prev);
+  const toggleSeasonalEffect = () => setSeasonalEffect((prev) => !prev);
+  const toggleSparkleEffect = () => setSparkleEffect((prev) => !prev);
 
   return (
     <EffectContext.Provider value={{ clickEffect, mouseTrail, seasonalEffect, sparkleEffect, toggleClickEffect, toggleMouseTrail, toggleSeasonalEffect, toggleSparkleEffect }}>

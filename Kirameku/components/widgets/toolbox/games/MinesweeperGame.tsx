@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -76,7 +76,7 @@ export default function MinesweeperGame() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; }
   });
 
-  const { rows, cols, mines, label } = CONFIG[difficulty];
+  const { rows, cols, mines } = CONFIG[difficulty];
 
   const startTimer = () => {
     if (timerRef.current) return;

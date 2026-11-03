@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 
 interface UnitDef {
   name: string;
@@ -168,35 +168,32 @@ export default function UnitConverterApp() {
   const cat = categories.find((c) => c.id === catId) || categories[0];
   const unitKeys = Object.keys(cat.units);
 
-  // 初始化默认单位
-  useMemo(() => {
-    if (!fromUnit || !cat.units[fromUnit]) {
-      setFromUnit(unitKeys[0] || "");
-    }
-    if (!toUnit || !cat.units[toUnit]) {
-      setToUnit(unitKeys[1] || unitKeys[0] || "");
-    }
-  }, [catId]); // eslint-disable-line
+  // 选中单位可能不属于当前分类（切换分类后），这里派生出一个合法值，
+  // 而不是用 effect / useMemo 去 setState 修正（那会导致级联或无限渲染）。
+  const from = fromUnit && cat.units[fromUnit] ? fromUnit : (unitKeys[0] ?? "");
+  const to =
+    toUnit && cat.units[toUnit] ? toUnit : (unitKeys[1] ?? unitKeys[0] ?? "");
 
-  const result = useMemo(() => {
+  // 交给 React Compiler 自动记忆化，比手写 useMemo 更不容易失配
+  const result = (() => {
     const val = parseFloat(inputValue);
-    if (isNaN(val) || !fromUnit || !toUnit) return "";
+    if (isNaN(val) || !from || !to) return "";
 
     if (catId === "temp") {
-      return formatNumber(convertTemp(val, fromUnit, toUnit));
+      return formatNumber(convertTemp(val, from, to));
     }
 
-    const from = cat.units[fromUnit];
-    const to = cat.units[toUnit];
-    if (!from || !to) return "";
+    const fromDef = cat.units[from];
+    const toDef = cat.units[to];
+    if (!fromDef || !toDef) return "";
 
-    const baseVal = val * from.toBase;
-    return formatNumber(baseVal / to.toBase);
-  }, [inputValue, fromUnit, toUnit, catId, cat]);
+    const baseVal = val * fromDef.toBase;
+    return formatNumber(baseVal / toDef.toBase);
+  })();
 
   const swap = () => {
-    setFromUnit(toUnit);
-    setToUnit(fromUnit);
+    setFromUnit(to);
+    setToUnit(from);
     if (result) setInputValue(result);
   };
 
@@ -233,7 +230,7 @@ export default function UnitConverterApp() {
             className="flex-1 text-lg font-black bg-transparent text-slate-900 dark:text-white outline-none min-w-0"
           />
           <select
-            value={fromUnit}
+            value={from}
             onChange={(e) => setFromUnit(e.target.value)}
             title="来源单位"
             className="text-xs px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none shrink-0"
@@ -263,7 +260,7 @@ export default function UnitConverterApp() {
             {result || "—"}
           </div>
           <select
-            value={toUnit}
+            value={to}
             onChange={(e) => setToUnit(e.target.value)}
             title="目标单位"
             className="text-xs px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none shrink-0"
@@ -278,19 +275,22 @@ export default function UnitConverterApp() {
       {/* 快捷换算列表 */}
       <div className="flex-1 overflow-auto">
         <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">
-          {inputValue || "0"} {cat.units[fromUnit]?.name || ""} 等于
+          {inputValue || "0"} {cat.units[from]?.name || ""} 等于
         </div>
-        {unitKeys.filter((k) => k !== fromUnit).map((k) => {
+        {unitKeys.filter((k) => k !== from).map((k) => {
           let val: string;
           const numVal = parseFloat(inputValue);
           if (isNaN(numVal)) {
             val = "—";
           } else if (catId === "temp") {
-            val = formatNumber(convertTemp(numVal, fromUnit, k));
+            val = formatNumber(convertTemp(numVal, from, k));
           } else {
-            const from = cat.units[fromUnit];
-            const to = cat.units[k];
-            val = from && to ? formatNumber((numVal * from.toBase) / to.toBase) : "—";
+            const fromDef = cat.units[from];
+            const toDef = cat.units[k];
+            val =
+              fromDef && toDef
+                ? formatNumber((numVal * fromDef.toBase) / toDef.toBase)
+                : "—";
           }
           return (
             <div

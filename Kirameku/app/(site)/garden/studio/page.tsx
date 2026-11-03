@@ -357,6 +357,19 @@ const catIcons: Record<string, React.ElementType> = {
 };
 
 // ========== Component ==========
+/** 属性面板展示的家具快照（数值都已格式化为字符串） */
+interface SelectedFurniture {
+  name: string;
+  type: string;
+  color: string;
+  materialType: string;
+  palette: string;
+  posX: string;
+  posZ: string;
+  rotY: string;
+  scale: string;
+}
+
 export default function StudioPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -380,7 +393,14 @@ export default function StudioPage() {
 
   // UI state
   const [mode, setMode] = useState<"translate" | "rotate">("translate");
-  const [selectedData, setSelectedData] = useState<any>(null);
+  // 当前操作模式的 ref 镜像：给每帧/键盘回调读取，避免闭包拿到旧值。
+  // 在切换入口同步写入（而不是用 effect 同步），避免「渲染后修改 ref」。
+  const modeRef = useRef<"translate" | "rotate">("translate");
+  const changeMode = useCallback((next: "translate" | "rotate") => {
+    modeRef.current = next;
+    setMode(next);
+  }, []);
+  const [selectedData, setSelectedData] = useState<SelectedFurniture | null>(null);
   const [furnitureCount, setFurnitureCount] = useState(0);
   const [openCats, setOpenCats] = useState<Record<number, boolean>>({ 0: true });
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
@@ -801,8 +821,8 @@ export default function StudioPage() {
       switch (e.key) {
         case "Delete": case "Backspace": deleteSelected(); break;
         case "Escape": deselectFurniture(); break;
-        case "w": case "W": setMode("translate"); break;
-        case "e": case "E": setMode("rotate"); break;
+        case "w": case "W": changeMode("translate"); break;
+        case "e": case "E": changeMode("rotate"); break;
         case "d": case "D":
           if (e.ctrlKey || e.metaKey) { e.preventDefault(); duplicateSelected(); }
           break;
@@ -856,10 +876,6 @@ export default function StudioPage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep mode ref in sync
-  const modeRef = useRef(mode);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-
   // ========== Render ==========
   const selPalette = selectedData ? (colorPalettes[selectedData.palette] || colorPalettes.decor) : [];
   const selMaterials = selectedData
@@ -880,7 +896,7 @@ export default function StudioPage() {
             { m: "translate" as const, icon: Move, tip: "移动 (W)" },
             { m: "rotate" as const, icon: RotateCw, tip: "旋转 (E)" },
           ].map(btn => (
-            <button key={btn.m} title={btn.tip} onClick={() => setMode(btn.m)}
+            <button key={btn.m} title={btn.tip} onClick={() => changeMode(btn.m)}
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${mode === btn.m ? "bg-amber-600 text-white" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300"}`}>
               <btn.icon className="w-3.5 h-3.5" />
             </button>

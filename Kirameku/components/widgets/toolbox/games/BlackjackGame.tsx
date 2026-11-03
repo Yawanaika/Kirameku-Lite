@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useStoredNumber } from "@/lib/client-storage";
 
 const STORAGE_KEY = "game-blackjack-best";
 
@@ -47,18 +48,6 @@ function handValue(hand: Card[]): number {
   return total;
 }
 
-function isSoft(hand: Card[]): boolean {
-  let total = 0;
-  let aces = 0;
-  for (const c of hand) {
-    if (c.hidden) continue;
-    total += cardValue(c);
-    if (c.rank === "A") aces++;
-  }
-  while (total > 21 && aces > 0) { total -= 10; aces--; }
-  return aces > 0 && total <= 21;
-}
-
 const SUIT_COLORS: Record<Suit, string> = {
   "♠": "text-slate-800 dark:text-white",
   "♣": "text-slate-800 dark:text-white",
@@ -69,25 +58,14 @@ const SUIT_COLORS: Record<Suit, string> = {
 type GameState = "betting" | "playing" | "dealer" | "done";
 
 export default function BlackjackGame() {
-  const [deck, setDeck] = useState<Card[]>(createDeck);
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [chips, setChips] = useState(1000);
   const [bet, setBet] = useState(100);
-  const [best, setBest] = useState(() => {
-    try { return Number(localStorage.getItem(STORAGE_KEY)) || 1000; } catch { return 1000; }
-  });
+  const [best, saveBest] = useStoredNumber(STORAGE_KEY, 1000);
   const [state, setState] = useState<GameState>("betting");
   const [message, setMessage] = useState("");
   const [deckRef, setDeckRef] = useState<Card[]>(createDeck);
-
-  const saveBest = useCallback((c: number) => {
-    setBest((b) => {
-      const nb = Math.max(b, c);
-      localStorage.setItem(STORAGE_KEY, String(nb));
-      return nb;
-    });
-  }, []);
 
   const drawCard = useCallback((d: Card[], hidden = false): { card: Card; remaining: Card[] } => {
     if (d.length < 10) d = [...d, ...createDeck()];

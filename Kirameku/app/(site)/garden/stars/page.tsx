@@ -50,7 +50,6 @@ function makePlanetTexture(colors: string[], size = 256): THREE.CanvasTexture {
   for (let y = 0; y < canvas.height; y++) {
     const bandColor = colors[Math.floor((y / canvas.height) * colors.length) % colors.length];
     ctx.fillStyle = bandColor;
-    const noise = Math.sin(y * 0.1) * 10 + Math.sin(y * 0.3) * 5;
     ctx.fillRect(0, y, canvas.width, 1);
     // add random spots
     for (let i = 0; i < 3; i++) {
@@ -114,7 +113,7 @@ function makeSunTexture(): THREE.CanvasTexture {
 
 function Sun() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const tex = useMemo(makeSunTexture, []);
+  const tex = useMemo(() => makeSunTexture(), []);
   useFrame((_, delta) => { if (meshRef.current) meshRef.current.rotation.y += delta * 0.1; });
 
   return (
@@ -139,10 +138,12 @@ function Sun() {
 function Planet({ data, onClick }: { data: PlanetData; onClick: (pos: THREE.Vector3) => void }) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
-  const angleRef = useRef(Math.random() * Math.PI * 2);
+  // 随机相位只在首帧生成（渲染期调用 Math.random 会破坏渲染幂等性）
+  const angleRef = useRef<number | null>(null);
   const tex = useMemo(() => makePlanetTexture(data.colors), [data.colors]);
 
   useFrame((_, delta) => {
+    if (angleRef.current === null) angleRef.current = Math.random() * Math.PI * 2;
     angleRef.current += delta * data.speed * 0.15;
     if (groupRef.current) {
       groupRef.current.position.x = Math.cos(angleRef.current) * data.distance;
@@ -182,7 +183,7 @@ function Planet({ data, onClick }: { data: PlanetData; onClick: (pos: THREE.Vect
 }
 
 function FlyCamera({ target, onArrived }: { target: THREE.Vector3 | null; onArrived: () => void }) {
-  const { camera, controls } = useThree();
+  const { camera } = useThree();
   const flyDest = useRef<THREE.Vector3 | null>(null);
   const startPos = useRef(new THREE.Vector3());
   const progress = useRef(1);
@@ -196,8 +197,6 @@ function FlyCamera({ target, onArrived }: { target: THREE.Vector3 | null; onArri
       const dist = target.length();
       flyDest.current = new THREE.Vector3(target.x * 0.5, dist * 0.25 + 2, target.z * 0.5 + dist * 0.3);
       progress.current = 0;
-      const ctrl = controls as any;
-      if (ctrl) ctrl.enabled = false;
     }
     if (progress.current >= 1 || !flyDest.current) return;
     progress.current = Math.min(1, progress.current + delta * 0.6);
@@ -205,8 +204,6 @@ function FlyCamera({ target, onArrived }: { target: THREE.Vector3 | null; onArri
     camera.position.lerpVectors(startPos.current, flyDest.current, t);
     camera.lookAt(0, 0, 0);
     if (progress.current >= 1) {
-      const ctrl = controls as any;
-      if (ctrl) ctrl.enabled = true;
       onArrived();
     }
   });
@@ -225,7 +222,8 @@ function Scene({ onSelect }: { onSelect: (p: PlanetData | null) => void }) {
         <Planet key={p.name} data={p} onClick={(pos) => { onSelect(p); setFlyTarget(pos); }} />
       ))}
       <FlyCamera target={flyTarget} onArrived={() => setFlyTarget(null)} />
-      <OrbitControls enablePan={false} minDistance={5} maxDistance={120} enableDamping dampingFactor={0.05} rotateSpeed={0.5} zoomSpeed={0.8} />
+      {/* 飞行动画期间禁用交互，避免和相机 lerp 打架（声明式，避免直接改 controls 对象） */}
+      <OrbitControls enabled={flyTarget === null} enablePan={false} minDistance={5} maxDistance={120} enableDamping dampingFactor={0.05} rotateSpeed={0.5} zoomSpeed={0.8} />
     </>
   );
 }

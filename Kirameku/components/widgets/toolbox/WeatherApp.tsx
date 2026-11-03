@@ -258,7 +258,7 @@ const STORAGE_KEY = "weather-city";
 
 export default function WeatherApp() {
   const savedCity = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-  const [city, setCity] = useState("");
+  const [, setCity] = useState("");
   const [inputCity, setInputCity] = useState(savedCity || "");
   const [data, setData] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(false);

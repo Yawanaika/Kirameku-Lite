@@ -33,8 +33,8 @@ export default function ProgrammerHistoryApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // loading 初值即 true，这里不再同步 setState（effect 里同步 setState 会引发级联渲染）
   useEffect(() => {
-    setLoading(true);
     fetch("/api/uapis?path=history/programmer/today")
       .then((res) => res.json().then((d) => ({ ok: res.ok, data: d })))
       .then(({ ok, data }) => {
