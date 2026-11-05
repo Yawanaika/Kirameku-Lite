@@ -2,6 +2,7 @@ import { getSqlite } from "@/server/db/client";
 import { getMetrics } from "@/server/http/metrics";
 import type { NotificationLevel } from "./contracts";
 import type { NotificationsService, RuleRuntimeState } from "./service";
+import { describeError } from "./transport";
 
 /** One evaluated alert, whether or not it crossed the threshold. */
 export interface CheckOutcome {
@@ -41,6 +42,17 @@ let baseline: CounterBaseline | null = null;
 function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+/**
+ * 取不到规则行时的兜底：全部按默认值评估，不做任何阈值判断。
+ * 注意这里不能按事件区分——默认值对所有事件都是同一个。
+ */
+const FALLBACK_RULE_STATE: RuleRuntimeState = {
+  enabled: true,
+  channels: [],
+  thresholds: {},
+  cooldownSeconds: 0,
+};
 
 function gb(bytes: number | null | undefined): string {
   if (typeof bytes !== "number") return "未知";
@@ -314,7 +326,7 @@ function checkSiteHealth(): CheckOutcome {
       };
     }
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     return {
       ...base,
       triggered: true,
@@ -343,8 +355,7 @@ function checkContentPending(state: RuleRuntimeState): CheckOutcome {
   try {
     counts = pendingContent();
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    return { ...base, detail: `统计失败：${reason.slice(0, 80)}` };
+    return { ...base, detail: `统计失败：${describeError(error).slice(0, 80)}` };
   }
 
   if (counts.total < minCount) {
@@ -373,13 +384,6 @@ export async function runNotificationChecks(
   const outcomes: CheckOutcome[] = [];
   const errors: string[] = [];
 
-  const fallback = (_eventKey: string): RuleRuntimeState => ({
-    enabled: true,
-    channels: [],
-    thresholds: {},
-    cooldownSeconds: 0,
-  });
-
   const [errorState, notFoundState, busyState, backupState, diskState, pendingState] =
     await Promise.all([
       service.getRuleState("http.error_rate"),
@@ -393,27 +397,28 @@ export async function runNotificationChecks(
   const metrics = getMetrics();
   const previous = baseline;
 
-  const guarded = (eventKey: string, run: () => CheckOutcome): void => {
+  /** 跑一个检查；抛错就记进 errors 而不是中断整轮。可以一次返回多个结果。 */
+  const guarded = (
+    label: string,
+    run: () => CheckOutcome | CheckOutcome[],
+  ): void => {
     try {
-      outcomes.push(run());
+      const result = run();
+      outcomes.push(...(Array.isArray(result) ? result : [result]));
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      errors.push(`${eventKey}: ${reason}`);
+      errors.push(`${label}: ${describeError(error)}`);
     }
   };
 
-  try {
+  guarded("http checks", () => {
     const pair = checkHttpRates(
-      errorState ?? fallback("http.error_rate"),
-      notFoundState ?? fallback("http.not_found_burst"),
+      errorState ?? FALLBACK_RULE_STATE,
+      notFoundState ?? FALLBACK_RULE_STATE,
       metrics,
       previous,
     );
-    outcomes.push(pair.error, pair.notFound);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    errors.push(`http checks: ${reason}`);
-  }
+    return [pair.error, pair.notFound];
+  });
 
   baseline = {
     at: Date.now(),
@@ -423,7 +428,9 @@ export async function runNotificationChecks(
     busy: metrics.sqlite_busy_total,
   };
 
-  if (backupState) guarded("backup.stale", () => checkBackupStale(backupState));
+  if (backupState) {
+    guarded("backup.stale", () => checkBackupStale(backupState));
+  }
   if (diskState) guarded("disk.low", () => checkDiskLow(diskState));
   if (busyState) guarded("db.busy", () => checkDbBusy(busyState, metrics, previous));
   guarded("site.health", () => checkSiteHealth());
@@ -445,8 +452,7 @@ export async function runNotificationChecks(
         force: false,
       });
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      errors.push(`${outcome.eventKey} notify: ${reason}`);
+      errors.push(`${outcome.eventKey} notify: ${describeError(error)}`);
     }
   }
 

@@ -38,7 +38,7 @@ import { openSecret, sealSecret } from "./secrets";
 import { sendTelegram } from "./channels/telegram";
 import { sendEmail } from "./channels/email";
 import { sendWebhook } from "./channels/webhook";
-import { DeliveryError, sleep } from "./transport";
+import { DeliveryError, describeError, sleep } from "./transport";
 
 const CHANNEL_SENDERS: Record<
   ChannelType,
@@ -118,6 +118,38 @@ function isConfigured(type: ChannelType, config: ChannelConfig): boolean {
   return requiredFields(type).every((key) => isFilled(config, key));
 }
 
+/**
+ * 存储里的密钥是密封的，只有真正往外发的时候才解开。
+ * 投递和试发都要明文，视图层则用 SECRET_MASK 顶替，所以这段不能并到 toChannelView。
+ */
+function openChannelConfig(
+  type: ChannelType,
+  stored: ChannelConfig,
+): ChannelConfig {
+  const secrets = new Set(secretFields(type));
+  const config: ChannelConfig = {};
+  for (const [key, value] of Object.entries(stored)) {
+    config[key] = secrets.has(key) ? openSecret(String(value)) : value;
+  }
+  return config;
+}
+
+/**
+ * openChannelConfig 的镜像：把密钥换成掩码再回给前端。
+ * 已填写的密钥一律显示 SECRET_MASK，空值保持空串，前端据此判断「有没有存过」。
+ */
+function maskChannelConfig(
+  type: ChannelType,
+  stored: ChannelConfig,
+): ChannelConfig {
+  const secrets = new Set(secretFields(type));
+  const config: ChannelConfig = {};
+  for (const [key, value] of Object.entries(stored)) {
+    config[key] = secrets.has(key) ? (value ? SECRET_MASK : "") : value;
+  }
+  return config;
+}
+
 export function createNotificationsService(db: AppDatabase) {
   /** Insert the default channel / rule rows once; safe to call concurrently. */
   async function ensureDefaults(): Promise<void> {
@@ -149,16 +181,6 @@ export function createNotificationsService(db: AppDatabase) {
   ): ChannelView {
     const spec = CHANNEL_SPECS[type];
     const stored = parseConfig(row?.config ?? null);
-    const secrets = new Set(secretFields(type));
-
-    const config: ChannelConfig = {};
-    for (const [key, value] of Object.entries(stored)) {
-      config[key] = secrets.has(key)
-        ? value
-          ? SECRET_MASK
-          : ""
-        : value;
-    }
 
     return {
       type,
@@ -166,7 +188,7 @@ export function createNotificationsService(db: AppDatabase) {
       description: spec.description,
       enabled: row?.enabled === true,
       configured: isConfigured(type, stored),
-      config,
+      config: maskChannelConfig(type, stored),
       fields: spec.fields,
       updated_at: iso(row?.updatedAt),
     };
@@ -263,8 +285,7 @@ export function createNotificationsService(db: AppDatabase) {
       return { ok: true, durationMs: Date.now() - startedAt };
     } catch (error) {
       const retryable = error instanceof DeliveryError && error.retryable;
-      let lastError =
-        error instanceof Error ? error.message : String(error);
+      let lastError = describeError(error);
 
       if (retryable) {
         for (let attempt = 2; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -273,10 +294,7 @@ export function createNotificationsService(db: AppDatabase) {
             await CHANNEL_SENDERS[type](config, message);
             return { ok: true, durationMs: Date.now() - startedAt };
           } catch (retryError) {
-            lastError =
-              retryError instanceof Error
-                ? retryError.message
-                : String(retryError);
+            lastError = describeError(retryError);
             if (!(retryError instanceof DeliveryError && retryError.retryable)) {
               break;
             }
@@ -317,34 +335,42 @@ export function createNotificationsService(db: AppDatabase) {
       const stored = parseConfig(row.config);
       if (!isConfigured(type, stored)) continue;
 
-      const config: ChannelConfig = {};
-      for (const [key, value] of Object.entries(stored)) {
-        config[key] = secretFields(type).includes(key)
-          ? openSecret(String(value))
-          : value;
-      }
-
-      const result = await sendOnce(type, config, message);
-      outcomes.push({
-        channel: type,
-        ok: result.ok,
-        error: result.error,
-        duration_ms: result.durationMs,
-      });
-
-      await writeLog({
-        eventKey: message.eventKey,
-        level: message.level,
-        title: message.title,
-        body: message.body,
-        channelType: type,
-        status: result.ok ? "success" : "failed",
-        error: result.error,
-        durationMs: result.durationMs,
-      });
+      const result = await sendOnce(
+        type,
+        openChannelConfig(type, stored),
+        message,
+      );
+      outcomes.push(await recordDelivery(type, message, result));
     }
 
     return outcomes;
+  }
+
+  /**
+   * 一次投递结束后同时做两件事：落一条日志、转成对外形状。
+   * 真实投递和后台「试发」都用它，免得两处日志字段各写一遍又写歪。
+   */
+  async function recordDelivery(
+    type: ChannelType,
+    message: NotificationMessage,
+    result: { ok: boolean; error?: string; durationMs: number },
+  ): Promise<DeliveryOutcome> {
+    await writeLog({
+      eventKey: message.eventKey,
+      level: message.level,
+      title: message.title,
+      body: message.body,
+      channelType: type,
+      status: result.ok ? "success" : "failed",
+      error: result.error,
+      durationMs: result.durationMs,
+    });
+    return {
+      channel: type,
+      ok: result.ok,
+      error: result.error,
+      duration_ms: result.durationMs,
+    };
   }
 
   async function loadRule(eventKey: string) {
@@ -354,6 +380,36 @@ export function createNotificationsService(db: AppDatabase) {
       .where(eq(notificationRule.eventKey, eventKey))
       .limit(1);
     return row;
+  }
+
+  /**
+   * 「这一轮不发」的统一出口：可选地留一条 skipped 日志，然后返回同形状的结果。
+   * 关闭事件、没有渠道、冷却中三种情况都走这里，避免每个分支各写一份日志参数。
+   */
+  async function skipNotify(
+    input: InternalNotifyInput,
+    skipped: NonNullable<NotifyResult["skipped"]>,
+    reason: string,
+    recordSkip: boolean,
+  ): Promise<NotifyResult> {
+    if (recordSkip) {
+      await writeLog({
+        eventKey: input.eventKey,
+        level: input.level,
+        title: input.title,
+        body: input.body,
+        channelType: "",
+        status: "skipped",
+        error: reason,
+      });
+    }
+    return {
+      eventKey: input.eventKey,
+      sent: false,
+      skipped,
+      reason,
+      outcomes: [],
+    };
   }
 
   return {
@@ -534,24 +590,12 @@ export function createNotificationsService(db: AppDatabase) {
         rule?.cooldownSeconds ?? spec?.cooldownSeconds ?? 0;
 
       if (rule && rule.enabled !== true) {
-        if (options.recordSkip) {
-          await writeLog({
-            eventKey: input.eventKey,
-            level: input.level,
-            title: input.title,
-            body: input.body,
-            channelType: "",
-            status: "skipped",
-            error: "该预警事件已关闭",
-          });
-        }
-        return {
-          eventKey: input.eventKey,
-          sent: false,
-          skipped: "rule-disabled",
-          reason: "该预警事件已关闭",
-          outcomes: [],
-        };
+        return skipNotify(
+          input,
+          "rule-disabled",
+          "该预警事件已关闭",
+          options.recordSkip === true,
+        );
       }
 
       const targets =
@@ -560,24 +604,12 @@ export function createNotificationsService(db: AppDatabase) {
           : parseChannelList(rule?.channels ?? null);
 
       if (targets.length === 0) {
-        if (options.recordSkip) {
-          await writeLog({
-            eventKey: input.eventKey,
-            level: input.level,
-            title: input.title,
-            body: input.body,
-            channelType: "",
-            status: "skipped",
-            error: "没有为该事件选择推送渠道",
-          });
-        }
-        return {
-          eventKey: input.eventKey,
-          sent: false,
-          skipped: "no-channel",
-          reason: "没有为该事件选择推送渠道",
-          outcomes: [],
-        };
+        return skipNotify(
+          input,
+          "no-channel",
+          "没有为该事件选择推送渠道",
+          options.recordSkip === true,
+        );
       }
 
       if (!input.force && rule?.lastFiredAt && cooldownSeconds > 0) {
@@ -586,13 +618,13 @@ export function createNotificationsService(db: AppDatabase) {
           const remaining = Math.ceil(
             (cooldownSeconds * 1000 - elapsedMs) / 1000,
           );
-          return {
-            eventKey: input.eventKey,
-            sent: false,
-            skipped: "cooldown",
-            reason: `冷却中，还需等待 ${remaining} 秒`,
-            outcomes: [],
-          };
+          // 冷却中不写日志：这是正常节流，不是需要留痕的异常。
+          return skipNotify(
+            input,
+            "cooldown",
+            `冷却中，还需等待 ${remaining} 秒`,
+            false,
+          );
         }
       }
 
@@ -642,13 +674,6 @@ export function createNotificationsService(db: AppDatabase) {
         throw errors.badRequest("通道配置不完整，请先填写必填项");
       }
 
-      const config: ChannelConfig = {};
-      for (const [key, value] of Object.entries(stored)) {
-        config[key] = secretFields(type).includes(key)
-          ? openSecret(String(value))
-          : value;
-      }
-
       const message: NotificationMessage = {
         eventKey: "channel.test",
         level: "info",
@@ -658,24 +683,12 @@ export function createNotificationsService(db: AppDatabase) {
         timestamp: new Date().toISOString(),
       };
 
-      const result = await sendOnce(type, config, message);
-      await writeLog({
-        eventKey: message.eventKey,
-        level: message.level,
-        title: message.title,
-        body: message.body,
-        channelType: type,
-        status: result.ok ? "success" : "failed",
-        error: result.error,
-        durationMs: result.durationMs,
-      });
-
-      return {
-        channel: type,
-        ok: result.ok,
-        error: result.error,
-        duration_ms: result.durationMs,
-      };
+      const result = await sendOnce(
+        type,
+        openChannelConfig(type, stored),
+        message,
+      );
+      return recordDelivery(type, message, result);
     },
 
     async listLogs(query: LogListQuery): Promise<{

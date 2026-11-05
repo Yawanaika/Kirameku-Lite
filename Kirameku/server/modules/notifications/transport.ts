@@ -20,6 +20,11 @@ export class DeliveryError extends Error {
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
+/** `unknown` 异常统一转成一行可读文字，日志与告警文案都用它。 */
+export function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function requestWithTimeout(
   url: string,
   init: RequestInit = {},
@@ -32,8 +37,9 @@ export async function requestWithTimeout(
       cache: "no-store",
     });
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new DeliveryError(`请求 ${url} 失败：${reason}`, { retryable: true });
+    throw new DeliveryError(`请求 ${url} 失败：${describeError(error)}`, {
+      retryable: true,
+    });
   }
 }
 

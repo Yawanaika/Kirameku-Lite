@@ -4,6 +4,7 @@ import { formatEmail } from "../format";
 import {
   DeliveryError,
   booleanValue,
+  describeError,
   numberValue,
   stringValue,
 } from "../transport";
@@ -48,7 +49,7 @@ export async function sendEmail(
     await transporter.sendMail({ from, to: to.join(", "), subject, text, html });
   } catch (error) {
     const code = (error as { code?: string }).code ?? "";
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     // SMTP 4xx is transient, authentication/recipient errors are not.
     const retryable =
       code === "ETIMEDOUT" ||

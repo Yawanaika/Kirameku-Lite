@@ -2,6 +2,7 @@ import "server-only";
 import { env } from "@/server/env";
 import { runNotificationChecks, type CheckReport } from "./checks";
 import { getNotificationsService } from "./index";
+import { describeError } from "./transport";
 
 /**
  * Next.js may evaluate this module through separate server entry runtimes
@@ -74,7 +75,7 @@ export async function runChecksNow(): Promise<CheckReport> {
     state.lastError = report.errors.length > 0 ? report.errors.join("; ") : null;
     return report;
   } catch (error) {
-    state.lastError = error instanceof Error ? error.message : String(error);
+    state.lastError = describeError(error);
     state.lastRunAt = new Date().toISOString();
     throw error;
   } finally {
