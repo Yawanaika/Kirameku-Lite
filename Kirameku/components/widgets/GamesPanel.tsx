@@ -310,6 +310,24 @@ export default function GamesPanel() {
     return () => window.removeEventListener("open-games-panel", open);
   }, [isMobile]);
 
+  // 键盘用户：Esc 关闭，面板打开时焦点进入面板。
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setIsOpen(false);
+      setActiveGame(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    panelRef.current?.focus();
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
     const close = (e: MouseEvent) => {
@@ -354,7 +372,11 @@ export default function GamesPanel() {
           exit={{ opacity: 0, y: -30, scale: 0.95 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
           style={{ ...panelStyle, zIndex: 40, x: isMobile ? 0 : offset.x, y: isMobile ? 0 : offset.y }}
-          className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col"
+          className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col outline-none"
+          role="dialog"
+          aria-modal="true"
+          aria-label="游戏厅"
+          tabIndex={-1}
         >
           {/* 顶部栏 — 拖拽把手 */}
           <div

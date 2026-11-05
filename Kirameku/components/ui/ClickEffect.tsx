@@ -27,11 +27,12 @@ const COLORS = [
 
 export default function ClickEffect() {
   const pathname = usePathname();
-  const { clickEffect } = useEffects();
+  const { clickEffect, reducedMotion } = useEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
   const animFrame = useRef<number>(0);
-  const disabled = pathname?.startsWith("/garden/") || !clickEffect;
+  const disabled =
+    reducedMotion || pathname?.startsWith("/garden/") || !clickEffect;
 
   useEffect(() => {
     if (disabled) return;

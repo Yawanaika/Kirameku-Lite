@@ -30,12 +30,13 @@ interface Particle {
 
 export default function SeasonalEffect() {
   const pathname = usePathname();
-  const { seasonalEffect } = useEffects();
+  const { seasonalEffect, reducedMotion } = useEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
   const animFrame = useRef<number>(0);
   const season = useRef(getSeason());
-  const disabled = pathname?.startsWith("/garden/") || !seasonalEffect;
+  const disabled =
+    reducedMotion || pathname?.startsWith("/garden/") || !seasonalEffect;
 
   useEffect(() => {
     if (disabled) return;

@@ -20,11 +20,12 @@ interface Sparkle {
 
 export default function KiraSparkle() {
   const pathname = usePathname();
-  const { sparkleEffect } = useEffects();
+  const { sparkleEffect, reducedMotion } = useEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sparkles = useRef<Sparkle[]>([]);
   const animFrame = useRef<number>(0);
-  const disabled = pathname?.startsWith("/garden/") || !sparkleEffect;
+  const disabled =
+    reducedMotion || pathname?.startsWith("/garden/") || !sparkleEffect;
 
   useEffect(() => {
     if (disabled) return;

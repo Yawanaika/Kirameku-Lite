@@ -542,6 +542,25 @@ export default function Toolbox() {
     return () => window.removeEventListener("resize", onResize);
   }, [isOpen, updateBtnRect]);
 
+  // 键盘用户：Esc 关闭面板，打开后把焦点移进面板，关闭后还给悬浮按钮。
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setIsOpen(false);
+      setActiveApp(null);
+      btnRef.current?.querySelector("button")?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    panelRef.current?.focus();
+  }, [isOpen]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -614,8 +633,12 @@ export default function Toolbox() {
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             style={{ ...panelStyle, zIndex: 30, x: isMobile ? 0 : panelOffset.x, y: isMobile ? 0 : panelOffset.y, ...(isMobile ? {} : { width: panelW, height: panelH }) }}
-            className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col"
+            className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col outline-none"
             ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="工具箱"
+            tabIndex={-1}
           >
             {/* 顶部拖拽把手 */}
             <div
@@ -761,6 +784,9 @@ export default function Toolbox() {
             }
           }}
           title="工具箱"
+          aria-label="工具箱"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
           className="w-12 h-12 rounded-2xl bg-white/40 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-xl flex items-center justify-center hover:shadow-2xl transition-all text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-700/60 active:scale-95"
           style={{ touchAction: "none" }}
         >

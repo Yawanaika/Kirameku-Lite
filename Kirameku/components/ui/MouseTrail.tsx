@@ -15,14 +15,14 @@ interface Particle {
 }
 
 export default function MouseTrail() {
-  const { mouseTrail } = useEffects();
+  const { mouseTrail, reducedMotion } = useEffects();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particles = useRef<Particle[]>([]);
   const mouse = useRef({ x: 0, y: 0 });
   const frame = useRef(0);
 
   useEffect(() => {
-    if (!mouseTrail) return;
+    if (!mouseTrail || reducedMotion) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
@@ -94,9 +94,9 @@ export default function MouseTrail() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleMove);
     };
-  }, [mouseTrail]);
+  }, [mouseTrail, reducedMotion]);
 
-  if (!mouseTrail) return null;
+  if (!mouseTrail || reducedMotion) return null;
 
   return (
     <canvas
