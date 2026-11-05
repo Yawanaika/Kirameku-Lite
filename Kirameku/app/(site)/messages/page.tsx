@@ -29,6 +29,7 @@ function GithubIcon({ className }: { className?: string }) {
 }
 import {
   getMessages,
+  getMessagesCount,
   createMessage,
   likeMessage,
   type MessageItem,
@@ -57,9 +58,15 @@ function flattenReplies(
   return result;
 }
 
+/** 单页条数：首屏只取一页，剩下的按需往下翻。 */
+const PAGE_SIZE = 20;
+
 function MessagesContent() {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [user, setUser] = useState<GitHubUser | null>(() => {
     if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("github_user");
@@ -99,16 +106,21 @@ function MessagesContent() {
       });
   }, []);
 
-  // 加载留言
+  // 加载首屏留言
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const [data] = await Promise.all([
-          getMessages({ page: 1, size: 50 }),
+        const [data, count] = await Promise.all([
+          getMessages({ page: 1, size: PAGE_SIZE }),
+          // 计数失败不该拖垮列表，拿不到就当总数未知。
+          getMessagesCount()
+            .then((result) => result.count)
+            .catch(() => 0),
         ]);
         if (!active) return;
         setMessages(data);
+        setTotal(count);
       } finally {
         if (active) setLoading(false);
       }
@@ -118,6 +130,25 @@ function MessagesContent() {
       active = false;
     };
   }, []);
+
+  async function handleLoadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const data = await getMessages({ page: next, size: PAGE_SIZE });
+      // 追加时按 id 去重：翻页期间若有新留言插入，页边界会重叠加。
+      setMessages((prev) => {
+        const seen = new Set(prev.map((item) => item.id));
+        return [...prev, ...data.filter((item) => !seen.has(item.id))];
+      });
+      setPage(next);
+    } catch {
+      // 失败保留当前页，用户可再点一次。
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   function handleLogin() {
     window.location.href = "/api/auth/github/login";
@@ -399,7 +430,9 @@ function MessagesContent() {
             key={msg.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: idx * 0.05 }}
+            // 延迟最多累积到 0.3s：原来 idx * 0.05 在 50 条时要等 2.5s
+            // 才看到最后一条，翻页后还会继续变慢。
+            transition={{ duration: 0.4, delay: Math.min(idx, 6) * 0.05 }}
           >
             <MessageCard
               msg={msg}
@@ -412,6 +445,20 @@ function MessagesContent() {
           </motion.div>
         ))}
       </div>
+
+      {/* 分页：还有没加载的留言时才出现 */}
+      {!loading && messages.length < total && (
+        <div className="flex justify-center mt-6 md:mt-8">
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-5 py-2 rounded-full text-xs md:text-sm text-slate-500 dark:text-slate-400 border border-slate-200/70 dark:border-white/10 hover:text-sky-500 hover:border-sky-300 dark:hover:border-sky-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {loadingMore ? "加载中..." : `加载更多（${messages.length} / ${total}）`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
