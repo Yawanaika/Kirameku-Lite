@@ -1,7 +1,9 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- 图片地址来自后台配置或第三方接口，域名不可预知，按 lib/image.ts 的约定绕过 next/image 优化器 */
 
+import { useState } from "react";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
+import { useToast } from "@/components/providers/ToastProvider";
 
 export default function ProfileCard({
   postCount = 0,
@@ -74,6 +76,7 @@ export default function ProfileCard({
           {profile.social?.tg && (
             <SocialBtn type="tg" url={profile.social.tg} />
           )}
+          <RssSubscribeButton />
         </div>
       </div>
     </div>
@@ -100,6 +103,64 @@ function StatItem({
         {label}
       </div>
     </div>
+  );
+}
+
+/** 站点 RSS 源路径，与 app/feed/route.ts 以及 layout 里的 alternate link 保持一致。 */
+const FEED_PATH = "/feed";
+
+/**
+ * 首页个人信息卡片上的 RSS 订阅入口。
+ *
+ * RSS 源是站点自带的 /feed，不需要后台配置。点击后把绝对地址复制到剪贴板，
+ * 方便直接粘贴到阅读器；剪贴板不可用（例如非 HTTPS 环境）时退化为在新标签页
+ * 打开订阅源。
+ */
+function RssSubscribeButton() {
+  const { profile } = useSiteSettings();
+  const { addToast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const copyFeedUrl = async () => {
+    // 后台配置了「站点对外地址」时优先用它，避免从 localhost / 内网 IP 打开页面时
+    // 把调试地址复制进阅读器；留空才回退到当前 origin。
+    const base = profile.url.trim().replace(/\/+$/, "") || window.location.origin;
+    const absolute = `${base}${FEED_PATH}`;
+    try {
+      await navigator.clipboard.writeText(absolute);
+      setCopied(true);
+      addToast("success", "RSS 订阅链接已复制，粘贴到阅读器即可订阅");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.open(absolute, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={copyFeedUrl}
+      title={copied ? "订阅链接已复制" : "RSS 订阅"}
+      aria-label={copied ? "订阅链接已复制" : "RSS 订阅"}
+      className="w-10 h-10 rounded-xl bg-white/50 dark:bg-slate-700/50 flex items-center justify-center text-slate-700 dark:text-slate-300 hover:text-orange-500 dark:hover:text-orange-400 hover:scale-125 hover:-translate-y-1 transition-all duration-300 border border-white/40 dark:border-white/10 shadow-sm cursor-pointer"
+    >
+      {copied ? (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="6.18" cy="17.82" r="2.18" />
+          <path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z" />
+        </svg>
+      )}
+    </button>
   );
 }
 
