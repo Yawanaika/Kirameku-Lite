@@ -2,7 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readBackupOverview, summarizeBackups } from "./service";
+import {
+  deleteBackupGroups,
+  readBackupOverview,
+  summarizeBackups,
+} from "./service";
 
 let directory: string;
 
@@ -113,6 +117,66 @@ describe("readBackupOverview", () => {
     expect(overview.latestFile).toBe(overview.groups[0].uploads);
     // 没有数据库快照就是没有可恢复的备份，即使图片归档还很新。
     expect(overview.stale).toBe(true);
+  });
+});
+
+describe("deleteBackupGroups", () => {
+  it("removes every file of the requested group and keeps the rest", () => {
+    const target = stampAgo(30);
+    const keep = stampAgo(1);
+    writeFile(`${target}.db`, 100);
+    writeFile(`${target}.db.meta.json`, 10);
+    writeFile(`${target}-uploads.tar.gz`, 50);
+    // 不符合命名约定的同名文件不该被顺手删掉。
+    writeFile(`${target}.txt`, 5);
+    writeFile(`${keep}.db`, 200);
+
+    const result = deleteBackupGroups([target], directory);
+
+    expect(result.missing).toEqual([]);
+    expect(result.failed).toEqual([]);
+    expect(result.deleted).toHaveLength(1);
+    expect(result.deleted[0].stamp).toBe(target);
+    expect(result.deleted[0].bytes).toBe(160);
+    expect(result.deleted[0].files.sort()).toEqual(
+      [`${target}.db`, `${target}.db.meta.json`, `${target}-uploads.tar.gz`].sort(),
+    );
+    expect(fs.existsSync(path.join(directory, `${target}.txt`))).toBe(true);
+    expect(fs.existsSync(path.join(directory, `${keep}.db`))).toBe(true);
+    expect(readBackupOverview(directory).counts.groups).toBe(1);
+  });
+
+  it("deletes several groups in one call", () => {
+    const first = stampAgo(20);
+    const second = stampAgo(10);
+    writeFile(`${first}.db`, 10);
+    writeFile(`${second}.db`, 20);
+
+    const result = deleteBackupGroups([first, second], directory);
+
+    expect(result.deleted.map((group) => group.stamp)).toEqual([first, second]);
+    expect(fs.readdirSync(directory)).toEqual([]);
+  });
+
+  it("reports stamps that are not in the directory instead of failing", () => {
+    writeFile(`${stampAgo(1)}.db`, 10);
+
+    const result = deleteBackupGroups(
+      ["kirameku-2020-01-01T00-00-00-000Z", "../../etc/passwd"],
+      directory,
+    );
+
+    expect(result.deleted).toEqual([]);
+    expect(result.missing).toEqual([
+      "kirameku-2020-01-01T00-00-00-000Z",
+      "../../etc/passwd",
+    ]);
+  });
+
+  it("throws when the backup directory cannot be read", () => {
+    expect(() =>
+      deleteBackupGroups([stampAgo(1)], path.join(directory, "missing")),
+    ).toThrow(/备份目录不可读/);
   });
 });
 

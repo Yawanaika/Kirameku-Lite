@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** 备份文件的三类产物，与 scripts/backup-db.ts 的文件名约定一致。 */
 export type BackupFileKind = "database" | "metadata" | "uploads";
 
@@ -49,6 +51,46 @@ export interface BackupOverview {
     availableBytes: number;
   } | null;
   retention: BackupRetention;
+}
+
+/**
+ * 一组备份共用的时间戳前缀（文件名里的 `: .` 换成了 `-`）。
+ *
+ * 删除只接受这种形状的 stamp：路径由服务端用 `path.join(备份目录, 文件名)`
+ * 拼出来，绝不能让请求体直接带进路径片段。
+ */
+export const BACKUP_STAMP_PATTERN =
+  /^kirameku-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
+
+/** DELETE /api/admin/backups 的请求体：一次删一组或多组快照。 */
+export const deleteBackupsInput = z.object({
+  stamps: z
+    .array(z.string().regex(BACKUP_STAMP_PATTERN, "备份时间戳格式不正确"))
+    .min(1, "至少选择一组快照")
+    .max(200, "一次最多删除 200 组快照"),
+});
+
+export type DeleteBackupsInput = z.infer<typeof deleteBackupsInput>;
+
+/** 已删除的一组快照：同一时间戳下的全部文件一起删掉。 */
+export interface DeletedBackupGroup {
+  stamp: string;
+  files: string[];
+  bytes: number;
+}
+
+/** 单个文件删除失败（权限、占用等）；整组删除不会因为它中断。 */
+export interface BackupDeleteFailure {
+  stamp: string;
+  file: string;
+  reason: string;
+}
+
+export interface BackupDeleteResult {
+  deleted: DeletedBackupGroup[];
+  /** 请求里带了、但备份目录中已经不存在的快照。 */
+  missing: string[];
+  failed: BackupDeleteFailure[];
 }
 
 /**

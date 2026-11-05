@@ -13,7 +13,7 @@ import { GET as getAlbum } from "./albums/[id]/route";
 import { GET as getAudit } from "./audit/route";
 import { POST as createCategory } from "./categories/route";
 import { GET as getVisitorsCount } from "./visitors/count/route";
-import { GET as getBackups } from "./backups/route";
+import { DELETE as deleteBackups, GET as getBackups } from "./backups/route";
 import { GET as getAnalytics } from "./analytics/route";
 import { GET as getMedia } from "./media/route";
 import { POST as previewMarkdown } from "./markdown/preview/route";
@@ -258,6 +258,87 @@ describe("GET /api/admin/backups", () => {
     expect(body.counts.groups).toBe(0);
     expect(body.stale).toBe(true);
     expect(body.latestAgeSeconds).toBeNull();
+  });
+});
+
+describe("DELETE /api/admin/backups", () => {
+  function stamp(hoursAgo: number): string {
+    const date = new Date(Date.now() - hoursAgo * 3_600_000);
+    return `kirameku-${date.toISOString().replace(/[:.]/g, "-")}`;
+  }
+
+  function backupPath(name: string): string {
+    return path.join(envState.directory, "backups", name);
+  }
+
+  function deleteRequest(body: unknown): Request {
+    return new Request("http://localhost:3000/api/admin/backups", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function resetBackups(): void {
+    fs.rmSync(path.join(envState.directory, "backups"), {
+      recursive: true,
+      force: true,
+    });
+    fs.mkdirSync(path.join(envState.directory, "backups"), { recursive: true });
+  }
+
+  it("requires an admin session", async () => {
+    resetBackups();
+    const response = await deleteBackups(
+      deleteRequest({ stamps: [stamp(1)] }),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("deletes the requested snapshot files", async () => {
+    await asAdmin();
+    resetBackups();
+    const older = stamp(30);
+    const newer = stamp(1);
+    fs.writeFileSync(backupPath(`${older}.db`), Buffer.alloc(32));
+    fs.writeFileSync(backupPath(`${older}.db.meta.json`), Buffer.alloc(4));
+    fs.writeFileSync(backupPath(`${newer}.db`), Buffer.alloc(64));
+
+    const response = await deleteBackups(deleteRequest({ stamps: [older] }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.deleted).toHaveLength(1);
+    expect(body.deleted[0].stamp).toBe(older);
+    expect(body.deleted[0].files.sort()).toEqual(
+      [`${older}.db`, `${older}.db.meta.json`].sort(),
+    );
+    expect(fs.existsSync(backupPath(`${older}.db`))).toBe(false);
+    expect(fs.existsSync(backupPath(`${newer}.db`))).toBe(true);
+
+    fs.rmSync(path.join(envState.directory, "backups"), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it("rejects payloads that do not carry valid stamps", async () => {
+    await asAdmin();
+    resetBackups();
+
+    const empty = await deleteBackups(deleteRequest({ stamps: [] }));
+    const traversal = await deleteBackups(
+      deleteRequest({ stamps: ["../data/test.db"] }),
+    );
+
+    expect(empty.status).toBe(422);
+    expect(traversal.status).toBe(422);
+
+    fs.rmSync(path.join(envState.directory, "backups"), {
+      recursive: true,
+      force: true,
+    });
   });
 });
 

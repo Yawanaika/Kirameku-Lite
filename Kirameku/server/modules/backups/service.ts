@@ -2,13 +2,17 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { env } from "@/server/env";
+import { errors } from "@/server/http/errors";
 import { readDiskUsage } from "@/server/storage/disk";
 import type {
   BackupCounts,
+  BackupDeleteFailure,
+  BackupDeleteResult,
   BackupFileKind,
   BackupGroup,
   BackupOverview,
   BackupSummary,
+  DeletedBackupGroup,
 } from "./contracts";
 
 /**
@@ -18,7 +22,8 @@ import type {
  *   kirameku-<ts>.db.meta.json    校验和与完整性元数据
  *   kirameku-<ts>-uploads.tar.gz  上传图片归档（没有图片时不存在）
  *
- * 这里只读、从不删除或恢复：恢复要停服，仍留在 CLI（pnpm db:restore）。
+ * 这里只列出与删除：恢复要停服并替换 SQLite 文件，仍然只留在 CLI
+ * （pnpm db:restore）；后台只允许清理过期的快照，腾出磁盘空间。
  */
 const FILE_PATTERN =
   /^(kirameku-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)(\.db\.meta\.json|\.db|-uploads\.tar\.gz)$/;
@@ -166,6 +171,76 @@ export function readBackupOverview(dir: string = resolveBackupDir()): BackupOver
       weeklyCount: WEEKLY_RETENTION_COUNT,
     },
   };
+}
+
+function describeFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 删除指定时间戳下的整组快照（数据库 + 元数据 + 图片归档一起删）。
+ *
+ * 只删备份目录里真实存在、且文件名能被 `FILE_PATTERN` 解析出来的文件：
+ * stamp 只用来匹配，实际路径由 readdir 的结果拼出来，请求体里的字符串
+ * 永远进不了 `path.join`，因此没有目录穿越的空间。
+ *
+ * 单个文件删不掉（占用、权限）时记录下来继续删其余的，最后一起汇报；
+ * 目录整个读不了才抛错，否则用户会误以为文件已经被删干净。
+ */
+export function deleteBackupGroups(
+  stamps: readonly string[],
+  dir: string = resolveBackupDir(),
+): BackupDeleteResult {
+  const wanted = new Set(stamps);
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch (error) {
+    throw errors.internal(`备份目录不可读，无法删除：${describeFailure(error)}`);
+  }
+
+  const filesByStamp = new Map<string, string[]>();
+  for (const name of entries) {
+    const parsed = parseFileName(name);
+    if (!parsed || !wanted.has(parsed.stamp)) continue;
+    const files = filesByStamp.get(parsed.stamp) ?? [];
+    files.push(name);
+    filesByStamp.set(parsed.stamp, files);
+  }
+
+  const deleted: DeletedBackupGroup[] = [];
+  const missing: string[] = [];
+  const failed: BackupDeleteFailure[] = [];
+
+  for (const stamp of wanted) {
+    const files = filesByStamp.get(stamp);
+    if (!files || files.length === 0) {
+      missing.push(stamp);
+      continue;
+    }
+
+    const removed: string[] = [];
+    let bytes = 0;
+    for (const name of files) {
+      const target = path.join(dir, name);
+      try {
+        const size = fs.statSync(target).size;
+        fs.unlinkSync(target);
+        bytes += size;
+        removed.push(name);
+      } catch (error) {
+        failed.push({ stamp, file: name, reason: describeFailure(error) });
+      }
+    }
+
+    // 整组删干净了才算删掉；只剩部分文件时由 failed 说明原因，不要报成功。
+    if (removed.length === files.length) {
+      deleted.push({ stamp, files: removed, bytes });
+    }
+  }
+
+  return { deleted, missing, failed };
 }
 
 /** `/api/internal/metrics` 的备份字段：只保留计数与新鲜度。 */
