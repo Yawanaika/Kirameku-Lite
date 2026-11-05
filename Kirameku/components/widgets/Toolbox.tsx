@@ -31,18 +31,8 @@ const NoteApp = lazy(() => import("./toolbox/NoteApp"));
 const BaseConverterApp = lazy(() => import("./toolbox/BaseConverterApp"));
 const CoinFlipApp = lazy(() => import("./toolbox/CoinFlipApp"));
 const RPSApp = lazy(() => import("./toolbox/RPSApp"));
-const DujitangApp = lazy(() => import("./toolbox/DujitangApp"));
-const HistoryApp = lazy(() => import("./toolbox/HistoryApp"));
 const WeatherApp = lazy(() => import("./toolbox/WeatherApp"));
 const RandomImageApp = lazy(() => import("./toolbox/RandomImageApp"));
-const BmiApp = lazy(() => import("./toolbox/BmiApp"));
-const BilibiliHotApp = lazy(() => import("./toolbox/BilibiliHotApp"));
-const GoldPriceApp = lazy(() => import("./toolbox/GoldPriceApp"));
-const JiakaoApp = lazy(() => import("./toolbox/JiakaoApp"));
-const HoroscopeApp = lazy(() => import("./toolbox/HoroscopeApp"));
-const GenshinApp = lazy(() => import("./toolbox/GenshinApp"));
-const Random4kApp = lazy(() => import("./toolbox/Random4kApp"));
-const GuanyinApp = lazy(() => import("./toolbox/GuanyinApp"));
 const GamesApp = lazy(() => import("./toolbox/GamesApp"));
 const WorldTimeApp = lazy(() => import("./toolbox/WorldTimeApp"));
 const HotBoardApp = lazy(() => import("./toolbox/HotBoardApp"));
@@ -87,18 +77,6 @@ const allApps: AppDef[] = [
     component: HotBoardApp,
   },
   {
-    id: "bilibilihot",
-    name: "B站热榜",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <path d="M4 7h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z" stroke="#00a1d6" strokeWidth="1.5" />
-        <path d="M8 4l4 3 4-3" stroke="#00a1d6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M9 13l2 2 4-4" stroke="#00a1d6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    component: BilibiliHotApp,
-  },
-  {
     id: "games",
     name: "小游戏",
     icon: (
@@ -123,17 +101,6 @@ const allApps: AppDef[] = [
       </svg>
     ),
     component: WeatherApp,
-  },
-  {
-    id: "goldprice",
-    name: "今日金价",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="#f59e0b" strokeWidth="1.5" />
-        <text x="12" y="16" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#f59e0b">Au</text>
-      </svg>
-    ),
-    component: GoldPriceApp,
   },
   {
     id: "movieboxoffice",
@@ -179,72 +146,8 @@ const allApps: AppDef[] = [
     ),
     component: ProgrammerHistoryApp,
   },
-  {
-    id: "history",
-    name: "历史今天",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="#6366f1" strokeWidth="1.5" />
-        <polyline points="12 6 12 12 16 14" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="1" fill="#6366f1" />
-      </svg>
-    ),
-    component: HistoryApp,
-  },
 
   // ── 趣味测试 ──
-  {
-    id: "horoscope",
-    name: "星座运势",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="#8b5cf6" strokeWidth="1.5" />
-        <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke="#8b5cf6" strokeWidth="1.5" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="2" fill="#8b5cf6" opacity="0.3" />
-      </svg>
-    ),
-    component: HoroscopeApp,
-  },
-  {
-    id: "guanyin",
-    name: "观音灵签",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="#8b5cf6" strokeWidth="1.5" />
-        <path d="M8 14c0 0 1.5 2 4 2s4-2 4-2" stroke="#8b5cf6" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="9" cy="10" r="1" fill="#8b5cf6" />
-        <circle cx="15" cy="10" r="1" fill="#8b5cf6" />
-        <path d="M12 2v4" stroke="#8b5cf6" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-    component: GuanyinApp,
-  },
-  {
-    id: "bmi",
-    name: "BMI",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="#10b981" strokeWidth="1.5" />
-        <path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M12 6v4M10 8h4" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M7 18l2-4M17 18l-2-4" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-    component: BmiApp,
-  },
-  {
-    id: "jiakao",
-    name: "驾考题库",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="5" width="18" height="14" rx="2" stroke="#6366f1" strokeWidth="1.5" />
-        <path d="M7 12h2M15 12h2M12 9v6" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="8" cy="19" r="1.5" stroke="#6366f1" strokeWidth="1.5" />
-        <circle cx="16" cy="19" r="1.5" stroke="#6366f1" strokeWidth="1.5" />
-      </svg>
-    ),
-    component: JiakaoApp,
-  },
 
   // ── 图片壁纸 ──
   {
@@ -258,30 +161,6 @@ const allApps: AppDef[] = [
       </svg>
     ),
     component: RandomImageApp,
-  },
-  {
-    id: "genshin",
-    name: "原神图片",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="#eab308" strokeWidth="1.5" />
-        <path d="M12 7l2.5 5H9.5L12 7z" stroke="#eab308" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M12 12v5" stroke="#eab308" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="1" fill="#eab308" />
-      </svg>
-    ),
-    component: GenshinApp,
-  },
-  {
-    id: "random4k",
-    name: "4K图片",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="3" width="18" height="18" rx="3" stroke="#0ea5e9" strokeWidth="1.5" />
-        <text x="12" y="16" textAnchor="middle" fontSize="9" fontWeight="bold" fill="#0ea5e9">4K</text>
-      </svg>
-    ),
-    component: Random4kApp,
   },
   {
     id: "fortune",
@@ -306,20 +185,6 @@ const allApps: AppDef[] = [
       </svg>
     ),
     component: HitokotoApp,
-  },
-  {
-    id: "dujitang",
-    name: "毒鸡汤",
-    icon: (
-      <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none">
-        <path d="M12 3C7 3 3 7 3 12c0 3 1.5 5.5 4 7l-1 2h12l-1-2c2.5-1.5 4-4 4-7 0-5-4-9-9-9z" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M9 14s1 1.5 3 1.5 3-1.5 3-1.5" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="9.5" cy="10" r="1" fill="#f59e0b" />
-        <circle cx="14.5" cy="10" r="1" fill="#f59e0b" />
-        <path d="M15 3.5c1 .5 2 1.5 2 2.5" stroke="#f59e0b" strokeWidth="1" strokeLinecap="round" opacity="0.5" />
-      </svg>
-    ),
-    component: DujitangApp,
   },
   {
     id: "dice",

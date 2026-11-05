@@ -11,7 +11,6 @@ const LyricBar = dynamic(() => import("@/components/music/LyricBar"), { ssr: fal
 const LatestPostsCarousel = dynamic(() => import("@/components/home/LatestPostsCarousel"), { ssr: false });
 const LatestChatterCarousel = dynamic(() => import("@/components/home/LatestChatterCarousel"), { ssr: false });
 const PhotoWallPreview = dynamic(() => import("@/components/home/PhotoWallPreview"), { ssr: false });
-const DogDiary = dynamic(() => import("@/components/home/DogDiary"), { ssr: false });
 const SiteDashboard = dynamic(() => import("@/components/widgets/SiteDashboard"), { ssr: false });
 
 export default function HomeClient({
@@ -70,16 +69,10 @@ export default function HomeClient({
               <LazyMount minHeight={240}>
                 <LatestPostsCarousel />
               </LazyMount>
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 flex-1 md:min-h-[220px] items-stretch">
-                <div className="md:col-span-8 h-full">
+              <div className="grid grid-cols-1 gap-4 md:gap-6 flex-1 md:min-h-[220px] items-stretch">
+                <div className="h-full">
                   <LazyMount className="h-full" minHeight={220}>
                     <LatestChatterCarousel />
-                  </LazyMount>
-                </div>
-                <div className="md:col-span-4 h-full flex">
-                  {/* flex 容器里的子项默认按内容宽度收缩，必须显式撑满，否则卡片会比同排其他卡片窄 */}
-                  <LazyMount className="h-full w-full" minHeight={220}>
-                    <DogDiary />
                   </LazyMount>
                 </div>
               </div>

@@ -24,7 +24,8 @@ const STATIC_ROUTES: Array<{
   { path: "/timeline", changeFrequency: "monthly", priority: 0.7 },
   { path: "/music", changeFrequency: "monthly", priority: 0.5 },
   { path: "/about", changeFrequency: "yearly", priority: 0.5 },
-  { path: "/garden", changeFrequency: "monthly", priority: 0.4 },
+  // /garden 需要密码才能进入，未解锁时服务端渲染的是空壳。
+  // 收录它等于给爬虫一个永远空白的页面，所以不进 sitemap。
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

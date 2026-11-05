@@ -24,18 +24,8 @@ const MinesweeperGame = lazy(() => import("./toolbox/games/MinesweeperGame"));
 const TetrisGame = lazy(() => import("./toolbox/games/TetrisGame"));
 const FlappyBirdGame = lazy(() => import("./toolbox/games/FlappyBirdGame"));
 const MemoryGame = lazy(() => import("./toolbox/games/MemoryGame"));
-const BreakoutGame = lazy(() => import("./toolbox/games/BreakoutGame"));
-const ShooterGame = lazy(() => import("./toolbox/games/ShooterGame"));
 const GomokuGame = lazy(() => import("./toolbox/games/GomokuGame"));
-const WatermelonGame = lazy(() => import("./toolbox/games/WatermelonGame"));
-const BlackjackGame = lazy(() => import("./toolbox/games/BlackjackGame"));
-const CoinCatcherGame = lazy(() => import("./toolbox/games/CoinCatcherGame"));
 const SudokuGame = lazy(() => import("./toolbox/games/SudokuGame"));
-const Match3Game = lazy(() => import("./toolbox/games/Match3Game"));
-const WhackAMoleGame = lazy(() => import("./toolbox/games/WhackAMoleGame"));
-const StackGame = lazy(() => import("./toolbox/games/StackGame"));
-const ColorSwitchGame = lazy(() => import("./toolbox/games/ColorSwitchGame"));
-const DoodleJumpGame = lazy(() => import("./toolbox/games/DoodleJumpGame"));
 
 interface GameDef {
   id: string;
@@ -134,41 +124,6 @@ const games: GameDef[] = [
     component: MemoryGame,
   },
   {
-    id: "breakout",
-    name: "打砖块",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#3b82f6" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#3b82f6" strokeWidth="2" />
-        <rect x="10" y="10" width="8" height="5" rx="1" fill="#ef4444" />
-        <rect x="20" y="10" width="8" height="5" rx="1" fill="#f97316" />
-        <rect x="30" y="10" width="8" height="5" rx="1" fill="#eab308" />
-        <rect x="10" y="17" width="8" height="5" rx="1" fill="#22c55e" />
-        <rect x="20" y="17" width="8" height="5" rx="1" fill="#3b82f6" />
-        <rect x="30" y="17" width="8" height="5" rx="1" fill="#8b5cf6" />
-        <circle cx="24" cy="30" r="3" fill="#3b82f6" />
-        <rect x="16" y="38" width="16" height="4" rx="2" fill="#3b82f6" />
-      </svg>
-    ),
-    component: BreakoutGame,
-  },
-  {
-    id: "shooter",
-    name: "飞机大战",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#ef4444" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#ef4444" strokeWidth="2" />
-        <path d="M24 8l8 20H16L24 8z" fill="#ef4444" />
-        <rect x="10" y="28" width="8" height="4" rx="1" fill="#ef4444" opacity="0.6" />
-        <rect x="30" y="28" width="8" height="4" rx="1" fill="#ef4444" opacity="0.6" />
-        <path d="M21 28v10l3 3 3-3V28" fill="#ef4444" />
-        <circle cx="24" cy="18" r="3" fill="#fca5a5" />
-      </svg>
-    ),
-    component: ShooterGame,
-  },
-  {
     id: "gomoku",
     name: "五子棋",
     icon: (
@@ -189,50 +144,6 @@ const games: GameDef[] = [
     component: GomokuGame,
   },
   {
-    id: "watermelon",
-    name: "合成大西瓜",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#22c55e" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#22c55e" strokeWidth="2" />
-        <circle cx="24" cy="26" r="12" fill="#22c55e" />
-        <circle cx="24" cy="26" r="9" fill="#16a34a" />
-        <path d="M18 16c2-4 8-4 12 0" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-    component: WatermelonGame,
-  },
-  {
-    id: "blackjack",
-    name: "21点",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#16a34a" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#16a34a" strokeWidth="2" />
-        <rect x="12" y="12" width="12" height="18" rx="2" fill="white" stroke="#16a34a" strokeWidth="1.5" />
-        <text x="18" y="25" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#16a34a">A</text>
-        <rect x="22" y="18" width="12" height="18" rx="2" fill="white" stroke="#16a34a" strokeWidth="1.5" />
-        <text x="28" y="31" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#dc2626">♥</text>
-      </svg>
-    ),
-    component: BlackjackGame,
-  },
-  {
-    id: "coincatcher",
-    name: "接金币",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#f59e0b" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#f59e0b" strokeWidth="2" />
-        <circle cx="24" cy="14" r="5" fill="#f59e0b" />
-        <text x="24" y="17" textAnchor="middle" fontSize="7" fontWeight="bold" fill="white">$</text>
-        <path d="M14 32l4-6h12l4 6" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <line x1="14" y1="32" x2="34" y2="32" stroke="#92400e" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-    component: CoinCatcherGame,
-  },
-  {
     id: "sudoku",
     name: "数独",
     icon: (
@@ -250,88 +161,6 @@ const games: GameDef[] = [
       </svg>
     ),
     component: SudokuGame,
-  },
-  {
-    id: "match3",
-    name: "消消乐",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#ec4899" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#ec4899" strokeWidth="2" />
-        <circle cx="16" cy="16" r="5" fill="#ef4444" />
-        <circle cx="32" cy="16" r="5" fill="#3b82f6" />
-        <circle cx="24" cy="28" r="5" fill="#22c55e" />
-        <circle cx="16" cy="28" r="5" fill="#eab308" />
-        <circle cx="32" cy="28" r="5" fill="#a855f7" />
-        <circle cx="24" cy="16" r="5" fill="#f97316" />
-      </svg>
-    ),
-    component: Match3Game,
-  },
-  {
-    id: "whackmole",
-    name: "打地鼠",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#f59e0b" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#f59e0b" strokeWidth="2" />
-        <circle cx="24" cy="24" r="8" fill="#92400e" opacity="0.3" />
-        <circle cx="24" cy="24" r="6" fill="#a16207" />
-        <circle cx="21" cy="22" r="1.5" fill="#1e293b" />
-        <circle cx="27" cy="22" r="1.5" fill="#1e293b" />
-        <ellipse cx="24" cy="26" rx="2" ry="1.5" fill="#92400e" />
-        <circle cx="10" cy="14" r="3" fill="#f59e0b" opacity="0.5" />
-        <circle cx="38" cy="14" r="3" fill="#ef4444" opacity="0.5" />
-      </svg>
-    ),
-    component: WhackAMoleGame,
-  },
-  {
-    id: "stack",
-    name: "堆叠塔",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#3b82f6" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#3b82f6" strokeWidth="2" />
-        <rect x="12" y="30" width="24" height="5" rx="1" fill="#3b82f6" />
-        <rect x="14" y="24" width="20" height="5" rx="1" fill="#60a5fa" />
-        <rect x="16" y="18" width="16" height="5" rx="1" fill="#93c5fd" />
-        <rect x="18" y="12" width="12" height="5" rx="1" fill="#bfdbfe" />
-      </svg>
-    ),
-    component: StackGame,
-  },
-  {
-    id: "colorswitch",
-    name: "色彩穿越",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#a855f7" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#a855f7" strokeWidth="2" />
-        <circle cx="24" cy="24" r="12" stroke="#a855f7" strokeWidth="3" strokeDasharray="18.85 18.85" />
-        <circle cx="24" cy="24" r="12" stroke="#3b82f6" strokeWidth="3" strokeDasharray="18.85 18.85" strokeDashoffset="18.85" />
-        <circle cx="24" cy="24" r="4" fill="#a855f7" />
-      </svg>
-    ),
-    component: ColorSwitchGame,
-  },
-  {
-    id: "doodlejump",
-    name: "涂鸦跳跃",
-    icon: (
-      <svg className="w-12 h-12" viewBox="0 0 48 48" fill="none">
-        <rect x="4" y="4" width="40" height="40" rx="8" fill="#6366f1" opacity="0.15" />
-        <rect x="4" y="4" width="40" height="40" rx="8" stroke="#6366f1" strokeWidth="2" />
-        <rect x="10" y="34" width="28" height="4" rx="2" fill="#22c55e" />
-        <rect x="18" y="22" width="12" height="12" rx="4" fill="#6366f1" />
-        <circle cx="22" cy="26" r="2" fill="white" />
-        <circle cx="28" cy="26" r="2" fill="white" />
-        <circle cx="22.5" cy="26" r="1" fill="#1e293b" />
-        <circle cx="28.5" cy="26" r="1" fill="#1e293b" />
-        <path d="M20 14l4-6 4 6" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    component: DoodleJumpGame,
   },
 ];
 

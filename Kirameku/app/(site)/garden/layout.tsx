@@ -4,17 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  ArrowLeft, LayoutDashboard, MapPin, Orbit, CloudRain, User,
+  ArrowLeft, LayoutDashboard, Orbit, CloudRain,
   Sparkles, Droplets, Flower2, Mountain, Code2, Grid3x3,
   Sigma, BarChart3, FileText, Braces, Palette, QrCode, Star, Box,
 } from "lucide-react";
 
 const navItems = [
   { href: "/garden", label: "仪表盘", icon: LayoutDashboard },
-  { href: "/garden/map", label: "地图", icon: MapPin },
   { href: "/garden/solar", label: "太阳系", icon: Orbit },
   { href: "/garden/rain", label: "代码雨", icon: CloudRain },
-  { href: "/garden/visitor", label: "访客信息", icon: User },
   { href: "/garden/fireworks", label: "烟花", icon: Sparkles },
   { href: "/garden/fluid", label: "流体", icon: Droplets },
   { href: "/garden/kaleidoscope", label: "万花筒", icon: Flower2 },
