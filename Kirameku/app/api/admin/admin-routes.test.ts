@@ -13,6 +13,8 @@ import { GET as getAlbum } from "./albums/[id]/route";
 import { GET as getAudit } from "./audit/route";
 import { POST as createCategory } from "./categories/route";
 import { GET as getVisitorsCount } from "./visitors/count/route";
+import { GET as getBackups } from "./backups/route";
+import { GET as getAnalytics } from "./analytics/route";
 import { POST as previewMarkdown } from "./markdown/preview/route";
 
 /*
@@ -22,9 +24,12 @@ import { POST as previewMarkdown } from "./markdown/preview/route";
  */
 const envState = vi.hoisted(() => {
   const previous = process.env.DATABASE_PATH;
+  const previousBackupDir = process.env.BACKUP_DIR;
   const directory = `${process.env.TMPDIR ?? "/tmp"}/kirameku-admin-routes-${process.pid}-${Date.now()}`;
   process.env.DATABASE_PATH = `${directory}/test.db`;
-  return { previous, directory };
+  // 备份面板直接读 BACKUP_DIR，测试用它指向临时目录，避免读到开发机上的真实备份。
+  process.env.BACKUP_DIR = `${directory}/backups`;
+  return { previous, previousBackupDir, directory };
 });
 
 const { cookieStore } = vi.hoisted(() => ({
@@ -109,6 +114,8 @@ afterAll(async () => {
 
   if (envState.previous === undefined) delete process.env.DATABASE_PATH;
   else process.env.DATABASE_PATH = envState.previous;
+  if (envState.previousBackupDir === undefined) delete process.env.BACKUP_DIR;
+  else process.env.BACKUP_DIR = envState.previousBackupDir;
 });
 
 beforeEach(() => {
@@ -198,6 +205,93 @@ describe("GET /api/admin/visitors/count", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ count: 1 });
+  });
+});
+
+describe("GET /api/admin/backups", () => {
+  function stamp(hoursAgo: number): string {
+    const date = new Date(Date.now() - hoursAgo * 3_600_000);
+    return `kirameku-${date.toISOString().replace(/[:.]/g, "-")}`;
+  }
+
+  it("requires an admin session", async () => {
+    const response = await getBackups(request("/api/admin/backups"));
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns the newest snapshot and its freshness for an admin", async () => {
+    await asAdmin();
+    fs.mkdirSync(path.join(envState.directory, "backups"), { recursive: true });
+    const recent = stamp(2);
+    fs.writeFileSync(
+      path.join(envState.directory, "backups", `${recent}.db`),
+      Buffer.alloc(64),
+    );
+
+    const response = await getBackups(request("/api/admin/backups"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.counts).toEqual({
+      groups: 1,
+      databases: 1,
+      uploadsArchives: 0,
+    });
+    expect(body.latestFile).toBe(`${recent}.db`);
+    expect(body.stale).toBe(false);
+
+    fs.rmSync(path.join(envState.directory, "backups"), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it("reports a stale state when the directory has no snapshots", async () => {
+    await asAdmin();
+
+    const response = await getBackups(request("/api/admin/backups"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.counts.groups).toBe(0);
+    expect(body.stale).toBe(true);
+    expect(body.latestAgeSeconds).toBeNull();
+  });
+});
+
+describe("GET /api/admin/analytics", () => {
+  it("requires an admin session", async () => {
+    const response = await getAnalytics(request("/api/admin/analytics"));
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns filled buckets and rejects an out-of-range window", async () => {
+    await asAdmin();
+    connection
+      .prepare(
+        'INSERT INTO "visitor" ("ip", "path", "created_at") VALUES (?, ?, ?)',
+      )
+      .run("198.51.100.7", "/posts/hello", Date.now() - 60_000);
+
+    const response = await getAnalytics(request("/api/admin/analytics?days=7"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.range.days).toBe(7);
+    expect(body.daily).toHaveLength(7);
+    expect(body.hours).toHaveLength(24);
+    expect(body.totals).toEqual({ pv: 1, uv: 1 });
+    expect(body.topPages[0]).toMatchObject({ key: "/posts/hello", pv: 1, uv: 1 });
+
+    // 未给参数时按默认 7 天；超过 90 天直接拒绝，而不是静默截断。
+    const defaulted = await getAnalytics(request("/api/admin/analytics"));
+    expect((await defaulted.json()).range.days).toBe(7);
+
+    const tooWide = await getAnalytics(request("/api/admin/analytics?days=500"));
+    // 参数校验失败统一走 422 VALIDATION_ERROR。
+    expect(tooWide.status).toBe(422);
   });
 });
 

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   BellRing,
   Bookmark,
+  DatabaseBackup,
   FileText,
   FolderKanban,
   FolderOpen,
@@ -36,6 +38,8 @@ const primaryItems = [
   { href: "/admin/navigation", label: "导航菜单", icon: Navigation },
   { href: "/admin/site-config", label: "站点配置", icon: SlidersHorizontal },
   { href: "/admin/visitors", label: "访客", icon: Users },
+  { href: "/admin/analytics", label: "统计", icon: BarChart3 },
+  { href: "/admin/backups", label: "备份", icon: DatabaseBackup },
   { href: "/admin/notifications", label: "预警通知", icon: BellRing },
   { href: "/admin/audit", label: "操作审计", icon: ScrollText },
   { href: "/admin/account", label: "账号", icon: UserRound },
