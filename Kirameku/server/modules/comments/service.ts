@@ -14,6 +14,7 @@ import type {
   ChatterCommentItem,
   CommentGitHubUser,
   PostCommentItem,
+  ReviewStatus,
 } from "./contracts";
 
 const postCommentSelection = {
@@ -499,7 +500,7 @@ export function createCommentsService(db: AppDatabase) {
     },
 
     async listAdminComments(params: {
-      status?: string;
+      status?: ReviewStatus;
       page: number;
       size: number;
     }): Promise<AdminPostCommentItem[]> {
@@ -520,7 +521,7 @@ export function createCommentsService(db: AppDatabase) {
 
     async updatePostCommentStatus(
       id: number,
-      status: string,
+      status: ReviewStatus,
     ): Promise<AdminPostCommentItem> {
       const [row] = await db
         .update(comment)
@@ -541,7 +542,7 @@ export function createCommentsService(db: AppDatabase) {
     },
 
     async listAdminChatterComments(params: {
-      status?: string;
+      status?: ReviewStatus;
       page: number;
       size: number;
     }): Promise<AdminChatterCommentItem[]> {
@@ -567,7 +568,7 @@ export function createCommentsService(db: AppDatabase) {
 
     async updateChatterCommentStatus(
       id: number,
-      status: string,
+      status: ReviewStatus,
     ): Promise<AdminChatterCommentItem> {
       const [row] = await db
         .update(chatterComment)

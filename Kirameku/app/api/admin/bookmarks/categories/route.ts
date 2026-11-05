@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createBookmarkCategoryInput } from "@/server/modules/bookmarks/contracts";
 import { getBookmarksService } from "@/server/modules/bookmarks";
+import { revalidateBookmarks } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createBookmarkCategoryInput.parse(await readJson(request));
-      return getBookmarksService().createCategory(input);
+      const result = await getBookmarksService().createCategory(input);
+      revalidateBookmarks();
+      return result;
     },
     { request },
   );

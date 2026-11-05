@@ -4,13 +4,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMusic } from "@/components/providers/MusicProvider";
+import { formatDuration } from "@/lib/format";
 
-const formatTime = (time: number) => {
-  if (!time || isNaN(time)) return "00:00";
-  const m = Math.floor(time / 60).toString().padStart(2, "0");
-  const s = Math.floor(time % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-};
+
 
 export default function CloudPlayer() {
   const router = useRouter();
@@ -151,14 +147,14 @@ export default function CloudPlayer() {
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <span className="w-10 text-right">{formatTime(currentTime)}</span>
+            <span className="w-10 text-right">{formatDuration(currentTime, { padMinutes: true })}</span>
             <input
               type="range" min="0" max="100" value={progress} onChange={safeHandleSeek}
               title="播放进度"
               className="flex-1 h-1.5 bg-white/40 dark:bg-slate-700/50 rounded-full appearance-none outline-none cursor-pointer shadow-inner"
               style={{ background: `linear-gradient(to right, #818cf8 ${progress}%, rgba(148,163,184,0.4) ${progress}%)` }}
             />
-            <span className="w-10">{formatTime(duration)}</span>
+            <span className="w-10">{formatDuration(duration, { padMinutes: true })}</span>
           </div>
 
           <div className="flex items-center justify-center gap-6">

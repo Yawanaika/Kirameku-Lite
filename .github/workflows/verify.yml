@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: Typecheck, test, migrate, build
+    name: Lint, typecheck, test, migrate, build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,6 +32,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Lint 跑在最前面：它最快，能在类型检查前就挡掉死代码、未使用变量等问题。
+      - name: Lint
+        run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck

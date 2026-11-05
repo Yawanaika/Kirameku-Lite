@@ -51,29 +51,23 @@ function hours(seconds: number): string {
   return `${round(seconds / 3600)} 小时`;
 }
 
+/**
+ * 只统计友链申请：评论和留言入库即为 approved，后台没有「待审核」这一步，
+ * 以前那两个分支永远返回 0，把真正的待办数量稀释了。
+ */
 function pendingContent() {
   const database = getSqlite();
-  const count = (sql: string, ...params: string[]) =>
-    Number((database.prepare(sql).get(...params) as { total: number }).total);
-
-  const comments = count(
-    `SELECT count(*) AS total FROM "comment" WHERE "status" = ?`,
-    "pending",
-  );
-  const messages = count(
-    `SELECT count(*) AS total FROM "message" WHERE "status" = ?`,
-    "pending",
-  );
-  const friendLinks = count(
-    `SELECT count(*) AS total FROM "friend_link" WHERE "is_approved" = 0`,
+  const friendLinks = Number(
+    (
+      database
+        .prepare(
+          `SELECT count(*) AS total FROM "friend_link" WHERE "is_approved" = 0`,
+        )
+        .get() as { total: number }
+    ).total,
   );
 
-  return {
-    comments,
-    messages,
-    friendLinks,
-    total: comments + messages + friendLinks,
-  };
+  return { friendLinks, total: friendLinks };
 }
 
 function checkBackupStale(state: RuleRuntimeState): CheckOutcome {
@@ -339,10 +333,10 @@ function checkContentPending(state: RuleRuntimeState): CheckOutcome {
     eventKey: "content.pending",
     triggered: false,
     level: "info",
-    title: "有待审核内容",
+    title: "有待审核的友链申请",
     body: "",
     fields: [],
-    detail: "没有待审核内容",
+    detail: "没有待审核的友链申请",
   };
 
   let counts: ReturnType<typeof pendingContent>;
@@ -354,20 +348,18 @@ function checkContentPending(state: RuleRuntimeState): CheckOutcome {
   }
 
   if (counts.total < minCount) {
-    return { ...base, detail: `待审核 ${counts.total} 条` };
+    return { ...base, detail: `待审核友链 ${counts.total} 条` };
   }
 
   return {
     ...base,
     triggered: true,
-    body: `当前有 ${counts.total} 条内容等待审核，去后台处理一下吧。`,
+    body: `当前有 ${counts.friendLinks} 条友链申请等待审核，去后台处理一下吧。`,
     fields: [
-      { label: "待审核评论", value: String(counts.comments) },
-      { label: "待审核留言", value: String(counts.messages) },
       { label: "友链申请", value: String(counts.friendLinks) },
       { label: "触发阈值", value: String(minCount) },
     ],
-    detail: `待审核 ${counts.total} 条`,
+    detail: `待审核友链 ${counts.friendLinks} 条`,
   };
 }
 

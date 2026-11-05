@@ -8,6 +8,7 @@ import {
   updateCategoryInput,
 } from "@/server/modules/categories/contracts";
 import { getCategoriesService } from "@/server/modules/categories";
+import { revalidateTaxonomy } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = categoryIdParams.parse(await params);
       const input = updateCategoryInput.parse(await readJson(request));
-      return getCategoriesService().update(id, input);
+      const result = await getCategoriesService().update(id, input);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );
@@ -38,7 +41,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = categoryIdParams.parse(await params);
-      return getCategoriesService().remove(id);
+      const result = await getCategoriesService().remove(id);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );

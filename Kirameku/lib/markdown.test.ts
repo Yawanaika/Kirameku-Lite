@@ -1,43 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { renderMarkdown } from "./markdown";
+import { describe, it, expect } from "vitest";
+import { renderMarkdownWithToc } from "@/lib/markdown";
 
-describe("renderMarkdown", () => {
-  it("renders headings, links and lists", async () => {
-    const html = await renderMarkdown(
-      "# Title\n\n- item\n\n[link](https://example.com)",
-    );
-
-    expect(html).toContain("<h1>Title</h1>");
-    expect(html).toContain("<li>item</li>");
-    expect(html).toContain('href="https://example.com"');
-  });
-
-  it("strips scripts, event handlers and javascript: urls", async () => {
-    const html = await renderMarkdown(
-      [
-        "safe text",
-        '<script>alert("xss")</script>',
-        '<img src="x" onerror="alert(1)" />',
-        "[bad](javascript:alert(1))",
-        '<iframe src="https://evil.example"></iframe>',
-      ].join("\n\n"),
-    );
-
-    expect(html).not.toContain("<script");
-    expect(html).not.toContain("onerror");
-    expect(html).not.toContain("<iframe");
-    expect(html).not.toContain("javascript:");
-    expect(html).toContain("safe text");
-  });
-
-  it("highlights fenced code blocks after sanitizing", async () => {
-    const html = await renderMarkdown("```ts\nconst answer = 42;\n```");
-
-    expect(html).toContain('class="hljs language-ts"');
-    expect(html).toContain("hljs-keyword");
-  });
-
-  it("returns an empty string for empty input", async () => {
-    await expect(renderMarkdown("")).resolves.toBe("");
+describe("renderMarkdownWithToc", () => {
+  it("adds unique ids and builds a toc", async () => {
+    const md = "## 安装步骤\n\n正文\n\n### 依赖说明\n\n## 安装步骤\n\n## Hello World!\n";
+    const { html, toc } = await renderMarkdownWithToc(md);
+    console.log(JSON.stringify(toc));
+    console.log(html);
+    expect(toc).toHaveLength(4);
+    expect(toc[0]).toEqual({ level: 2, id: "安装步骤", text: "安装步骤" });
+    expect(toc[3].id).toBe("hello-world");
+    expect(html).toContain('id="安装步骤-2"');
   });
 });

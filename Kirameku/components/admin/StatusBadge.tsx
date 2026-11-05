@@ -7,7 +7,6 @@ const variants: Record<string, BadgeProps["variant"]> = {
   active: "success",
   draft: "muted",
   archived: "muted",
-  pending: "warning",
   developing: "info",
   rejected: "danger",
 };

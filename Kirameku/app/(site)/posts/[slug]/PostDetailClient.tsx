@@ -13,12 +13,21 @@ import { bypassImageOptimization } from "@/lib/image";
 
 const PostComments = dynamic(() => import("@/components/posts/PostComments"), { ssr: false });
 
+/** 与服务端 lib/markdown.ts 的 TocEntry 同构；只在这里重声明，避免客户端模块拉进 server-only。 */
+interface TocEntry {
+  level: 2 | 3;
+  id: string;
+  text: string;
+}
+
 export default function PostDetailClient({
   initialPost,
   contentHtml,
+  toc = [],
 }: {
   initialPost: Omit<PostDetail, "content">;
   contentHtml: string;
+  toc?: TocEntry[];
 }) {
   const [post, setPost] = useState<Omit<PostDetail, "content">>(initialPost);
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
@@ -191,9 +200,36 @@ export default function PostDetailClient({
             </button>
           </div>
 
+          {/* 目录：标题少于两条时没有意义，直接不渲染 */}
+          {toc.length >= 2 && (
+            <nav
+              aria-label="文章目录"
+              className="mb-5 sm:mb-7 rounded-xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 dark:border-white/10 dark:bg-white/5"
+            >
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                目录
+              </p>
+              <ul className="space-y-1">
+                {toc.map((entry) => (
+                  <li key={entry.id} className={entry.level === 3 ? "pl-4" : undefined}>
+                    <a
+                      href={`#${entry.id}`}
+                      className="block truncate text-sm text-slate-600 transition-colors hover:text-indigo-500 dark:text-slate-300 dark:hover:text-indigo-400"
+                    >
+                      {entry.text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+
           {/* 文章内容 */}
           <div className="relative" ref={contentRef}>
             <style>{`
+              .post-content :is(h1, h2, h3, h4) {
+                scroll-margin-top: 5.5rem;
+              }
               .post-content ul {
                 list-style-type: disc !important;
                 padding-left: 1.5rem !important;

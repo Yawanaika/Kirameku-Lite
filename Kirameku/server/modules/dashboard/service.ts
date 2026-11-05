@@ -16,14 +16,16 @@ export const dashboardService = {
         .select({ value: count() })
         .from(post)
         .where(eq(post.status, "published")),
+      // 评论/留言入库即 approved，后台只会在 approved 与 rejected 间切换，
+      // 所以这里统计「已通过」而不是永远不会增长的「待审核」。
       db
         .select({ value: count() })
         .from(comment)
-        .where(eq(comment.status, "pending")),
+        .where(eq(comment.status, "approved")),
       db
         .select({ value: count() })
         .from(message)
-        .where(eq(message.status, "pending")),
+        .where(eq(message.status, "approved")),
       db.select({ value: count() }).from(visitor),
       db
         .select({
@@ -41,8 +43,8 @@ export const dashboardService = {
     return {
       counts: {
         posts: postRows?.value ?? 0,
-        pendingComments: commentRows?.value ?? 0,
-        pendingMessages: messageRows?.value ?? 0,
+        approvedComments: commentRows?.value ?? 0,
+        approvedMessages: messageRows?.value ?? 0,
         visitors: visitorRows?.value ?? 0,
       },
       recentPosts,

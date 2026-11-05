@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createAlbumInput } from "@/server/modules/albums/contracts";
 import { getAlbumsService } from "@/server/modules/albums";
+import { revalidateAlbums } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createAlbumInput.parse(await readJson(request));
-      return getAlbumsService().create(input);
+      const result = await getAlbumsService().create(input);
+      revalidateAlbums();
+      return result;
     },
     { request },
   );

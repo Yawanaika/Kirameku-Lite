@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** 只有草稿与已发布两种状态，见 posts/contracts.ts 的同一约束。 */
+const chatterStatus = z.enum(["draft", "published"]);
+
 /** Public chatter list query. Drafts are never exposed by the public API. */
 export const chatterListQuery = z.object({
   status: z.literal("published").default("published"),
@@ -16,13 +19,13 @@ export const chatterParams = z.object({
 });
 
 export const adminChatterListQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: chatterStatus.optional(),
   page: z.coerce.number().int().min(1).default(1),
   size: z.coerce.number().int().min(1).max(200).default(20),
 });
 
 export const adminChatterCountQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: chatterStatus.optional(),
 });
 
 export const adminChatterIdParams = z.object({
@@ -32,7 +35,6 @@ export const adminChatterIdParams = z.object({
 const chatterContent = z.string().trim().min(1).max(10_000);
 const chatterImages = z.array(z.string().trim().max(1000)).max(20);
 const chatterMood = z.string().trim().max(100);
-const chatterStatus = z.string().trim().min(1).max(50);
 
 export const createChatterInput = z.object({
   content: chatterContent,

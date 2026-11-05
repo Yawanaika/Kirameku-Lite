@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+/**
+ * 评论只有「已通过 / 已拒绝」两种状态：入库默认 approved，后台只能互转。
+ * 以前还留着一个 pending 分支，但没有任何写路径会产出它，
+ * 于是「待审核」筛选永远为空、仪表盘的待审核计数永远是 0。
+ */
+export const reviewStatus = z.enum(["approved", "rejected"]);
+export type ReviewStatus = z.infer<typeof reviewStatus>;
+
 export const postCommentsParams = z.object({
   postId: z.coerce.number().int().min(1),
 });
@@ -30,7 +38,7 @@ export const commentIdParams = z.object({
 });
 
 export const adminCommentListQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: reviewStatus.optional(),
   page: z.coerce.number().int().min(1).default(1),
   size: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -40,11 +48,11 @@ export const adminCommentIdParams = z.object({
 });
 
 export const updateCommentStatusInput = z.object({
-  status: z.enum(["approved", "rejected", "pending"]),
+  status: reviewStatus,
 });
 
 export const adminChatterCommentListQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: reviewStatus.optional(),
   page: z.coerce.number().int().min(1).default(1),
   size: z.coerce.number().int().min(1).max(100).default(20),
 });

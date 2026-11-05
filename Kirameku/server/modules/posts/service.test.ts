@@ -428,6 +428,14 @@ describe("posts service", () => {
     });
     expect(updated.published_at).not.toBeNull();
 
+    // 发布时间语义：撤稿不清空、再次发布不改写，只有第一次发布才落时间戳。
+    const firstPublishedAt = updated.published_at;
+    const unpublished = await posts.update(created.id, { status: "draft" });
+    expect(unpublished.status).toBe("draft");
+    expect(unpublished.published_at).toBe(firstPublishedAt);
+    const republished = await posts.update(created.id, { status: "published" });
+    expect(republished.published_at).toBe(firstPublishedAt);
+
     await expect(
       posts.update(created.id, { slug: "first" }),
     ).rejects.toMatchObject({ status: 409 });

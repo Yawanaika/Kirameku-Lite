@@ -8,6 +8,7 @@ import {
   createChatterInput,
 } from "@/server/modules/chatters/contracts";
 import { getChattersService } from "@/server/modules/chatters";
+import { revalidateChatters } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createChatterInput.parse(await readJson(request));
-      return getChattersService().create(input);
+      const result = await getChattersService().create(input);
+      revalidateChatters();
+      return result;
     },
     { request },
   );

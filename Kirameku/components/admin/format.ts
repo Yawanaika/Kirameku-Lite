@@ -1,21 +1,15 @@
-const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  timeZone: "Asia/Shanghai",
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+import { formatDateTime } from "@/lib/format";
 
-export function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return dateTimeFormatter.format(date);
-}
+/**
+ * 后台格式化工具的统一出口。时间格式化本身已经收敛到 `lib/format.ts`，
+ * 这里只保留后台专属的状态文案映射，避免前后台各自维护一份日期实现。
+ */
+export { formatDateTime };
 
 const statusLabels: Record<string, string> = {
   published: "已发布",
   draft: "草稿",
   approved: "已通过",
-  pending: "待审核",
   rejected: "已拒绝",
   active: "维护中",
   developing: "开发中",

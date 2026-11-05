@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "@/server/http/errors";
-import { inspectImage, MAX_IMAGE_BYTES } from "./image";
+import {
+  inspectImage,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_EDGE,
+  MAX_IMAGE_PIXELS,
+} from "./image";
 
 function png(width: number, height: number): Buffer {
   const buffer = Buffer.alloc(33);
@@ -91,6 +96,19 @@ describe("inspectImage", () => {
     expect(() => inspectImage(Buffer.from("not an image"), "image/png")).toThrow(
       AppError,
     );
+  });
+
+  it("rejects decompression bombs even when the file is tiny", () => {
+    // 33 字节的 PNG 头就能声明 20000x20000，解码会吃掉 1.6GB 内存。
+    expect(() => inspectImage(png(20_000, 20_000), "image/png")).toThrow(AppError);
+    expect(() => inspectImage(png(MAX_IMAGE_EDGE + 1, 10), "image/png")).toThrow(
+      AppError,
+    );
+    // 总像素超限但每条边都不超限时同样要拒绝。
+    const edge = Math.floor(Math.sqrt(MAX_IMAGE_PIXELS)) + 1;
+    expect(() => inspectImage(png(edge, edge), "image/png")).toThrow(AppError);
+    // 边界值本身仍然允许。
+    expect(() => inspectImage(png(8_000, 6_000), "image/png")).not.toThrow();
   });
 
   it("rejects empty, truncated and oversized files", () => {

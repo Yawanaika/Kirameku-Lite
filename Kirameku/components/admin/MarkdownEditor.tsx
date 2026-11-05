@@ -1,93 +1,31 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
-import { basicSetup } from "codemirror";
-import { markdown } from "@codemirror/lang-markdown";
-import { oneDark } from "@codemirror/theme-one-dark";
+import dynamic from "next/dynamic";
 
-interface MarkdownEditorProps {
+/**
+ * CodeMirror 6 一整套（state/view/basicSetup/markdown/oneDark）打包后接近 500KB，
+ * 只有管理后台打开文章编辑器时才需要。这里用动态边界把它推迟到客户端加载，
+ * 避免它进入 /admin/posts 的首屏 chunk。
+ *
+ * 加载期间用同样高度的占位，避免布局跳动。
+ */
+const MarkdownEditorCore = dynamic(() => import("./MarkdownEditorCore"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/60 dark:border-white/10 dark:bg-slate-900/40">
+      <div className="flex h-full items-center justify-center text-xs text-slate-400">
+        正在加载编辑器…
+      </div>
+    </div>
+  ),
+});
+
+export interface MarkdownEditorProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
 }
 
-/**
- * Thin controlled wrapper around CodeMirror 6 for the admin post editor.
- * The view is created once; external value changes (for example loading an
- * existing post) are dispatched into the document without recreating it.
- */
-export default function MarkdownEditor({
-  id,
-  value,
-  onChange,
-}: MarkdownEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
-  const onChangeRef = useRef(onChange);
-  const initialValue = useRef(value);
-
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  useEffect(() => {
-    const parent = containerRef.current;
-    if (!parent) return;
-
-    const state = EditorState.create({
-      doc: initialValue.current,
-      extensions: [
-        basicSetup,
-        markdown(),
-        oneDark,
-        EditorView.lineWrapping,
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            onChangeRef.current(update.state.doc.toString());
-          }
-        }),
-        EditorView.contentAttributes.of({
-          ...(id ? { id } : {}),
-          "aria-label": "文章正文",
-          spellcheck: "false",
-        }),
-        EditorView.theme({
-          "&": { height: "100%", fontSize: "13px" },
-          ".cm-scroller": {
-            fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
-            lineHeight: "1.65",
-          },
-          ".cm-content": { padding: "12px 0" },
-          "&.cm-focused": { outline: "none" },
-        }),
-      ],
-    });
-
-    const view = new EditorView({ state, parent });
-    viewRef.current = view;
-
-    return () => {
-      view.destroy();
-      viewRef.current = null;
-    };
-  }, [id]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const current = view.state.doc.toString();
-    if (current === value) return;
-    view.dispatch({
-      changes: { from: 0, to: current.length, insert: value },
-    });
-  }, [value]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="h-[420px] overflow-hidden rounded-xl border border-slate-200/80 dark:border-white/10"
-    />
-  );
+export default function MarkdownEditor(props: MarkdownEditorProps) {
+  return <MarkdownEditorCore {...props} />;
 }

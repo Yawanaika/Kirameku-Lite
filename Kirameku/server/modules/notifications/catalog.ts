@@ -144,8 +144,8 @@ export const NOTIFICATION_EVENTS: EventSpec[] = [
   },
   {
     key: "content.pending",
-    label: "待审核内容堆积",
-    description: "有新的评论 / 留言 / 友链申请等待站长审核。",
+    label: "友链申请待审核",
+    description: "有新的友链申请等待站长审核（评论与留言入库即通过，不在此列）。",
     level: "info",
     cooldownSeconds: 21_600,
     thresholds: [

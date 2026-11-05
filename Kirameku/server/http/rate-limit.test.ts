@@ -4,6 +4,8 @@ import {
   assertRateLimit,
   enforceIpRateLimit,
   enforceRateLimit,
+  RATE_LIMIT_MAX_KEYS,
+  rateLimitKeyCount,
   recordRateLimitFailure,
   resetRateLimits,
   tryConsumeRateLimit,
@@ -40,6 +42,18 @@ describe("rate limit", () => {
     expect(tryConsumeRateLimit("view:1", 1, 60_000)).toBe(true);
     expect(tryConsumeRateLimit("view:1", 1, 60_000)).toBe(false);
     expect(tryConsumeRateLimit("view:2", 1, 60_000)).toBe(true);
+  });
+
+  it("keeps the bucket map bounded even when every key is still live", () => {
+    // 全是伪造 IP 也会立刻过期前打满窗口：以前只删过期项，
+    // key 数量会无限增长，最终每个请求都要全表扫一遍。
+    for (let index = 0; index < RATE_LIMIT_MAX_KEYS + 500; index += 1) {
+      enforceRateLimit(`scan:${index}`, 1, 60_000);
+    }
+
+    expect(rateLimitKeyCount()).toBeLessThanOrEqual(RATE_LIMIT_MAX_KEYS);
+    // 新来的 key 仍然被正常计数，只是把最老的挤出去
+    expect(() => enforceRateLimit("scan:new", 1, 60_000)).not.toThrow();
   });
 
   it("keys public write limits per forwarded client IP", () => {

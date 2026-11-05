@@ -4,13 +4,9 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMusic } from "@/components/providers/MusicProvider";
+import { formatDuration } from "@/lib/format";
 
-const formatTime = (s: number) => {
-  if (!s || isNaN(s)) return "0:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-};
+
 
 // SVG Icons
 const Icons = {
@@ -188,7 +184,7 @@ export default function MusicPage() {
 
             {/* Progress */}
             <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-              <span className="text-[10px] md:text-xs text-slate-600 dark:text-slate-300 font-bold w-8 md:w-10 text-right tabular-nums">{formatTime(currentTime)}</span>
+              <span className="text-[10px] md:text-xs text-slate-600 dark:text-slate-300 font-bold w-8 md:w-10 text-right tabular-nums">{formatDuration(currentTime)}</span>
               <div className="flex-1 relative group">
                 <div className="h-1.5 bg-slate-200/80 dark:bg-slate-600/50 rounded-full overflow-hidden">
                   <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -200,7 +196,7 @@ export default function MusicPage() {
                   className="absolute inset-0 w-full opacity-0 cursor-pointer"
                 />
               </div>
-              <span className="text-[10px] md:text-xs text-slate-600 dark:text-slate-300 font-bold w-8 md:w-10 tabular-nums">{formatTime(duration)}</span>
+              <span className="text-[10px] md:text-xs text-slate-600 dark:text-slate-300 font-bold w-8 md:w-10 tabular-nums">{formatDuration(duration)}</span>
             </div>
 
             {/* Transport */}

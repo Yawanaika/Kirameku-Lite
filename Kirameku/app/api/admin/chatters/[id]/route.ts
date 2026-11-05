@@ -8,6 +8,7 @@ import {
   updateChatterInput,
 } from "@/server/modules/chatters/contracts";
 import { getChattersService } from "@/server/modules/chatters";
+import { revalidateChatters } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = adminChatterIdParams.parse(await params);
       const input = updateChatterInput.parse(await readJson(request));
-      return getChattersService().update(id, input);
+      const result = await getChattersService().update(id, input);
+      revalidateChatters();
+      return result;
     },
     { request },
   );
@@ -52,7 +55,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = adminChatterIdParams.parse(await params);
-      return getChattersService().remove(id);
+      const result = await getChattersService().remove(id);
+      revalidateChatters();
+      return result;
     },
     { request },
   );

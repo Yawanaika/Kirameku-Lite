@@ -209,7 +209,6 @@ export default function MessagesManager() {
               className="w-32"
             >
               <option value="">全部状态</option>
-              <option value="pending">待审核</option>
               <option value="approved">已通过</option>
               <option value="rejected">已拒绝</option>
             </Select>

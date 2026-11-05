@@ -8,6 +8,7 @@ import {
   createBookmarkSiteInput,
 } from "@/server/modules/bookmarks/contracts";
 import { getBookmarksService } from "@/server/modules/bookmarks";
+import { revalidateBookmarks } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createBookmarkSiteInput.parse(await readJson(request));
-      return getBookmarksService().createSite(input);
+      const result = await getBookmarksService().createSite(input);
+      revalidateBookmarks();
+      return result;
     },
     { request },
   );

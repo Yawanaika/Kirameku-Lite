@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createCategoryInput } from "@/server/modules/categories/contracts";
 import { getCategoriesService } from "@/server/modules/categories";
+import { revalidateTaxonomy } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createCategoryInput.parse(await readJson(request));
-      return getCategoriesService().create(input);
+      const result = await getCategoriesService().create(input);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );

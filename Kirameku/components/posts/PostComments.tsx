@@ -5,6 +5,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Heart, Send, Reply, ChevronDown, ChevronUp, LogOut } from "lucide-react";
 import { bypassImageOptimization } from "@/lib/image";
+import { formatRelativeTime } from "@/lib/format";
 import {
   getPostComments,
   createComment,
@@ -40,23 +41,6 @@ function flattenReplies(
     }
   }
   return result;
-}
-
-function relativeTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (days >= 3) {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  }
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  return `${days}天前`;
 }
 
 export default function PostComments({ postId }: { postId: number }) {
@@ -470,7 +454,7 @@ function CommentCard({
             )}
           </div>
           <span className="text-[10px] md:text-xs text-slate-400 dark:text-slate-500 shrink-0">
-            {relativeTime(comment.created_at)}
+            {formatRelativeTime(comment.created_at)}
           </span>
         </div>
 
@@ -583,7 +567,7 @@ function ReplyCard({
               {reply.github_user?.login ?? "匿名用户"}
             </span>
             <span className="text-[10px] md:text-xs text-slate-400">
-              {relativeTime(reply.created_at)}
+              {formatRelativeTime(reply.created_at)}
             </span>
           </div>
           <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">

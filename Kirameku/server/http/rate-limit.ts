@@ -8,20 +8,38 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 const MAX_KEYS = 10_000;
+/** 每插入这么多次才做一次过期清理，避免每个请求都全表扫描。 */
+const SWEEP_EVERY = 1_000;
+let insertsSinceSweep = 0;
+
+function sweepExpired(now: number): void {
+  for (const [key, value] of buckets) {
+    if (now >= value.resetAt) buckets.delete(key);
+  }
+}
 
 function getBucket(key: string, windowMs: number): Bucket {
   const now = Date.now();
   let bucket = buckets.get(key);
+  const isNew = !bucket || now >= bucket.resetAt;
 
-  if (!bucket || now >= bucket.resetAt) {
+  if (!bucket || isNew) {
     bucket = { count: 0, resetAt: now + windowMs };
     buckets.set(key, bucket);
   }
 
-  // Avoid unbounded growth from scans or spoofed keys.
-  if (buckets.size > MAX_KEYS) {
-    for (const [oldKey, value] of buckets) {
-      if (now >= value.resetAt) buckets.delete(oldKey);
+  // 防被扫描/伪造 IP 打爆内存：Map 的迭代顺序就是插入顺序，
+  // 超限时淘汰最老的 key。每来一个新 key 只删一个，成本 O(1)；
+  // 老实现是每次全表扫描找过期项，key 多时自己就把 CPU 打满了。
+  if (isNew) {
+    insertsSinceSweep += 1;
+    if (buckets.size > MAX_KEYS) {
+      const oldest = buckets.keys().next();
+      if (!oldest.done && oldest.value !== key) buckets.delete(oldest.value);
+    }
+    if (insertsSinceSweep >= SWEEP_EVERY) {
+      insertsSinceSweep = 0;
+      sweepExpired(now);
     }
   }
 
@@ -102,4 +120,13 @@ export function tryConsumeRateLimit(
 /** Test helper; not used by production code. */
 export function resetRateLimits(): void {
   buckets.clear();
+  insertsSinceSweep = 0;
 }
+
+/** Test helper; reports how many keys the limiter is currently tracking. */
+export function rateLimitKeyCount(): number {
+  return buckets.size;
+}
+
+/** Exposed for tests so the cap assertion does not hard-code the constant. */
+export const RATE_LIMIT_MAX_KEYS = MAX_KEYS;

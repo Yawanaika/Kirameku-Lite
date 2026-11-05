@@ -15,7 +15,8 @@ const projectLongDescription = z.string().trim().max(50_000);
 const projectCoverImage = z.string().trim().max(500);
 const projectTechStack = z.array(z.string().trim().max(100)).max(30);
 const projectLink = z.string().trim().max(300);
-const projectStatus = z.string().trim().min(1).max(20);
+/** 三态固定取值，对应后台 ProjectEditor 的下拉选项。 */
+const projectStatus = z.enum(["developing", "active", "archived"]);
 const projectStatusLabel = z.string().trim().max(20);
 const projectSort = z.coerce.number().int().min(-1_000_000).max(1_000_000);
 

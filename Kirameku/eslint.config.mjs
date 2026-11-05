@@ -8,8 +8,9 @@ const eslintConfig = defineConfig([
   {
     rules: {
       // 以 `_` 开头的形参/变量表示「按契约必须存在但未使用」，不必再逐处 disable。
+      // 设为 error 而不是 warn：CI 现在会跑 lint，warn 级别等于没有门禁。
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "error",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",

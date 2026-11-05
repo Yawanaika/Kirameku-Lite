@@ -8,6 +8,7 @@ import {
   updatePostInput,
 } from "@/server/modules/posts/contracts";
 import { getPostsService } from "@/server/modules/posts";
+import { revalidatePosts } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = postIdParams.parse(await params);
       const input = updatePostInput.parse(await readJson(request));
-      return getPostsService().update(id, input);
+      const result = await getPostsService().update(id, input);
+      revalidatePosts();
+      return result;
     },
     { request },
   );
@@ -52,7 +55,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = postIdParams.parse(await params);
-      return getPostsService().remove(id);
+      const result = await getPostsService().remove(id);
+      revalidatePosts();
+      return result;
     },
     { request },
   );

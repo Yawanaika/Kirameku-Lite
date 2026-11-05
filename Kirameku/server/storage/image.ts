@@ -1,6 +1,10 @@
 import { errors } from "@/server/http/errors";
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** 单边像素上限，挡住超宽/超高的解压炸弹。 */
+export const MAX_IMAGE_EDGE = 12_000;
+/** 总像素上限（5000 万像素，约等于 8000x6000 的相机原图）。 */
+export const MAX_IMAGE_PIXELS = 50_000_000;
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "gif";
 
@@ -202,6 +206,18 @@ export function inspectImage(
     dimensions.height <= 0
   ) {
     throw errors.unsupportedMediaType("无法识别图片尺寸");
+  }
+
+  // 字节数小不代表解码安全：一张几 MB 的 PNG 可以解出上亿像素，
+  // 单进程渲染或 sharp 处理时会直接把内存打爆，所以这里按像素设上限。
+  if (
+    dimensions.width > MAX_IMAGE_EDGE ||
+    dimensions.height > MAX_IMAGE_EDGE ||
+    dimensions.width * dimensions.height > MAX_IMAGE_PIXELS
+  ) {
+    throw errors.unsupportedMediaType(
+      `图片尺寸过大：${dimensions.width}x${dimensions.height}，上限 ${MAX_IMAGE_EDGE}px/边、${MAX_IMAGE_PIXELS} 像素`,
+    );
   }
 
   return {

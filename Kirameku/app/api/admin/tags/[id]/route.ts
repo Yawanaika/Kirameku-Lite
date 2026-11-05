@@ -8,6 +8,7 @@ import {
   updateTagInput,
 } from "@/server/modules/tags/contracts";
 import { getTagsService } from "@/server/modules/tags";
+import { revalidateTaxonomy } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = tagIdParams.parse(await params);
       const input = updateTagInput.parse(await readJson(request));
-      return getTagsService().update(id, input);
+      const result = await getTagsService().update(id, input);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );
@@ -38,7 +41,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = tagIdParams.parse(await params);
-      return getTagsService().remove(id);
+      const result = await getTagsService().remove(id);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );

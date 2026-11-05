@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createFriendLinkInput } from "@/server/modules/friend-links/contracts";
 import { getFriendLinksService } from "@/server/modules/friend-links";
+import { revalidateFriendLinks } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createFriendLinkInput.parse(await readJson(request));
-      return getFriendLinksService().create(input);
+      const result = await getFriendLinksService().create(input);
+      revalidateFriendLinks();
+      return result;
     },
     { request },
   );

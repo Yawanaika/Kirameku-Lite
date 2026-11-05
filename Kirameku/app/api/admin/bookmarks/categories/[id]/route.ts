@@ -8,6 +8,7 @@ import {
   updateBookmarkCategoryInput,
 } from "@/server/modules/bookmarks/contracts";
 import { getBookmarksService } from "@/server/modules/bookmarks";
+import { revalidateBookmarks } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = bookmarkCategoryIdParams.parse(await params);
       const input = updateBookmarkCategoryInput.parse(await readJson(request));
-      return getBookmarksService().updateCategory(id, input);
+      const result = await getBookmarksService().updateCategory(id, input);
+      revalidateBookmarks();
+      return result;
     },
     { request },
   );
@@ -38,7 +41,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = bookmarkCategoryIdParams.parse(await params);
-      return getBookmarksService().removeCategory(id);
+      const result = await getBookmarksService().removeCategory(id);
+      revalidateBookmarks();
+      return result;
     },
     { request },
   );

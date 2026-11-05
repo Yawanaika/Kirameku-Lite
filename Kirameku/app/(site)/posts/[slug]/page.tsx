@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { renderMarkdown } from "@/lib/markdown";
+import { renderMarkdownWithToc } from "@/lib/markdown";
 import { AppError } from "@/server/http/errors";
 import { getPostsService } from "@/server/modules/posts";
 import {
@@ -79,13 +79,40 @@ export default async function PostDetailPage({ params }: PageProps) {
   if (!post) notFound();
 
   const { content, ...initialPost } = post;
-  const contentHtml = await renderMarkdown(content);
+  const [{ html: contentHtml, toc }, base] = await Promise.all([
+    renderMarkdownWithToc(content),
+    getSiteUrl(),
+  ]);
+
+  // BlogPosting 结构化数据：搜索结果和第三方聚合靠它取标题、封面和发布时间。
+  // 只输出库里的真实字段，不臆造作者/评分等不存在的属性。
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.description || undefined,
+    image: post.cover ? shareImageUrl(post.cover, base) : undefined,
+    url: siteUrl(`/posts/${post.slug}`, base),
+    mainEntityOfPage: siteUrl(`/posts/${post.slug}`, base),
+    datePublished: post.published_at ?? post.created_at,
+    dateModified: post.updated_at,
+    ...(post.tags.length > 0 ? { keywords: post.tags.join(",") } : {}),
+    ...(post.category ? { articleSection: post.category } : {}),
+  };
 
   return (
-    <PostDetailClient
-      key={post.slug}
-      initialPost={initialPost}
-      contentHtml={contentHtml}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        // JSON.stringify 会转义引号，内容全部来自数据库字段，不存在 </script> 注入面
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <PostDetailClient
+        key={post.slug}
+        initialPost={initialPost}
+        contentHtml={contentHtml}
+        toc={toc}
+      />
+    </>
   );
 }

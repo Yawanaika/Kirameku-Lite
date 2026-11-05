@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/**
+ * 只有草稿与已发布两种状态。以前是自由字符串，写错一个字母文章就会
+ * 从前台静默消失，后台列表却仍显示「已发布」。
+ */
+const postStatus = z.enum(["draft", "published"]);
+
 /** Public post list query. Drafts are never exposed by the public API. */
 export const postListQuery = z.object({
   status: z.literal("published").default("published"),
@@ -14,7 +20,7 @@ export const postCountQuery = z.object({
 });
 
 export const adminPostListQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: postStatus.optional(),
   category: z.string().trim().min(1).max(100).optional(),
   tag: z.string().trim().min(1).max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -22,7 +28,7 @@ export const adminPostListQuery = z.object({
 });
 
 export const adminPostCountQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: postStatus.optional(),
 });
 
 export const postIdParams = z.object({
@@ -34,7 +40,6 @@ const postSlug = z.string().trim().min(1).max(200);
 const postDescription = z.string().trim().max(5000);
 const postContent = z.string().max(2_000_000);
 const postCover = z.string().trim().max(1000);
-const postStatus = z.string().trim().min(1).max(50);
 const postCategoryId = z.coerce.number().int().min(1).nullable();
 const postTags = z.array(z.string().trim().max(100)).max(50);
 const postWordCount = z.coerce.number().int().min(0).max(10_000_000);

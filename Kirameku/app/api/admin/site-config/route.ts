@@ -8,6 +8,7 @@ import {
   createSiteConfigInput,
 } from "@/server/modules/site-config/contracts";
 import { getSiteConfigService } from "@/server/modules/site-config";
+import { revalidateSiteChrome } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createSiteConfigInput.parse(await readJson(request));
-      return getSiteConfigService().create(input);
+      const result = await getSiteConfigService().create(input);
+      revalidateSiteChrome();
+      return result;
     },
     { request },
   );
@@ -41,7 +44,9 @@ export async function PUT(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = batchSiteConfigInput.parse(await readJson(request));
-      return getSiteConfigService().batchUpdate(input);
+      const result = await getSiteConfigService().batchUpdate(input);
+      revalidateSiteChrome();
+      return result;
     },
     { request },
   );

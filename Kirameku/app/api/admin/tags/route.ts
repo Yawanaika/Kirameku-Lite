@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createTagInput } from "@/server/modules/tags/contracts";
 import { getTagsService } from "@/server/modules/tags";
+import { revalidateTaxonomy } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createTagInput.parse(await readJson(request));
-      return getTagsService().create(input);
+      const result = await getTagsService().create(input);
+      revalidateTaxonomy();
+      return result;
     },
     { request },
   );

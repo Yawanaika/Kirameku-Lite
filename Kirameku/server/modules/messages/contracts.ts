@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { reviewStatus } from "@/server/modules/comments/contracts";
+
+export type { ReviewStatus } from "@/server/modules/comments/contracts";
 
 /** Public message list query. Only approved top-level messages are exposed. */
 export const messageListQuery = z.object({
@@ -26,13 +29,13 @@ export const messageIdParams = z.object({
 });
 
 export const adminMessageListQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: reviewStatus.optional(),
   page: z.coerce.number().int().min(1).default(1),
   size: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export const adminMessageCountQuery = z.object({
-  status: z.string().trim().min(1).max(50).optional(),
+  status: reviewStatus.optional(),
 });
 
 export const adminMessageIdParams = z.object({
@@ -40,7 +43,7 @@ export const adminMessageIdParams = z.object({
 });
 
 export const updateMessageStatusInput = z.object({
-  status: z.enum(["approved", "rejected", "pending"]),
+  status: reviewStatus,
 });
 
 /** Internal service input; the public route narrows status to approved. */

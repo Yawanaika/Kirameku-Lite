@@ -4,6 +4,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { photoIdParams } from "@/server/modules/albums/contracts";
 import { getAlbumsService } from "@/server/modules/albums";
+import { revalidateAlbums } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = photoIdParams.parse(await params);
-      return getAlbumsService().removePhoto(id);
+      const result = await getAlbumsService().removePhoto(id);
+      revalidateAlbums();
+      return result;
     },
     { request },
   );

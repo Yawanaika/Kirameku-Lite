@@ -8,6 +8,7 @@ import {
   updateAlbumInput,
 } from "@/server/modules/albums/contracts";
 import { getAlbumsService } from "@/server/modules/albums";
+import { revalidateAlbums } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = albumIdParams.parse(await params);
       const input = updateAlbumInput.parse(await readJson(request));
-      return getAlbumsService().update(id, input);
+      const result = await getAlbumsService().update(id, input);
+      revalidateAlbums();
+      return result;
     },
     { request },
   );
@@ -57,7 +60,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = albumIdParams.parse(await params);
-      return getAlbumsService().remove(id);
+      const result = await getAlbumsService().remove(id);
+      revalidateAlbums();
+      return result;
     },
     { request },
   );

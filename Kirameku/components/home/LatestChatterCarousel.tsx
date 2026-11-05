@@ -8,6 +8,7 @@ import { MessageSquare, Heart } from "lucide-react";
 import { getChatters } from "@/lib/api";
 import type { ChatterItem } from "@/lib/api";
 import { bypassImageOptimization } from "@/lib/image";
+import { formatRelativeTime } from "@/lib/format";
 
 function ChatterImage({ src }: { src: string }) {
   const [isLandscape, setIsLandscape] = useState(true);
@@ -35,18 +36,6 @@ function ChatterImage({ src }: { src: string }) {
 }
 
 const SWIPE_THRESHOLD = 80;
-
-function relativeTime(dateStr: string): string {
-  const now = new Date();
-  const d = new Date(dateStr);
-  const diff = now.getTime() - d.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  return dateStr.replace("T", " ").slice(5, 16);
-}
 
 export default function LatestChatterCarousel() {
   const router = useRouter();
@@ -191,7 +180,7 @@ export default function LatestChatterCarousel() {
                       </span>
                     )}
                     <span className="text-xs text-slate-400">
-                      {relativeTime(item.created_at)}
+                      {formatRelativeTime(item.created_at)}
                     </span>
                   </div>
                   <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-3">

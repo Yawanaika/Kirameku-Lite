@@ -15,6 +15,14 @@ export interface HandlerOptions {
   actor?: string;
 }
 
+function readRetryAfterMs(details: unknown): number | null {
+  if (typeof details !== "object" || details === null) return null;
+  const value = (details as { retryAfterMs?: unknown }).retryAfterMs;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
 function errorResponse(
   error: unknown,
   requestId: string,
@@ -40,20 +48,29 @@ function errorResponse(
   }
 
   if (error instanceof AppError) {
-    return {
-      status: error.status,
-      response: Response.json(
-        {
-          error: {
-            code: error.code,
-            message: error.message,
-            ...(error.details === undefined ? {} : { details: error.details }),
-          },
-          requestId,
+    const response = Response.json(
+      {
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.details === undefined ? {} : { details: error.details }),
         },
-        { status: error.status },
-      ),
-    };
+        requestId,
+      },
+      { status: error.status },
+    );
+    // 429 带上 Retry-After，客户端和反代才知道什么时候可以重试，
+    // 否则只能盲目重试、反而把限流窗口继续顶满。
+    if (error.status === 429) {
+      const retryAfterMs = readRetryAfterMs(error.details);
+      if (retryAfterMs !== null) {
+        response.headers.set(
+          "Retry-After",
+          String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
+        );
+      }
+    }
+    return { status: error.status, response };
   }
 
   const sqliteCode =

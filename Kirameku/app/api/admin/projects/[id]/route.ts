@@ -8,6 +8,7 @@ import {
   updateProjectInput,
 } from "@/server/modules/projects/contracts";
 import { getProjectsService } from "@/server/modules/projects";
+import { revalidateProjects } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,9 @@ export async function PUT(
       await requireAdmin();
       const { id } = adminProjectIdParams.parse(await params);
       const input = updateProjectInput.parse(await readJson(request));
-      return getProjectsService().update(id, input);
+      const result = await getProjectsService().update(id, input);
+      revalidateProjects();
+      return result;
     },
     { request },
   );
@@ -52,7 +55,9 @@ export async function DELETE(
       assertSameOrigin(request);
       await requireAdmin();
       const { id } = adminProjectIdParams.parse(await params);
-      return getProjectsService().remove(id);
+      const result = await getProjectsService().remove(id);
+      revalidateProjects();
+      return result;
     },
     { request },
   );

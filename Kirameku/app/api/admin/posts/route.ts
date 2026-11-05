@@ -8,6 +8,7 @@ import {
   createPostInput,
 } from "@/server/modules/posts/contracts";
 import { getPostsService } from "@/server/modules/posts";
+import { revalidatePosts } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createPostInput.parse(await readJson(request));
-      return getPostsService().create(input);
+      const result = await getPostsService().create(input);
+      revalidatePosts();
+      return result;
     },
     { request },
   );

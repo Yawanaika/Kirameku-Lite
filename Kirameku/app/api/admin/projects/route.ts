@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { createProjectInput } from "@/server/modules/projects/contracts";
 import { getProjectsService } from "@/server/modules/projects";
+import { revalidateProjects } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
       assertSameOrigin(request);
       await requireAdmin();
       const input = createProjectInput.parse(await readJson(request));
-      return getProjectsService().create(input);
+      const result = await getProjectsService().create(input);
+      revalidateProjects();
+      return result;
     },
     { request },
   );

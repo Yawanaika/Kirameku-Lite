@@ -18,6 +18,7 @@ import { getGithubUser, logoutGithubUser } from "@/lib/api/github-auth";
 import type { GitHubUser } from "@/lib/api/types";
 import { useSiteSettings } from "@/components/providers/SiteSettingsProvider";
 import { bypassImageOptimization } from "@/lib/image";
+import { formatRelativeTime } from "@/lib/format";
 
 interface Moment {
   id: string;
@@ -59,17 +60,6 @@ const shanghaiKeyFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-const shanghaiDateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  timeZone: "Asia/Shanghai",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
 function formatDate(dateStr: string): string {
   const parts = shanghaiDateFormatter.formatToParts(new Date(dateStr));
   const month = parts.find((part) => part.type === "month")?.value ?? "";
@@ -93,21 +83,7 @@ function toMoment(item: ChatterItem): Moment {
   };
 }
 
-function relativeTime(dateStr: string): string {
-  const now = new Date();
-  const d = new Date(dateStr);
-  const diff = now.getTime() - d.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 3) return `${days}天前`;
-  return shanghaiDateTimeFormatter
-    .format(d)
-    .replaceAll("/", "-");
-}
+
 
 function flattenReplies(
   replies: ChatterCommentItem[],
@@ -357,7 +333,7 @@ export default function MomentsClient({
                     {!isExpanded && !onlyViewId && (
                       <div className="px-3 py-3 md:px-5 md:py-4">
                         <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
-                          <span suppressHydrationWarning className="text-[10px] md:text-xs text-slate-400">{relativeTime(moment.created_at)}</span>
+                          <span suppressHydrationWarning className="text-[10px] md:text-xs text-slate-400">{formatRelativeTime(moment.created_at)}</span>
                           {moment.mood && <span className="text-[10px] md:text-xs">{moment.mood}</span>}
                           {hasImages && <span className="text-[10px] md:text-xs text-slate-400">📷</span>}
                         </div>
@@ -372,7 +348,7 @@ export default function MomentsClient({
                             <div className="flex items-center gap-1.5 md:gap-2">
                               <Image src="/images/hong.jpg" alt="avatar" width={24} height={24} className="rounded-full object-cover md:w-7 md:h-7" />
                               <span className="text-xs md:text-sm font-semibold text-slate-800 dark:text-slate-200">{profile.authorName}</span>
-                              <span suppressHydrationWarning className="text-[10px] md:text-xs text-slate-400">{relativeTime(moment.created_at)}</span>
+                              <span suppressHydrationWarning className="text-[10px] md:text-xs text-slate-400">{formatRelativeTime(moment.created_at)}</span>
                             </div>
                             {moment.mood && (
                               <span className="text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 rounded-full bg-slate-100/80 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400">{moment.mood}</span>
@@ -525,7 +501,7 @@ function CommentCard({ comment, expandedReplies, onReply, onToggleReplies, liked
             <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-white text-[10px] font-bold">?</div>
           )}
           <span className="text-[10px] md:text-xs font-semibold text-slate-700 dark:text-slate-300">{comment.github_user?.login ?? "匿名用户"}</span>
-          <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(comment.created_at)}</span>
+          <span className="text-[10px] text-slate-400 ml-auto">{formatRelativeTime(comment.created_at)}</span>
         </div>
         <p className="text-[10px] md:text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap mb-1.5 md:mb-2 ml-7 md:ml-8">{comment.content}</p>
         <div className="flex items-center gap-2 ml-7 md:ml-8">
@@ -572,7 +548,7 @@ function ReplyCard({ reply, onReply, likedCommentIds, onCommentLike }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 mb-0.5">
             <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">{reply.github_user?.login ?? "匿名用户"}</span>
-            <span className="text-[9px] text-slate-400">{relativeTime(reply.created_at)}</span>
+            <span className="text-[9px] text-slate-400">{formatRelativeTime(reply.created_at)}</span>
           </div>
           <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-relaxed whitespace-pre-wrap">
             {reply.replyToUser && <span className="text-sky-500 dark:text-sky-400 mr-1">回复 @{reply.replyToUser}：</span>}

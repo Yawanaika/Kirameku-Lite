@@ -9,6 +9,7 @@ import {
 } from "@/lib/nav-dropdown";
 import { navDropdownConfigInput } from "@/server/modules/site-config/contracts";
 import { getSiteConfigService } from "@/server/modules/site-config";
+import { revalidateSiteChrome } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export async function PUT(request: Request) {
         value: JSON.stringify(config),
         description: DESCRIPTION,
       });
+      revalidateSiteChrome();
       return config;
     },
     { request },

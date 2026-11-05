@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Clock, BookOpen, Eye, Heart, Calendar } from "lucide-react";
 import type { PostItem } from "@/server/modules/posts/contracts";
+import { formatDate } from "@/lib/format";
 
 // ── 分类样式 ──────────────────────────────────────────
 
@@ -43,13 +44,6 @@ function getCatColor(cat: string): string {
     教程: "#60a5fa",
   };
   return map[cat] || "#94a3b8";
-}
-
-// ── 日期工具 ──────────────────────────────────────────
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 // ── 河流路径生成（带步长控制）──────────────────────────

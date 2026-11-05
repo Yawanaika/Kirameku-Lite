@@ -5,6 +5,7 @@ import { errors } from "@/server/http/errors";
 import type {
   MessageItem,
   MessageListParams,
+  ReviewStatus,
 } from "./contracts";
 
 interface MessageRow {
@@ -73,7 +74,7 @@ function groupChildren(rows: MessageRow[]): Map<number, MessageRow[]> {
 }
 
 export function createMessagesService(db: AppDatabase) {
-  async function loadRows(status?: string): Promise<MessageRow[]> {
+  async function loadRows(status?: ReviewStatus): Promise<MessageRow[]> {
     const conditions = [status ? eq(message.status, status) : sql`1 = 1`];
     return db
       .select({
@@ -181,7 +182,7 @@ export function createMessagesService(db: AppDatabase) {
     },
 
     async listAdmin(params: {
-      status?: string;
+      status?: ReviewStatus;
       page: number;
       size: number;
     }): Promise<MessageItem[]> {
@@ -198,7 +199,7 @@ export function createMessagesService(db: AppDatabase) {
         .map((row) => toItem(row, childrenByParent));
     },
 
-    async adminCount(status?: string): Promise<number> {
+    async adminCount(status?: ReviewStatus): Promise<number> {
       const conditions = [isNull(message.parentId)];
       if (status) conditions.push(eq(message.status, status));
 
@@ -209,7 +210,7 @@ export function createMessagesService(db: AppDatabase) {
       return row?.value ?? 0;
     },
 
-    async updateStatus(id: number, status: string): Promise<MessageItem> {
+    async updateStatus(id: number, status: ReviewStatus): Promise<MessageItem> {
       const [row] = await db
         .update(message)
         .set({ status })
