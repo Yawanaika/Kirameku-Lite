@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 import { env } from "@/server/env";
+import { summarizeBackups } from "@/server/modules/backups/service";
+import { readDiskUsage } from "@/server/storage/disk";
 
 const MAX_LATENCY_SAMPLES = 2048;
 
@@ -186,85 +188,21 @@ export function getMetrics(): MetricsSnapshot {
     },
     // Backup freshness is the cheapest signal that scheduled maintenance is
     // actually running; a stale latest_age_s means the timer stopped firing.
-    backups: backupSummary(),
-    disk: diskUsage(),
+    backups: summarizeBackups(),
+    disk: snapshotDisk(),
   };
 }
 
-function backupSummary(): MetricsSnapshot["backups"] {
-  const dir = path.resolve(env.BACKUP_DIR || "./backups");
-
-  try {
-    const entries = fs.readdirSync(dir);
-    let count = 0;
-    let uploadsArchives = 0;
-    let totalBytes = 0;
-    let latestFile: string | null = null;
-    let latestMtime = 0;
-
-    for (const entry of entries) {
-      const full = path.join(dir, entry);
-      let stat: fs.Stats;
-      try {
-        stat = fs.statSync(full);
-      } catch {
-        continue;
-      }
-
-      if (entry.endsWith("-uploads.tar.gz")) {
-        uploadsArchives += 1;
-        totalBytes += stat.size;
-        continue;
-      }
-      if (!entry.endsWith(".db")) continue;
-
-      count += 1;
-      totalBytes += stat.size;
-      if (stat.mtimeMs > latestMtime) {
-        latestMtime = stat.mtimeMs;
-        latestFile = entry;
-      }
-    }
-
-    return {
-      dir,
-      count,
-      uploads_archives: uploadsArchives,
-      total_bytes: totalBytes,
-      latest_file: latestFile,
-      latest_age_s:
-        latestMtime === 0
-          ? null
-          : Math.round((Date.now() - latestMtime) / 1000),
-    };
-  } catch {
-    return {
-      dir,
-      count: 0,
-      uploads_archives: 0,
-      total_bytes: 0,
-      latest_file: null,
-      latest_age_s: null,
-    };
-  }
-}
-
-function diskUsage(): MetricsSnapshot["disk"] {
-  const target = path.dirname(path.resolve(env.DATABASE_PATH));
-
-  try {
-    const stats = fs.statfsSync(target);
-    const total = stats.blocks * stats.bsize;
-    const available = stats.bavail * stats.bsize;
-    return {
-      path: target,
-      total_bytes: total,
-      used_bytes: total - stats.bfree * stats.bsize,
-      available_bytes: available,
-    };
-  } catch {
-    return null;
-  }
+/** 磁盘字段名属于对外监控契约，保持 snake_case 不变。 */
+function snapshotDisk(): MetricsSnapshot["disk"] {
+  const usage = readDiskUsage(path.dirname(path.resolve(env.DATABASE_PATH)));
+  if (!usage) return null;
+  return {
+    path: usage.path,
+    total_bytes: usage.totalBytes,
+    used_bytes: usage.usedBytes,
+    available_bytes: usage.availableBytes,
+  };
 }
 
 /** Test/maintenance hook; the HTTP endpoint never resets counters. */

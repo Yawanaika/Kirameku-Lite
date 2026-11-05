@@ -60,6 +60,44 @@ export function formatRelativeTime(
 }
 
 /**
+ * 已有「距今多少秒」时的相对文案，例如 `2 小时前`。
+ *
+ * 服务端算好的时长直接渲染，不必在组件里调用 `Date.now()`：
+ * 渲染期取当前时间是纯函数规则不允许的，也会让 SSR 与客户端对不上。
+ */
+export function formatElapsed(seconds: number | null | undefined): string {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds)) return "—";
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return "刚刚";
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  return `${Math.floor(hours / 24)} 天前`;
+}
+
+/** 字节数转人类可读体积，例如 `1.2 MB`；无效值返回 `—`。 */
+export function formatBytes(
+  value: number | null | undefined,
+  options: { fractionDigits?: number } = {},
+): string {
+  const { fractionDigits = 1 } = options;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return "—";
+  }
+  if (value < 1024) return `${Math.round(value)} B`;
+
+  const units = ["KB", "MB", "GB", "TB"];
+  let size = value / 1024;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${size.toFixed(fractionDigits)} ${units[unit]}`;
+}
+
+/**
  * 播放进度时长。`padMinutes` 为 true 时输出 `00:00`，否则 `0:00`，
  * 用于统一原本两套互不一致的实现。
  */
