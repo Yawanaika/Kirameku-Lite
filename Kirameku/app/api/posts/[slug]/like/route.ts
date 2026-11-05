@@ -3,6 +3,7 @@ import { enforceIpRateLimit } from "@/server/http/rate-limit";
 import { errors } from "@/server/http/errors";
 import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
+import { getVisitorKey } from "@/server/http/visitor-key";
 import { getPostsService } from "@/server/modules/posts";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,11 @@ export async function POST(
       assertSameOrigin(request);
       enforceIpRateLimit(request, "post-like", 30, 60_000);
       const { slug } = await params;
-      return getPostsService().like(parsePostId(slug), false);
+      return getPostsService().like(
+        parsePostId(slug),
+        false,
+        getVisitorKey(request),
+      );
     },
     { request },
   );

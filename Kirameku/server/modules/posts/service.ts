@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { category, post, postTag, tag } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
+import { applyLike } from "@/server/modules/likes/service";
 import type {
   CreatePostInput,
   PostDetail,
@@ -478,14 +479,37 @@ export function createPostsService(db: AppDatabase) {
       return row?.value ?? 0;
     },
 
-    async like(id: number, unlike = false): Promise<{ likes: number }> {
+    async like(
+      id: number,
+      unlike = false,
+      visitorKey?: string,
+    ): Promise<{ likes: number }> {
+      const where = and(eq(post.id, id), eq(post.status, "published"));
+
+      // 同一个人重复点等于没点：先过记账表，只有真的新增/撤销才动计数器。
+      const changed = await applyLike(db, {
+        targetType: "post",
+        targetId: id,
+        visitorKey,
+        unlike,
+      });
+      if (!changed) {
+        const [row] = await db
+          .select({ likes: post.likes })
+          .from(post)
+          .where(where)
+          .limit(1);
+        if (!row) throw errors.notFound("文章不存在");
+        return { likes: row.likes ?? 0 };
+      }
+
       const delta = unlike ? -1 : 1;
       const [row] = await db
         .update(post)
         .set({
           likes: sql<number>`max(0, coalesce(${post.likes}, 0) + ${delta})`,
         })
-        .where(and(eq(post.id, id), eq(post.status, "published")))
+        .where(where)
         .returning({ likes: post.likes });
 
       if (!row) throw errors.notFound("文章不存在");

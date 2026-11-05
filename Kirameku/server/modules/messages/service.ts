@@ -2,6 +2,7 @@ import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { githubUser, message } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
+import { applyLike } from "@/server/modules/likes/service";
 import type {
   MessageItem,
   MessageListParams,
@@ -169,8 +170,17 @@ export function createMessagesService(db: AppDatabase) {
     async toggleLike(
       id: number,
       unlike = false,
+      visitorKey?: string,
     ): Promise<MessageItem> {
       await getApprovedById(id);
+      const changed = await applyLike(db, {
+        targetType: "message",
+        targetId: id,
+        visitorKey,
+        unlike,
+      });
+      if (!changed) return getApprovedById(id);
+
       const delta = unlike ? -1 : 1;
       await db
         .update(message)

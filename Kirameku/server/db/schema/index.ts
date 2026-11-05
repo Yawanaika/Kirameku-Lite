@@ -6,6 +6,7 @@ export { chatter, chatterComment } from "./chatter";
 export { comment } from "./comment";
 export { friendLink } from "./friend-link";
 export { githubUser } from "./github-user";
+export { likeRecord } from "./like";
 export { message } from "./message";
 export {
   notificationChannel,

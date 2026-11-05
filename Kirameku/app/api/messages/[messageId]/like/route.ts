@@ -2,6 +2,7 @@ import { handle } from "@/server/http/handler";
 import { enforceIpRateLimit } from "@/server/http/rate-limit";
 import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
+import { getVisitorKey } from "@/server/http/visitor-key";
 import { messageIdParams } from "@/server/modules/messages/contracts";
 import { getMessagesService } from "@/server/modules/messages";
 
@@ -17,7 +18,7 @@ export async function POST(
       assertSameOrigin(request);
       enforceIpRateLimit(request, "message-like", 30, 60_000);
       const { messageId } = messageIdParams.parse(await params);
-      return getMessagesService().toggleLike(messageId, false);
+      return getMessagesService().toggleLike(messageId, false, getVisitorKey(request));
     },
     { request },
   );

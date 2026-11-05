@@ -2,6 +2,7 @@ import { handle } from "@/server/http/handler";
 import { enforceIpRateLimit } from "@/server/http/rate-limit";
 import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
+import { getVisitorKey } from "@/server/http/visitor-key";
 import { commentIdParams } from "@/server/modules/comments/contracts";
 import { getCommentsService } from "@/server/modules/comments";
 
@@ -17,7 +18,7 @@ export async function POST(
       assertSameOrigin(request);
       enforceIpRateLimit(request, "chatter-comment-like", 30, 60_000);
       const { commentId } = commentIdParams.parse(await params);
-      return getCommentsService().toggleChatterCommentLike(commentId, true);
+      return getCommentsService().toggleChatterCommentLike(commentId, true, getVisitorKey(request));
     },
     { request },
   );

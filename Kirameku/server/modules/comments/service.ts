@@ -8,6 +8,7 @@ import {
   post,
 } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
+import { applyLike } from "@/server/modules/likes/service";
 import type {
   AdminChatterCommentItem,
   AdminPostCommentItem,
@@ -413,8 +414,17 @@ export function createCommentsService(db: AppDatabase) {
     async togglePostCommentLike(
       id: number,
       unlike = false,
+      visitorKey?: string,
     ): Promise<PostCommentItem> {
       await getPostComment(id);
+      const changed = await applyLike(db, {
+        targetType: "comment",
+        targetId: id,
+        visitorKey,
+        unlike,
+      });
+      if (!changed) return getPostComment(id);
+
       const delta = unlike ? -1 : 1;
       await db
         .update(comment)
@@ -487,8 +497,17 @@ export function createCommentsService(db: AppDatabase) {
     async toggleChatterCommentLike(
       id: number,
       unlike = false,
+      visitorKey?: string,
     ): Promise<ChatterCommentItem> {
       await getChatterComment(id);
+      const changed = await applyLike(db, {
+        targetType: "chatter_comment",
+        targetId: id,
+        visitorKey,
+        unlike,
+      });
+      if (!changed) return getChatterComment(id);
+
       const delta = unlike ? -1 : 1;
       await db
         .update(chatterComment)
