@@ -3,16 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+/** 彩蛋暗号：输入后解锁花园。其余输入都当作站内搜索关键词。 */
+const GARDEN_PASSWORD = "5201314";
+
 export default function SearchBar() {
   const router = useRouter();
   const [value, setValue] = useState("");
 
   function handleSubmit() {
-    if (value.trim() === "5201314") {
+    const query = value.trim();
+    if (!query) return;
+
+    if (query === GARDEN_PASSWORD) {
       localStorage.setItem("garden-unlock", "true");
       router.push("/garden");
       setValue("");
+      return;
     }
+
+    router.push(`/search?q=${encodeURIComponent(query)}`);
   }
 
   return (
@@ -25,9 +34,9 @@ export default function SearchBar() {
         }}
       >
         <input
-          type="text"
+          type="search"
           className="w-full pl-14 pr-6 py-4 bg-white/50 dark:bg-slate-800/50 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl shadow-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-slate-800 dark:text-slate-200 transition-all placeholder-slate-500 dark:placeholder-slate-400 font-medium text-lg"
-          placeholder="输入暗号探索更多..."
+          placeholder="搜索文章，或输入暗号…"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           autoComplete="off"
@@ -35,6 +44,7 @@ export default function SearchBar() {
         />
         <button
           type="submit"
+          aria-label="搜索"
           className="absolute inset-y-0 left-0 pl-5 flex items-center z-10 cursor-pointer"
         >
           <svg
