@@ -15,6 +15,7 @@ import { POST as createCategory } from "./categories/route";
 import { GET as getVisitorsCount } from "./visitors/count/route";
 import { GET as getBackups } from "./backups/route";
 import { GET as getAnalytics } from "./analytics/route";
+import { GET as getMedia } from "./media/route";
 import { POST as previewMarkdown } from "./markdown/preview/route";
 
 /*
@@ -292,6 +293,51 @@ describe("GET /api/admin/analytics", () => {
     const tooWide = await getAnalytics(request("/api/admin/analytics?days=500"));
     // 参数校验失败统一走 422 VALIDATION_ERROR。
     expect(tooWide.status).toBe(422);
+  });
+});
+
+describe("GET /api/admin/media", () => {
+  it("requires an admin session", async () => {
+    const response = await getMedia(request("/api/admin/media"));
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns photos sorted by size with global stats", async () => {
+    await asAdmin();
+    connection
+      .prepare(
+        'INSERT INTO "photo" ("album_id", "url", "caption", "width", "height", "bytes", "format") VALUES (?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(1, "/uploads/big.jpg", "Big", 4000, 3000, 2_000_000, "jpeg");
+    connection
+      .prepare('INSERT INTO "photo" ("album_id", "url", "bytes") VALUES (?, ?, ?)')
+      .run(1, "/uploads/legacy.jpg", null);
+
+    const response = await getMedia(request("/api/admin/media?size=10"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    // 种子数据里已经有一张照片，加上刚插入的两张。
+    expect(body.total).toBe(3);
+    // 有体积的排前面，未记录体积的老照片垫底。
+    expect(body.items[0].caption).toBe("Big");
+    expect(body.items[1].bytes).toBeNull();
+    expect(body.items[2].bytes).toBeNull();
+    expect(body.stats.bytes).toBe(2_000_000);
+    expect(body.stats.missingBytes).toBe(2);
+    expect(body.stats.largest.caption).toBe("Big");
+    expect(body.albumOptions).toHaveLength(1);
+  });
+
+  it("rejects an unknown sort with 422", async () => {
+    await asAdmin();
+
+    const response = await getMedia(
+      request("/api/admin/media?sort=whatever"),
+    );
+
+    expect(response.status).toBe(422);
   });
 });
 

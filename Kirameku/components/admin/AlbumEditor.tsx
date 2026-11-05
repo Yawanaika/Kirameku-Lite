@@ -35,6 +35,11 @@ interface PhotoFormState {
   caption: string;
   orientation: string;
   sort: string;
+  /** 上传接口回传的元数据，随照片一起入库，媒体库靠它算体积与尺寸。 */
+  width?: number;
+  height?: number;
+  bytes?: number;
+  format?: string;
 }
 
 const emptyPhoto: PhotoFormState = {
@@ -155,6 +160,10 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
           caption: photoForm.caption.trim(),
           orientation: photoForm.orientation,
           sort: Number(photoForm.sort) || 0,
+          width: photoForm.width,
+          height: photoForm.height,
+          bytes: photoForm.bytes,
+          format: photoForm.format,
         }),
       });
       setPhotoForm(emptyPhoto);
@@ -320,12 +329,27 @@ export default function AlbumEditor({ albumId }: { albumId: number }) {
                 label="图片"
                 value={photoForm.url}
                 onChange={(url) =>
-                  setPhotoForm((current) => ({ ...current, url }))
+                  // 手改 URL 时把上一张的元数据一并清掉：上传成功后
+                  // ImageUploader 会紧接着调 onUploaded 补回新值。
+                  setPhotoForm((current) => ({
+                    ...current,
+                    url,
+                    width: undefined,
+                    height: undefined,
+                    bytes: undefined,
+                    format: undefined,
+                  }))
                 }
                 onUploaded={(image) =>
                   setPhotoForm((current) => ({
                     ...current,
+                    // 换图后旧图的元数据必须一起换掉，否则会把上一张的体积
+                    // 记到新图头上。
                     orientation: image.orientation,
+                    width: image.width,
+                    height: image.height,
+                    bytes: image.size,
+                    format: image.format,
                   }))
                 }
               />

@@ -30,6 +30,10 @@ type PhotoRow = Pick<
   | "caption"
   | "orientation"
   | "sort"
+  | "width"
+  | "height"
+  | "bytes"
+  | "format"
   | "createdAt"
 >;
 
@@ -54,6 +58,10 @@ function toPhoto(row: PhotoRow): PhotoItem {
     caption: row.caption ?? "",
     orientation: row.orientation ?? "landscape",
     sort: row.sort ?? 0,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    bytes: row.bytes ?? null,
+    format: row.format ?? null,
     created_at: row.createdAt?.toISOString() ?? new Date(0).toISOString(),
   };
 }
@@ -126,6 +134,10 @@ export function createAlbumsService(db: AppDatabase) {
           caption: photo.caption,
           orientation: photo.orientation,
           sort: photo.sort,
+          width: photo.width,
+          height: photo.height,
+          bytes: photo.bytes,
+          format: photo.format,
           createdAt: photo.createdAt,
         })
         .from(photo)
@@ -189,6 +201,10 @@ export function createAlbumsService(db: AppDatabase) {
           caption: input.caption,
           orientation: input.orientation,
           sort: input.sort,
+          width: input.width ?? null,
+          height: input.height ?? null,
+          bytes: input.bytes ?? null,
+          format: input.format ?? null,
         })
         .returning();
       if (!row) throw errors.internal("保存照片失败");

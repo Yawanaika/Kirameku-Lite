@@ -27,12 +27,23 @@ export const updateAlbumInput = z
     message: "至少提供一个字段",
   });
 
+const photoEdge = z.coerce.number().int().min(0).max(100_000);
+const photoBytes = z.coerce.number().int().min(0).max(100 * 1024 * 1024);
+
+/**
+ * width/height/bytes/format 由上传接口回传，前端透传即可。
+ * 手填 URL（外链）时这几项缺失，媒体库里显示「未记录」，不要瞎猜。
+ */
 export const createPhotoInput = z.object({
   album_id: z.coerce.number().int().min(1),
   url: z.string().trim().min(1).max(1000),
   caption: z.string().trim().max(1000).default(""),
   orientation: z.enum(["landscape", "portrait"]).default("landscape"),
   sort: albumSort.default(0),
+  width: photoEdge.optional(),
+  height: photoEdge.optional(),
+  bytes: photoBytes.optional(),
+  format: z.enum(["jpeg", "png", "webp", "gif"]).optional(),
 });
 
 export const photoIdParams = z.object({
@@ -61,5 +72,10 @@ export interface PhotoItem {
   caption: string;
   orientation: string;
   sort: number;
+  /** 老照片在上传记录元数据之前入库，这几项可能为 null。 */
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+  format: string | null;
   created_at: string;
 }
