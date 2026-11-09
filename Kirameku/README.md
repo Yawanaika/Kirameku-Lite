@@ -2,6 +2,8 @@
 
 TypeScript + Next.js 16 单体应用。公开站点、管理后台和 API 共用同一个进程；数据库为 SQLite（WAL）。
 
+Next.js 与 `eslint-config-next` 固定为同一版本；升级时请同步更新两者及锁文件。
+
 ## 本地启动
 
 需要 **Node.js 22 LTS**（见 `.nvmrc`；CI 同样使用 22）。从其他 Node 大版本切换后，重新编译 SQLite 原生模块：

@@ -144,6 +144,12 @@ beforeEach(() => {
   linkTag(first, sqliteId);
   linkTag(second, typeScriptId);
   linkTag(third, typeScriptId);
+  connection.exec(
+    `UPDATE category SET post_count = (SELECT COUNT(*) FROM post WHERE post.category_id = category.id AND post.status = 'published')`,
+  );
+  connection.exec(
+    `UPDATE tag SET post_count = (SELECT COUNT(*) FROM post_tag JOIN post ON post.id = post_tag.post_id WHERE post_tag.tag_id = tag.id AND post.status = 'published')`,
+  );
 
   connection
     .prepare(
@@ -293,17 +299,43 @@ describe("posts service", () => {
     await expect(posts.like(4)).rejects.toBeInstanceOf(AppError);
   });
 
-  it("increments views atomically for published posts only", async () => {
-    await expect(posts.incrementView(1)).resolves.toEqual({ views: 8 });
-    await expect(posts.incrementView(1)).resolves.toEqual({ views: 9 });
+  it("deduplicates views per visitor, post and UTC day", async () => {
+    await expect(posts.incrementView(1, "visitor-a", "2026-11-09")).resolves.toEqual({ counted: true, views: 8 });
+    await expect(posts.incrementView(1, "visitor-a", "2026-11-09")).resolves.toEqual({ counted: false });
+    await expect(posts.incrementView(1, "visitor-a", "2026-11-10")).resolves.toEqual({ counted: true, views: 9 });
 
     const [row] = connection
       .prepare('SELECT "views" FROM "post" WHERE "id" = ?')
       .all(1) as Array<{ views: number }>;
     expect(row.views).toBe(9);
+    const [dedupe] = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "post_view" WHERE "post_id" = ?')
+      .all(1) as Array<{ count: number }>;
+    expect(dedupe.count).toBe(2);
 
-    await expect(posts.incrementView(4)).rejects.toBeInstanceOf(AppError);
-    await expect(posts.incrementView(999)).rejects.toBeInstanceOf(AppError);
+    await expect(posts.incrementView(4, "visitor-a", "2026-11-09")).rejects.toBeInstanceOf(AppError);
+    await expect(posts.incrementView(999, "visitor-a", "2026-11-09")).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("rolls back the dedupe claim when incrementing views fails", async () => {
+    connection.exec([
+      "CREATE TRIGGER fail_post_view_update",
+      "BEFORE UPDATE OF views ON post WHEN OLD.id = 1",
+      "BEGIN SELECT RAISE(ABORT, 'simulated view update failure'); END;",
+    ].join("\n"));
+
+    await expect(
+      posts.incrementView(1, "retry-visitor", "2026-11-09"),
+    ).rejects.toThrow("simulated view update failure");
+    const [beforeRetry] = connection
+      .prepare('SELECT COUNT(*) AS "count" FROM "post_view" WHERE "visitor_key" = ?')
+      .all("retry-visitor") as Array<{ count: number }>;
+    expect(beforeRetry.count).toBe(0);
+
+    connection.exec("DROP TRIGGER fail_post_view_update");
+    await expect(
+      posts.incrementView(1, "retry-visitor", "2026-11-09"),
+    ).resolves.toEqual({ counted: true, views: 8 });
   });
 
   it("lists drafts and all statuses for the admin view", async () => {
@@ -464,6 +496,49 @@ describe("posts service", () => {
 
     expect(created.word_count).toBe(999);
     expect(created.reading_time).toBe(7);
+  });
+
+  it("updates only affected published taxonomy counters", async () => {
+    const created = await posts.create({
+      title: "Counter Check",
+      slug: "counter-check",
+      description: "",
+      content: "content",
+      cover: "",
+      category_id: techId,
+      tags: ["TypeScript", "SQLite"],
+      status: "published",
+      is_pinned: false,
+    });
+    const postCount = (table: "category" | "tag", id: number) =>
+      (connection
+        .prepare(`SELECT "post_count" AS "count" FROM "${table}" WHERE "id" = ?`)
+        .get(id) as { count: number }).count;
+
+    expect(postCount("category", techId)).toBe(3);
+    expect(postCount("tag", typeScriptId)).toBe(4);
+    expect(postCount("tag", sqliteId)).toBe(2);
+
+    await posts.update(created.id, {
+      status: "draft",
+      category_id: lifeId,
+      tags: ["SQLite"],
+    });
+    expect(postCount("category", techId)).toBe(2);
+    expect(postCount("category", lifeId)).toBe(1);
+    expect(postCount("tag", typeScriptId)).toBe(3);
+    expect(postCount("tag", sqliteId)).toBe(1);
+
+    await posts.update(created.id, { status: "published" });
+    expect(postCount("category", lifeId)).toBe(2);
+    expect(postCount("tag", sqliteId)).toBe(2);
+    await posts.update(created.id, { tags: ["TypeScript"] });
+    expect(postCount("tag", sqliteId)).toBe(1);
+    expect(postCount("tag", typeScriptId)).toBe(4);
+
+    await posts.remove(created.id);
+    expect(postCount("category", lifeId)).toBe(1);
+    expect(postCount("tag", typeScriptId)).toBe(3);
   });
 
   it("deletes a post and its tag links", async () => {

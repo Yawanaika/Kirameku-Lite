@@ -1,14 +1,11 @@
 import { handle } from "@/server/http/handler";
-import { getClientIp } from "@/server/http/ip";
-import { tryConsumeRateLimit } from "@/server/http/rate-limit";
+import { getVisitorKey } from "@/server/http/visitor-key";
 import { assertSameOrigin } from "@/server/http/origin";
 import { assertWritable } from "@/server/http/write-guard";
 import { errors } from "@/server/http/errors";
 import { getPostsService } from "@/server/modules/posts";
 
 export const dynamic = "force-dynamic";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function parsePostId(value: string): number {
   const id = Number(value);
@@ -20,8 +17,8 @@ function parsePostId(value: string): number {
 
 /**
  * Public view counter. The browser reports once per article per day, and the
- * server enforces the same rule per IP + article + day so prefetching, repeated
- * hydration, or a scripted client cannot inflate the number.
+ * server enforces the same rule per visitor key + article + UTC day so repeated
+ * hydration, prefetching, or a scripted client cannot inflate the number.
  */
 export async function POST(
   request: Request,
@@ -36,18 +33,9 @@ export async function POST(
       // sends the numeric post id here (same as `/api/posts/{id}/like`).
       const { slug: rawId } = await params;
       const id = parsePostId(rawId);
-      const ip = getClientIp(request);
+      const visitorKey = getVisitorKey(request);
       const day = new Date().toISOString().slice(0, 10);
-
-      const counted = tryConsumeRateLimit(
-        `post-view:${ip}:${id}:${day}`,
-        1,
-        DAY_MS,
-      );
-      if (!counted) return { counted: false };
-
-      const { views } = await getPostsService().incrementView(id);
-      return { counted: true, views };
+      return getPostsService().incrementView(id, visitorKey, day);
     },
     { request },
   );

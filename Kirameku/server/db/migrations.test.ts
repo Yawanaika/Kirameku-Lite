@@ -87,6 +87,7 @@ describe("SQLite baseline", () => {
       "0004_post_search.sql",
       "0005_like_record.sql",
       "0006_photo_metadata.sql",
+      "0007_post_views.sql",
     ]);
 
     const integrity = database.pragma("integrity_check") as Array<{

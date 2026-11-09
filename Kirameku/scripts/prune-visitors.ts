@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { count, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { env } from "../server/env";
-import { openDatabase } from "../server/db/open";
+import { env } from "@/server/env";
+import { openDatabase } from "@/server/db/open";
 import * as schema from "../server/db/schema";
-import { createVisitorsService } from "../server/modules/visitors/service";
+import { createVisitorsService } from "@/server/modules/visitors/service";
 
 /**
  * Visitor records contain IP addresses and coarse geolocation. Run this daily
@@ -34,12 +34,20 @@ async function main() {
 
   try {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const today = new Date().toISOString().slice(0, 10);
 
     if (dryRun) {
       const [row] = await db
         .select({ value: count() })
         .from(schema.visitor)
         .where(lt(schema.visitor.createdAt, cutoff));
+      const [expiredViews] = await db
+        .select({ value: count() })
+        .from(schema.postView)
+        .where(lt(schema.postView.day, today));
+      console.log(
+        `expired post-view records=${expiredViews?.value ?? 0} (database unchanged)`,
+      );
       console.log(
         `dry-run: retention=${days}d cutoff=${cutoff.toISOString()} ` +
           `rows=${row?.value ?? 0} (database unchanged)`,
@@ -48,7 +56,13 @@ async function main() {
     }
 
     const { deleted } = await createVisitorsService(db).pruneOlderThan(days);
-    console.log(`deleted ${deleted} visitor record(s) older than ${days} days`);
+    const viewsDeleted = sqlite
+      .prepare("DELETE FROM post_view WHERE day < ?")
+      .run(today).changes;
+    console.log(
+      `deleted ${deleted} visitor record(s) older than ${days} days and ` +
+        `${viewsDeleted} expired post-view record(s)`,
+    );
   } finally {
     sqlite.close();
   }

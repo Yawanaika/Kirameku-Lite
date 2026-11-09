@@ -14,6 +14,7 @@ export {
   notificationRule,
 } from "./notification";
 export { post, postTag } from "./post";
+export { postView } from "./post-view";
 export { project } from "./project";
 export { siteConfig } from "./site-config";
 export { tag } from "./tag";

@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
-import { category, post, postTag, tag } from "@/server/db/schema";
+import { category, post, postTag, postView, tag } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
 import { applyLike } from "@/server/modules/likes/service";
 import type {
@@ -189,9 +189,10 @@ export function createPostsService(db: AppDatabase) {
     if (row) throw errors.conflict("文章 slug 已存在");
   }
 
-  async function syncTags(postId: number, names: string[]): Promise<void> {
+  async function syncTags(postId: number, names: string[]): Promise<number[]> {
     await db.delete(postTag).where(eq(postTag.postId, postId));
 
+    const tagIds: number[] = [];
     const uniqueNames = [...new Set(names.map((name) => name.trim()))].filter(
       Boolean,
     );
@@ -220,24 +221,41 @@ export function createPostsService(db: AppDatabase) {
 
       if (!tagRow) throw errors.internal("保存标签失败");
       await db.insert(postTag).values({ postId, tagId: tagRow.id });
+      tagIds.push(tagRow.id);
     }
+    return tagIds;
   }
 
-  async function recalcTaxonomyCounts(): Promise<void> {
-    await db.run(sql`
-      UPDATE "category"
-      SET "post_count" = (
-        SELECT COUNT(*) FROM "post"
-        WHERE "post"."category_id" = "category"."id"
-      )
-    `);
-    await db.run(sql`
-      UPDATE "tag"
-      SET "post_count" = (
-        SELECT COUNT(*) FROM "post_tag"
-        WHERE "post_tag"."tag_id" = "tag"."id"
-      )
-    `);
+  async function tagIdsForPost(postId: number): Promise<number[]> {
+    const rows = await db
+      .select({ tagId: postTag.tagId })
+      .from(postTag)
+      .where(eq(postTag.postId, postId));
+    return rows.map((row) => row.tagId);
+  }
+
+  async function applyTaxonomyCountDeltas(
+    categoryDeltas: Map<number, number>,
+    tagDeltas: Map<number, number>,
+  ): Promise<void> {
+    for (const [categoryId, delta] of categoryDeltas) {
+      if (delta === 0) continue;
+      await db
+        .update(category)
+        .set({
+          postCount: sql<number>`max(0, coalesce(${category.postCount}, 0) + ${delta})`,
+        })
+        .where(eq(category.id, categoryId));
+    }
+    for (const [tagId, delta] of tagDeltas) {
+      if (delta === 0) continue;
+      await db
+        .update(tag)
+        .set({
+          postCount: sql<number>`max(0, coalesce(${tag.postCount}, 0) + ${delta})`,
+        })
+        .where(eq(tag.id, tagId));
+    }
   }
 
   return {
@@ -362,8 +380,17 @@ export function createPostsService(db: AppDatabase) {
         .returning({ id: post.id });
       if (!row) throw errors.internal("保存文章失败");
 
-      await syncTags(row.id, input.tags);
-      await recalcTaxonomyCounts();
+      const categoryDeltas = new Map<number, number>();
+      const tagDeltas = new Map<number, number>();
+      if (input.status === "published") {
+        if (input.category_id != null) categoryDeltas.set(input.category_id, 1);
+        for (const tagId of await syncTags(row.id, input.tags)) {
+          tagDeltas.set(tagId, 1);
+        }
+      } else {
+        await syncTags(row.id, input.tags);
+      }
+      await applyTaxonomyCountDeltas(categoryDeltas, tagDeltas);
       return loadDetailById(row.id);
     },
 
@@ -435,21 +462,71 @@ export function createPostsService(db: AppDatabase) {
         .returning({ id: post.id });
       if (!row) throw errors.notFound("文章不存在");
 
-      if (input.tags !== undefined) {
-        await syncTags(id, input.tags);
+      const wasPublished = existing.status === "published";
+      const willBePublished = nextStatus === "published";
+      const nextCategoryId =
+        input.category_id === undefined ? existing.categoryId : input.category_id;
+      const oldTagIds =
+        input.tags !== undefined || wasPublished !== willBePublished
+          ? await tagIdsForPost(id)
+          : [];
+      const newTagIds =
+        input.tags === undefined ? oldTagIds : await syncTags(id, input.tags);
+      const categoryDeltas = new Map<number, number>();
+      if (
+        wasPublished &&
+        (!willBePublished || existing.categoryId !== nextCategoryId) &&
+        existing.categoryId !== null
+      ) {
+        categoryDeltas.set(existing.categoryId, -1);
       }
-      await recalcTaxonomyCounts();
+      if (
+        willBePublished &&
+        (!wasPublished || existing.categoryId !== nextCategoryId) &&
+        nextCategoryId !== null
+      ) {
+        categoryDeltas.set(nextCategoryId, (categoryDeltas.get(nextCategoryId) ?? 0) + 1);
+      }
+      const oldTagSet = new Set(oldTagIds);
+      const newTagSet = new Set(newTagIds);
+      const tagDeltas = new Map<number, number>();
+      if (wasPublished) {
+        for (const tagId of oldTagSet) {
+          if (!willBePublished || !newTagSet.has(tagId)) tagDeltas.set(tagId, -1);
+        }
+      }
+      if (willBePublished) {
+        for (const tagId of newTagSet) {
+          if (!wasPublished || !oldTagSet.has(tagId)) {
+            tagDeltas.set(tagId, (tagDeltas.get(tagId) ?? 0) + 1);
+          }
+        }
+      }
+      await applyTaxonomyCountDeltas(categoryDeltas, tagDeltas);
       return loadDetailById(id);
     },
 
     async remove(id: number): Promise<{ ok: true }> {
+      const [existing] = await db
+        .select({ categoryId: post.categoryId, status: post.status })
+        .from(post)
+        .where(eq(post.id, id))
+        .limit(1);
+      if (!existing) throw errors.notFound("文章不存在");
+      const tagIds = await tagIdsForPost(id);
       const [row] = await db
         .delete(post)
         .where(eq(post.id, id))
         .returning({ id: post.id });
       if (!row) throw errors.notFound("文章不存在");
 
-      await recalcTaxonomyCounts();
+      const categoryDeltas = new Map<number, number>();
+      const tagDeltas = new Map<number, number>();
+      if (existing.status === "published") {
+        if (existing.categoryId !== null) categoryDeltas.set(existing.categoryId, -1);
+        for (const tagId of tagIds) tagDeltas.set(tagId, -1);
+      }
+      await applyTaxonomyCountDeltas(categoryDeltas, tagDeltas);
       return { ok: true };
     },
 
@@ -520,17 +597,37 @@ export function createPostsService(db: AppDatabase) {
      * Atomic view increment. Called only from the client-side reporting route;
      * reading an article (including SSR prefetch) must never call this.
      */
-    async incrementView(id: number): Promise<{ views: number }> {
-      const [row] = await db
-        .update(post)
-        .set({
-          views: sql<number>`coalesce(${post.views}, 0) + 1`,
-        })
-        .where(and(eq(post.id, id), eq(post.status, "published")))
-        .returning({ views: post.views });
+    async incrementView(
+      id: number,
+      visitorKey: string,
+      day: string,
+    ): Promise<{ counted: true; views: number } | { counted: false }> {
+      return db.transaction((tx) => {
+        const article = tx
+          .select({ id: post.id })
+          .from(post)
+          .where(and(eq(post.id, id), eq(post.status, "published")))
+          .limit(1)
+          .get();
+        if (!article) throw errors.notFound("文章不存在");
 
-      if (!row) throw errors.notFound("文章不存在");
-      return { views: row.views ?? 0 };
+        const inserted = tx
+          .insert(postView)
+          .values({ postId: id, visitorKey, day })
+          .onConflictDoNothing()
+          .returning({ id: postView.id })
+          .get();
+        if (!inserted) return { counted: false };
+
+        const updated = tx
+          .update(post)
+          .set({ views: sql<number>`coalesce(${post.views}, 0) + 1` })
+          .where(and(eq(post.id, id), eq(post.status, "published")))
+          .returning({ views: post.views })
+          .get();
+        if (!updated) throw errors.notFound("文章不存在");
+        return { counted: true, views: updated.views ?? 0 };
+      });
     },
   };
 }
