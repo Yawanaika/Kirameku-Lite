@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ne, or } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, or } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { category, post } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
@@ -40,7 +40,7 @@ export function createCategoriesService(db: AppDatabase) {
       .from(category)
       .leftJoin(
         post,
-        and(eq(post.categoryId, category.id), eq(post.status, "published")),
+        and(eq(post.categoryId, category.id), inArray(post.status, ["published", "unpublish_scheduled"])),
       )
       .where(eq(category.id, id))
       .groupBy(category.id)
@@ -86,7 +86,7 @@ export function createCategoriesService(db: AppDatabase) {
         .from(category)
         .leftJoin(
           post,
-          and(eq(post.categoryId, category.id), eq(post.status, "published")),
+          and(eq(post.categoryId, category.id), inArray(post.status, ["published", "unpublish_scheduled"])),
         )
         .groupBy(category.id)
         .orderBy(asc(category.sort), asc(category.id));

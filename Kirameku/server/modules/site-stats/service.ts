@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { chatter, photo, post } from "@/server/db/schema";
 
@@ -15,7 +15,7 @@ export function createSiteStatsService(db: AppDatabase) {
         db
           .select({ value: count() })
           .from(post)
-          .where(eq(post.status, "published")),
+          .where(inArray(post.status, ["published", "unpublish_scheduled"])),
         db
           .select({ value: count() })
           .from(chatter)

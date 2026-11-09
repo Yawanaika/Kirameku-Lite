@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, or } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
 import { post, postTag, tag } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
@@ -32,7 +32,7 @@ export function createTagsService(db: AppDatabase) {
       .leftJoin(postTag, eq(postTag.tagId, tag.id))
       .leftJoin(
         post,
-        and(eq(post.id, postTag.postId), eq(post.status, "published")),
+        and(eq(post.id, postTag.postId), inArray(post.status, ["published", "unpublish_scheduled"])),
       )
       .where(eq(tag.id, id))
       .groupBy(tag.id)
@@ -77,7 +77,7 @@ export function createTagsService(db: AppDatabase) {
         .leftJoin(postTag, eq(postTag.tagId, tag.id))
         .leftJoin(
           post,
-          and(eq(post.id, postTag.postId), eq(post.status, "published")),
+          and(eq(post.id, postTag.postId), inArray(post.status, ["published", "unpublish_scheduled"])),
         )
         .groupBy(tag.id)
         .orderBy(desc(count(post.id)), asc(tag.name));

@@ -541,6 +541,43 @@ describe("posts service", () => {
     expect(postCount("tag", typeScriptId)).toBe(3);
   });
 
+  it("keeps autosaved drafts separate, records revisions, restores, and runs schedules", async () => {
+    const created = await posts.create({
+      title: "Versioned", slug: "versioned", description: "", content: "published text",
+      cover: "", category_id: techId, tags: [], status: "published", is_pinned: false,
+    });
+    await posts.saveDraft(created.id, {
+      title: "Working copy", slug: "versioned", description: "draft", content: "uncommitted",
+      cover: "", category_id: techId, tags: [], status: "published",
+      scheduled_at: null, is_pinned: false,
+    });
+    expect((await posts.getById(created.id)).content).toBe("published text");
+    expect((await posts.getDraft(created.id))?.content).toBe("uncommitted");
+
+    await posts.update(created.id, { content: "committed" });
+    const history = await posts.listRevisions(created.id);
+    expect(history[0]?.snapshot.content).toBe("committed");
+    expect(history[1]?.snapshot.content).toBe("published text");
+    await posts.restoreRevision(created.id, history[1]!.id);
+    expect((await posts.getDraft(created.id))?.content).toBe("published text");
+    expect((await posts.getById(created.id)).content).toBe("committed");
+
+    await posts.update(created.id, {
+      status: "scheduled", scheduled_at: new Date(Date.now() - 1000).toISOString(),
+    });
+    expect(await posts.runDuePostSchedules()).toBe(1);
+    expect((await posts.getById(created.id)).status).toBe("published");
+    expect(await posts.runDuePostSchedules()).toBe(0);
+    await posts.update(created.id, {
+      status: "unpublish_scheduled", scheduled_at: new Date(Date.now() - 1000).toISOString(),
+    });
+    await expect(posts.getBySlug("versioned", { publishedOnly: true })).resolves.toMatchObject({
+      status: "unpublish_scheduled", content: "committed",
+    });
+    expect(await posts.runDuePostSchedules()).toBe(1);
+    expect((await posts.getById(created.id)).status).toBe("archived");
+  });
+
   it("deletes a post and its tag links", async () => {
     const created = await posts.create({
       title: "Delete Me",

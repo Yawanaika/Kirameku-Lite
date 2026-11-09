@@ -71,7 +71,8 @@ export default function PostsManager() {
   }
 
   async function togglePublished(post: PostItem) {
-    const nextStatus = post.status === "published" ? "draft" : "published";
+    const isPublic = post.status === "published" || post.status === "unpublish_scheduled";
+    const nextStatus = isPublic ? (post.status === "published" ? "draft" : "published") : "published";
     setMutatingId(post.id);
     setActionError(null);
     try {
@@ -135,6 +136,10 @@ export default function PostsManager() {
               <option value="">全部状态</option>
               <option value="published">已发布</option>
               <option value="draft">草稿</option>
+              <option value="pending">待发布</option>
+              <option value="scheduled">定时发布</option>
+              <option value="unpublish_scheduled">定时下架</option>
+              <option value="archived">已归档</option>
             </Select>
             <Select
               aria-label="按分类筛选"
@@ -254,7 +259,7 @@ export default function PostsManager() {
                             disabled={mutatingId === post.id}
                             onClick={() => togglePublished(post)}
                           >
-                            {post.status === "published" ? "转草稿" : "发布"}
+                            {post.status === "published" ? "转草稿" : post.status === "unpublish_scheduled" ? "取消定时下架" : post.status === "scheduled" ? "立即发布" : post.status === "archived" ? "重新发布" : "发布"}
                           </Button>
                           <Link
                             href={`/admin/posts/${post.id}`}

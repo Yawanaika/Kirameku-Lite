@@ -33,6 +33,8 @@ const jsonColumns: Record<string, readonly string[]> = {
   admin_audit_log: ["detail"],
   notification_channel: ["config"],
   notification_rule: ["channels", "settings"],
+  post_draft: ["snapshot"],
+  post_revision: ["snapshot"],
 };
 
 function kindOf(column: SQLiteColumn, tableName: string): ColumnKind {

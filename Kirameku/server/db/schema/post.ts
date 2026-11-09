@@ -30,6 +30,7 @@ export const post = sqliteTable(
     publishedAt: integer("published_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     index("idx_post_status_published_at").on(t.status, t.publishedAt),

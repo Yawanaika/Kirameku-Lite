@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Columns2,
@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   CategoryItem,
   PostDetail,
+  PostSnapshot,
   TagItem,
 } from "@/server/modules/posts/contracts";
 
@@ -42,6 +43,7 @@ interface FormState {
   categoryId: string;
   tags: string;
   status: string;
+  scheduledAt: string;
   isPinned: boolean;
 }
 
@@ -54,6 +56,7 @@ const emptyForm: FormState = {
   categoryId: "",
   tags: "",
   status: "draft",
+  scheduledAt: "",
   isPinned: false,
 };
 
@@ -75,6 +78,15 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function toLocalDateTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 function splitTags(value: string): string[] {
   return Array.from(
     new Set(
@@ -90,6 +102,12 @@ export default function PostEditor({ postId }: PostEditorProps) {
   const confirm = useConfirm();
   const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [activePostId, setActivePostId] = useState<number | null>(postId ?? null);
+  const activePostIdRef = useRef<number | null>(postId ?? null);
+  const autoSavePromiseRef = useRef<Promise<unknown> | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("尚未保存");
+  const [revisions, setRevisions] = useState<{ id: number; created_at: string; snapshot: PostSnapshot }[]>([]);
+  const [selectedRevisionId, setSelectedRevisionId] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [slugTouched, setSlugTouched] = useState(Boolean(postId));
   const [loadingPost, setLoadingPost] = useState(Boolean(postId));
@@ -110,19 +128,24 @@ export default function PostEditor({ postId }: PostEditorProps) {
     if (!postId) return;
     let active = true;
     adminRequest<PostDetail>(`/api/admin/posts/${postId}`)
-      .then((post) => {
+      .then(async (post) => {
         if (!active) return;
         setCategoryName(post.category);
+        const draft = await adminRequest<PostSnapshot | null>(`/api/admin/posts/${postId}/draft`);
+        if (!active) return;
+        const source = draft ?? {
+          title: post.title, slug: post.slug, description: post.description,
+          content: post.content, cover: post.cover, category_id: post.category_id,
+          tags: post.tags, status: post.status, scheduled_at: post.scheduled_at,
+          is_pinned: post.is_pinned,
+        };
         setForm({
-          title: post.title,
-          slug: post.slug,
-          description: post.description,
-          content: post.content,
-          cover: post.cover,
-          categoryId: "",
-          tags: post.tags.join(", "),
-          status: post.status,
-          isPinned: post.is_pinned,
+          title: source.title, slug: source.slug, description: source.description,
+          content: source.content, cover: source.cover,
+          categoryId: source.category_id ? String(source.category_id) : "",
+          tags: source.tags.join(", "), status: source.status,
+          scheduledAt: toLocalDateTime(source.scheduled_at),
+          isPinned: source.is_pinned,
         });
       })
       .catch((reason: unknown) => {
@@ -143,6 +166,48 @@ export default function PostEditor({ postId }: PostEditorProps) {
           categories?.find((item) => item.name === categoryName)?.id ?? "",
         )
       : "");
+
+  useEffect(() => {
+    if (!activePostId) return;
+    let active = true;
+    adminRequest<typeof revisions>(`/api/admin/posts/${activePostId}/revisions`)
+      .then((items) => { if (active) setRevisions(items); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [activePostId]);
+
+  useEffect(() => {
+    if (loadingPost || saving || !form.title.trim() || !form.slug.trim()) return;
+    const timer = window.setTimeout(() => {
+      setAutoSaveStatus("正在自动保存…");
+      const snapshot: PostSnapshot = {
+        title: form.title.trim(), slug: form.slug.trim(), description: form.description,
+        content: form.content, cover: form.cover.trim(),
+        category_id: selectedCategoryId ? Number(selectedCategoryId) : null,
+        tags: splitTags(form.tags), status: form.status as PostSnapshot["status"],
+        scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
+        is_pinned: form.isPinned,
+      };
+      const request = (autoSavePromiseRef.current ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => {
+          const currentPostId = activePostIdRef.current;
+          const url = currentPostId ? `/api/admin/posts/${currentPostId}/draft` : "/api/admin/posts/draft";
+          return adminRequest<{ post_id: number }>(url, {
+            method: currentPostId ? "PUT" : "POST", body: JSON.stringify(snapshot),
+          });
+        });
+      autoSavePromiseRef.current = request;
+      request.then((result) => {
+        activePostIdRef.current = result.post_id;
+        setActivePostId(result.post_id);
+        setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString()}`);
+      }).catch((reason: unknown) => {
+        setAutoSaveStatus(`自动保存失败：${describeAdminError(reason)}`);
+      });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [form, activePostId, loadingPost, saving, selectedCategoryId]);
 
   useEffect(() => {
     if (viewMode === "editor") return;
@@ -202,16 +267,22 @@ export default function PostEditor({ postId }: PostEditorProps) {
       category_id: selectedCategoryId ? Number(selectedCategoryId) : null,
       tags: splitTags(form.tags),
       status: form.status,
+      scheduled_at: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : null,
       is_pinned: form.isPinned,
     };
 
     setSaving(true);
     setError(null);
     try {
-      await adminRequest(postId ? `/api/admin/posts/${postId}` : "/api/admin/posts", {
-        method: postId ? "PUT" : "POST",
-        body: JSON.stringify(body),
-      });
+      await autoSavePromiseRef.current?.catch(() => undefined);
+      const currentPostId = activePostIdRef.current;
+      if (currentPostId) {
+        await adminRequest(`/api/admin/posts/${currentPostId}`, {
+          method: "PUT", body: JSON.stringify(body),
+        });
+      } else {
+        await adminRequest("/api/admin/posts", { method: "POST", body: JSON.stringify(body) });
+      }
       router.push("/admin/posts");
       router.refresh();
     } catch (reason) {
@@ -220,13 +291,31 @@ export default function PostEditor({ postId }: PostEditorProps) {
     }
   }
 
+  async function restoreRevision() {
+    if (!activePostId || !selectedRevisionId) return;
+    try {
+      const snapshot = await adminRequest<PostSnapshot>(`/api/admin/posts/${activePostId}/revisions/${selectedRevisionId}/restore`, { method: "POST" });
+      setCategoryName("");
+      setForm({
+        title: snapshot.title, slug: snapshot.slug, description: snapshot.description,
+        content: snapshot.content, cover: snapshot.cover,
+        categoryId: snapshot.category_id ? String(snapshot.category_id) : "",
+        tags: snapshot.tags.join(", "), status: snapshot.status,
+        scheduledAt: toLocalDateTime(snapshot.scheduled_at), isPinned: snapshot.is_pinned,
+      });
+      setAutoSaveStatus("已恢复到编辑草稿，可检查后再保存发布");
+    } catch (reason) {
+      setError(describeAdminError(reason));
+    }
+  }
+
   async function remove() {
-    if (!postId) return;
+    if (!activePostId) return;
     if (!await confirm("确定删除这篇文章？此操作不可撤销。")) return;
     setDeleting(true);
     setError(null);
     try {
-      await adminRequest(`/api/admin/posts/${postId}`, { method: "DELETE" });
+      await adminRequest(`/api/admin/posts/${activePostId}`, { method: "DELETE" });
       router.push("/admin/posts");
       router.refresh();
     } catch (reason) {
@@ -263,9 +352,10 @@ export default function PostEditor({ postId }: PostEditorProps) {
           <p className="mt-1 text-sm text-slate-500">
             {postId ? `文章 ID #${postId}` : "正文支持 Markdown，保存后可继续编辑。"}
           </p>
+          <p className="mt-1 text-xs text-slate-500" aria-live="polite">{autoSaveStatus}</p>
         </div>
         <div className="flex items-center gap-2">
-          {postId ? (
+          {activePostId ? (
             <Button
               variant="destructive"
               onClick={remove}
@@ -278,6 +368,7 @@ export default function PostEditor({ postId }: PostEditorProps) {
           <Link href="/admin/posts" className={buttonVariants({ variant: "outline" })}>
             取消
           </Link>
+          <Button type="button" variant="outline" onClick={() => setViewMode("preview")}>发布前预览</Button>
           <Button type="submit" disabled={saving || deleting}>
             <Save className="size-4" aria-hidden />
             {saving ? "保存中…" : "保存文章"}
@@ -422,9 +513,19 @@ export default function PostEditor({ postId }: PostEditorProps) {
                   onChange={(event) => update("status", event.target.value)}
                 >
                   <option value="draft">草稿</option>
+                  <option value="pending">待审核</option>
+                  <option value="scheduled">计划发布</option>
                   <option value="published">已发布</option>
+                  <option value="archived">已归档</option>
+                  <option value="unpublish_scheduled">计划下线</option>
                 </Select>
               </div>
+              {form.status === "scheduled" || form.status === "unpublish_scheduled" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="post-scheduled-at">执行时间</Label>
+                  <Input id="post-scheduled-at" type="datetime-local" value={form.scheduledAt} onChange={(event) => update("scheduledAt", event.target.value)} required />
+                </div>
+              ) : null}
               <div className="space-y-1.5">
                 <Label htmlFor="post-category">分类</Label>
                 <Select
@@ -466,6 +567,32 @@ export default function PostEditor({ postId }: PostEditorProps) {
               </label>
             </div>
           </section>
+
+          {activePostId ? (
+            <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">版本历史</h2>
+              <div className="mt-3 space-y-3">
+                <Select value={selectedRevisionId} onChange={(event) => setSelectedRevisionId(event.target.value)}>
+                  <option value="">选择历史版本进行比较</option>
+                  {revisions.map((revision) => <option key={revision.id} value={revision.id}>{new Date(revision.created_at).toLocaleString()} · {revision.snapshot.title}</option>)}
+                </Select>
+                {selectedRevisionId ? (() => {
+                  const selected = revisions.find((revision) => String(revision.id) === selectedRevisionId)?.snapshot;
+                  return selected ? (
+                    <div className="space-y-2 text-xs">
+                      <p className="font-medium">标题：{selected.title}</p>
+                      <p className="text-slate-500">当前正文：{form.content.length} 字符 · 历史正文：{selected.content.length} 字符</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/40 p-3"><strong>当前</strong>{"\n"}{form.content}</pre>
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/40 p-3"><strong>历史</strong>{"\n"}{selected.content}</pre>
+                      </div>
+                      <Button type="button" variant="outline" onClick={restoreRevision}>恢复到编辑草稿</Button>
+                    </div>
+                  ) : null;
+                })() : null}
+              </div>
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-white/[0.035] p-5">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">封面</h2>

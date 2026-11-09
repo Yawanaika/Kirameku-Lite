@@ -14,6 +14,9 @@ const statusLabels: Record<string, string> = {
   active: "维护中",
   developing: "开发中",
   archived: "已归档",
+  pending: "待发布",
+  scheduled: "定时发布",
+  unpublish_scheduled: "定时下架",
 };
 
 export function statusLabel(status: string, fallback?: string): string {

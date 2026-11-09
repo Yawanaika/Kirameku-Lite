@@ -1,10 +1,16 @@
 import { z } from "zod";
 
-/**
- * 只有草稿与已发布两种状态。以前是自由字符串，写错一个字母文章就会
- * 从前台静默消失，后台列表却仍显示「已发布」。
- */
-const postStatus = z.enum(["draft", "published"]);
+export const postStatus = z.enum([
+  "draft",
+  "pending",
+  "scheduled",
+  "published",
+  "archived",
+  "unpublish_scheduled",
+]);
+export type PostStatus = z.infer<typeof postStatus>;
+
+const scheduledAt = z.string().datetime().nullable();
 
 /** Public post list query. Drafts are never exposed by the public API. */
 export const postListQuery = z.object({
@@ -54,6 +60,7 @@ export const createPostInput = z.object({
   category_id: postCategoryId.optional(),
   tags: postTags.default([]),
   status: postStatus.default("draft"),
+  scheduled_at: scheduledAt.optional(),
   is_pinned: z.boolean().default(false),
   word_count: postWordCount.optional(),
   reading_time: postReadingTime.optional(),
@@ -69,6 +76,7 @@ export const updatePostInput = z
     category_id: postCategoryId.optional(),
     tags: postTags.optional(),
     status: postStatus.optional(),
+    scheduled_at: scheduledAt.optional(),
     is_pinned: z.boolean().optional(),
     word_count: postWordCount.optional(),
     reading_time: postReadingTime.optional(),
@@ -105,6 +113,8 @@ export interface PostItem {
   word_count: number;
   reading_time: number;
   published_at: string | null;
+  scheduled_at: string | null;
+  category_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +122,17 @@ export interface PostItem {
 export interface PostDetail extends PostItem {
   content: string;
 }
+
+export const postSnapshotSchema = z.object({
+  title: postTitle, slug: postSlug, description: postDescription,
+  content: postContent, cover: postCover, category_id: postCategoryId,
+  tags: postTags, status: postStatus, scheduled_at: scheduledAt,
+  is_pinned: z.boolean(),
+}).refine((value) =>
+  !["scheduled", "unpublish_scheduled"].includes(value.status) || value.scheduled_at !== null,
+  { message: "计划状态必须设置执行时间" },
+);
+export type PostSnapshot = z.infer<typeof postSnapshotSchema>;
 
 export interface CategoryItem {
   id: number;

@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { env } from "../server/env";
-import { openDatabase } from "../server/db/open";
-import * as schema from "../server/db/schema";
-import type { AppDatabase } from "../server/db/types";
+import { env } from "@/server/env";
+import { openDatabase } from "@/server/db/open";
+import * as schema from "@/server/db/schema";
+import type { AppDatabase } from "@/server/db/types";
 
 /**
  * Repair denormalised counters that are read directly by the UI.
@@ -45,7 +45,7 @@ async function main() {
       UPDATE "category" SET "post_count" = (
         SELECT COUNT(*) FROM "post"
         WHERE "post"."category_id" = "category"."id"
-          AND "post"."status" = 'published'
+          AND "post"."status" IN ('published', 'unpublish_scheduled')
       )
     `);
     await db.run(sql`
@@ -53,7 +53,7 @@ async function main() {
         SELECT COUNT(*) FROM "post_tag"
         JOIN "post" ON "post"."id" = "post_tag"."post_id"
         WHERE "post_tag"."tag_id" = "tag"."id"
-          AND "post"."status" = 'published'
+          AND "post"."status" IN ('published', 'unpublish_scheduled')
       )
     `);
     await db.run(sql`

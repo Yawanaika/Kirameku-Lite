@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { comment, message, post, visitor } from "@/server/db/schema";
 
@@ -15,7 +15,7 @@ export const dashboardService = {
       db
         .select({ value: count() })
         .from(post)
-        .where(eq(post.status, "published")),
+        .where(inArray(post.status, ["published", "unpublish_scheduled"])),
       // 评论/留言入库即 approved，后台只会在 approved 与 rejected 间切换，
       // 所以这里统计「已通过」而不是永远不会增长的「待审核」。
       db

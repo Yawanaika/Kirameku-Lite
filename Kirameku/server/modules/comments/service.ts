@@ -173,7 +173,7 @@ export function createCommentsService(db: AppDatabase) {
         and(
           eq(comment.id, id),
           eq(comment.status, "approved"),
-          eq(post.status, "published"),
+          inArray(post.status, ["published", "unpublish_scheduled"]),
         ),
       )
       .limit(1);
@@ -331,7 +331,7 @@ export function createCommentsService(db: AppDatabase) {
           and(
             eq(comment.postId, postId),
             eq(comment.status, "approved"),
-            eq(post.status, "published"),
+            inArray(post.status, ["published", "unpublish_scheduled"]),
           ),
         )
         .orderBy(desc(comment.createdAt), desc(comment.id));
@@ -373,7 +373,7 @@ export function createCommentsService(db: AppDatabase) {
         .select({ id: post.id })
         .from(post)
         .where(
-          and(eq(post.id, input.postId), eq(post.status, "published")),
+          and(eq(post.id, input.postId), inArray(post.status, ["published", "unpublish_scheduled"])),
         )
         .limit(1);
       if (!target) throw errors.notFound("文章不存在");

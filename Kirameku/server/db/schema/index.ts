@@ -15,6 +15,7 @@ export {
 } from "./notification";
 export { post, postTag } from "./post";
 export { postView } from "./post-view";
+export { postDraft, postRevision } from "./post-revision";
 export { project } from "./project";
 export { siteConfig } from "./site-config";
 export { tag } from "./tag";

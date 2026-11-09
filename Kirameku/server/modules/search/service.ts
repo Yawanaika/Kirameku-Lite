@@ -116,7 +116,7 @@ export function createSearchService(db: AppDatabase) {
       FROM "post_search"
       JOIN "post" p ON p."id" = "post_search"."rowid"
       LEFT JOIN "category" c ON c."id" = p."category_id"
-      WHERE ${filter} AND p."status" = 'published'
+      WHERE ${filter} AND p."status" IN ('published', 'unpublish_scheduled')
       ORDER BY bm25("post_search", 5.0, 2.0, 1.0), p."published_at" DESC
       LIMIT ${limit}
     `);
@@ -125,7 +125,7 @@ export function createSearchService(db: AppDatabase) {
       SELECT count(*) AS total
       FROM "post_search"
       JOIN "post" p ON p."id" = "post_search"."rowid"
-      WHERE ${filter} AND p."status" = 'published'
+      WHERE ${filter} AND p."status" IN ('published', 'unpublish_scheduled')
     `);
 
     return { rows, total: count?.total ?? 0 };
@@ -148,7 +148,7 @@ export function createSearchService(db: AppDatabase) {
              c."name" AS category
       FROM "post" p
       LEFT JOIN "category" c ON c."id" = p."category_id"
-      WHERE p."status" = 'published'
+      WHERE p."status" IN ('published', 'unpublish_scheduled')
         AND (p."title" LIKE ${pattern}
           OR p."description" LIKE ${pattern}
           OR p."content" LIKE ${pattern})
@@ -159,7 +159,7 @@ export function createSearchService(db: AppDatabase) {
     const [count] = await db.all<CountRow>(sql`
       SELECT count(*) AS total
       FROM "post" p
-      WHERE p."status" = 'published'
+      WHERE p."status" IN ('published', 'unpublish_scheduled')
         AND (p."title" LIKE ${pattern}
           OR p."description" LIKE ${pattern}
           OR p."content" LIKE ${pattern})

@@ -6,8 +6,12 @@ import { env } from "./server/env";
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  if (!env.NOTIFICATION_CHECKS) return;
+  const { startPostScheduleRunner } = await import(
+    "./server/modules/posts/scheduler"
+  );
+  startPostScheduleRunner();
 
+  if (!env.NOTIFICATION_CHECKS) return;
   const { startNotificationScheduler } = await import(
     "./server/modules/notifications/scheduler"
   );

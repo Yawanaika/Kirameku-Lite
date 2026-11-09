@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { AppDatabase } from "@/server/db/types";
-import { category, post, postTag, postView, tag } from "@/server/db/schema";
+import { category, post, postDraft, postRevision, postTag, postView, tag } from "@/server/db/schema";
 import { errors } from "@/server/http/errors";
 import { applyLike } from "@/server/modules/likes/service";
 import type {
@@ -9,6 +9,8 @@ import type {
   PostItem,
   PostListParams,
   UpdatePostInput,
+  PostSnapshot,
+  PostStatus,
 } from "./contracts";
 
 type PostRow = Pick<
@@ -19,6 +21,8 @@ type PostRow = Pick<
   | "description"
   | "cover"
   | "status"
+  | "categoryId"
+  | "scheduledAt"
   | "isPinned"
   | "views"
   | "likes"
@@ -44,6 +48,8 @@ function toItem(
     description: row.description ?? "",
     cover: row.cover ?? "",
     category: row.categoryName ?? "",
+    category_id: row.categoryId ?? null,
+    scheduled_at: row.scheduledAt?.toISOString() ?? null,
     tags,
     status: row.status ?? "draft",
     is_pinned: row.isPinned ?? false,
@@ -128,12 +134,31 @@ function autoReadingTime(wordCount: number): number {
 }
 
 export function createPostsService(db: AppDatabase) {
+  function toSnapshot(detail: PostDetail): PostSnapshot {
+    return {
+      title: detail.title, slug: detail.slug, description: detail.description,
+      content: detail.content, cover: detail.cover, category_id: detail.category_id,
+      tags: detail.tags, status: detail.status as PostStatus,
+      scheduled_at: detail.scheduled_at, is_pinned: detail.is_pinned,
+    };
+  }
+
+  async function recordRevision(id: number): Promise<void> {
+    const detail = await loadDetailById(id);
+    const snapshot = toSnapshot(detail);
+    const [latest] = await db.select({ snapshot: postRevision.snapshot })
+      .from(postRevision).where(eq(postRevision.postId, id))
+      .orderBy(desc(postRevision.createdAt), desc(postRevision.id)).limit(1);
+    if (latest && JSON.stringify(latest.snapshot) === JSON.stringify(snapshot)) return;
+    await db.insert(postRevision).values({ postId: id, snapshot });
+  }
+
   async function loadDetailById(
     id: number,
     options: { publishedOnly?: boolean } = {},
   ): Promise<PostDetail> {
     const conditions = [eq(post.id, id)];
-    if (options.publishedOnly) conditions.push(eq(post.status, "published"));
+    if (options.publishedOnly) conditions.push(inArray(post.status, ["published", "unpublish_scheduled"]));
 
     const [row] = await db
       .select({
@@ -144,6 +169,8 @@ export function createPostsService(db: AppDatabase) {
         content: post.content,
         cover: post.cover,
         status: post.status,
+        categoryId: post.categoryId,
+        scheduledAt: post.scheduledAt,
         isPinned: post.isPinned,
         views: post.views,
         likes: post.likes,
@@ -261,7 +288,9 @@ export function createPostsService(db: AppDatabase) {
   return {
     async list(params: PostListParams): Promise<PostItem[]> {
       const conditions = [
-        params.status ? eq(post.status, params.status) : sql`1 = 1`,
+        params.status === "published"
+          ? inArray(post.status, ["published", "unpublish_scheduled"])
+          : params.status ? eq(post.status, params.status) : sql`1 = 1`,
       ];
 
       if (params.category) {
@@ -284,6 +313,8 @@ export function createPostsService(db: AppDatabase) {
           description: post.description,
           cover: post.cover,
           status: post.status,
+          categoryId: post.categoryId,
+          scheduledAt: post.scheduledAt,
           isPinned: post.isPinned,
           views: post.views,
           likes: post.likes,
@@ -314,7 +345,7 @@ export function createPostsService(db: AppDatabase) {
       options: { publishedOnly?: boolean } = {},
     ): Promise<PostDetail> {
       const conditions = [eq(post.slug, slug)];
-      if (options.publishedOnly) conditions.push(eq(post.status, "published"));
+      if (options.publishedOnly) conditions.push(inArray(post.status, ["published", "unpublish_scheduled"]));
 
       const [row] = await db
         .select({
@@ -325,6 +356,8 @@ export function createPostsService(db: AppDatabase) {
           content: post.content,
           cover: post.cover,
           status: post.status,
+          categoryId: post.categoryId,
+          scheduledAt: post.scheduledAt,
           isPinned: post.isPinned,
           views: post.views,
           likes: post.likes,
@@ -356,6 +389,9 @@ export function createPostsService(db: AppDatabase) {
     },
 
     async create(input: CreatePostInput): Promise<PostDetail> {
+      if (["scheduled", "unpublish_scheduled"].includes(input.status) && !input.scheduled_at) {
+        throw errors.badRequest("计划状态必须设置执行时间");
+      }
       await assertSlugUnique(input.slug);
       if (input.category_id != null) await ensureCategory(input.category_id);
 
@@ -375,14 +411,15 @@ export function createPostsService(db: AppDatabase) {
           isPinned: input.is_pinned,
           wordCount,
           readingTime,
-          publishedAt: input.status === "published" ? new Date() : null,
+          publishedAt: ["published", "unpublish_scheduled"].includes(input.status) ? new Date() : null,
+          scheduledAt: input.scheduled_at ? new Date(input.scheduled_at) : null,
         })
         .returning({ id: post.id });
       if (!row) throw errors.internal("保存文章失败");
 
       const categoryDeltas = new Map<number, number>();
       const tagDeltas = new Map<number, number>();
-      if (input.status === "published") {
+      if (["published", "unpublish_scheduled"].includes(input.status)) {
         if (input.category_id != null) categoryDeltas.set(input.category_id, 1);
         for (const tagId of await syncTags(row.id, input.tags)) {
           tagDeltas.set(tagId, 1);
@@ -391,6 +428,7 @@ export function createPostsService(db: AppDatabase) {
         await syncTags(row.id, input.tags);
       }
       await applyTaxonomyCountDeltas(categoryDeltas, tagDeltas);
+      await recordRevision(row.id);
       return loadDetailById(row.id);
     },
 
@@ -401,6 +439,7 @@ export function createPostsService(db: AppDatabase) {
           content: post.content,
           status: post.status,
           publishedAt: post.publishedAt,
+          scheduledAt: post.scheduledAt,
           wordCount: post.wordCount,
           categoryId: post.categoryId,
         })
@@ -430,6 +469,9 @@ export function createPostsService(db: AppDatabase) {
         values.categoryId = input.category_id;
       }
       if (input.status !== undefined) values.status = input.status;
+      if (input.scheduled_at !== undefined) {
+        values.scheduledAt = input.scheduled_at ? new Date(input.scheduled_at) : null;
+      }
       if (input.is_pinned !== undefined) values.isPinned = input.is_pinned;
 
       let wordCount = existing.wordCount ?? 0;
@@ -451,10 +493,19 @@ export function createPostsService(db: AppDatabase) {
       }
 
       const nextStatus = input.status ?? existing.status ?? "draft";
+      const requiresSchedule = nextStatus === "scheduled" || nextStatus === "unpublish_scheduled";
+      const effectiveSchedule = input.scheduled_at === undefined
+        ? existing.scheduledAt
+        : input.scheduled_at ? new Date(input.scheduled_at) : null;
+      if (requiresSchedule && !effectiveSchedule) {
+        throw errors.badRequest("计划状态必须设置执行时间");
+      }
+      if (input.scheduled_at === undefined && !requiresSchedule) values.scheduledAt = null;
       if (nextStatus === "published" && !existing.publishedAt) {
         values.publishedAt = new Date();
       }
 
+      await recordRevision(id);
       const [row] = await db
         .update(post)
         .set(values)
@@ -462,8 +513,8 @@ export function createPostsService(db: AppDatabase) {
         .returning({ id: post.id });
       if (!row) throw errors.notFound("文章不存在");
 
-      const wasPublished = existing.status === "published";
-      const willBePublished = nextStatus === "published";
+      const wasPublished = ["published", "unpublish_scheduled"].includes(existing.status ?? "");
+      const willBePublished = ["published", "unpublish_scheduled"].includes(nextStatus);
       const nextCategoryId =
         input.category_id === undefined ? existing.categoryId : input.category_id;
       const oldTagIds =
@@ -503,7 +554,76 @@ export function createPostsService(db: AppDatabase) {
         }
       }
       await applyTaxonomyCountDeltas(categoryDeltas, tagDeltas);
+      await db.delete(postDraft).where(eq(postDraft.postId, id));
+      await recordRevision(id);
       return loadDetailById(id);
+    },
+
+    async saveDraft(id: number | null, snapshot: PostSnapshot): Promise<{ post_id: number }> {
+      let postId = id;
+      if (postId === null) {
+        const created = await this.create({ ...snapshot, status: "draft", scheduled_at: undefined });
+        postId = created.id;
+      } else {
+        await loadDetailById(postId);
+      }
+      await db.insert(postDraft).values({ postId, snapshot })
+        .onConflictDoUpdate({
+          target: postDraft.postId,
+          set: { snapshot, updatedAt: new Date() },
+        });
+      const [latest] = await db.select({ snapshot: postRevision.snapshot, createdAt: postRevision.createdAt })
+        .from(postRevision).where(eq(postRevision.postId, postId))
+        .orderBy(desc(postRevision.createdAt), desc(postRevision.id)).limit(1);
+      const changed = !latest || JSON.stringify(latest.snapshot) !== JSON.stringify(snapshot);
+      const intervalElapsed = !latest || !latest.createdAt || Date.now() - latest.createdAt.getTime() >= 60_000;
+      if (changed && intervalElapsed) {
+        await db.insert(postRevision).values({ postId, snapshot });
+      }
+      return { post_id: postId };
+    },
+
+    async getDraft(id: number): Promise<PostSnapshot | null> {
+      await loadDetailById(id);
+      const [row] = await db.select({ snapshot: postDraft.snapshot })
+        .from(postDraft).where(eq(postDraft.postId, id)).limit(1);
+      return row ? row.snapshot as PostSnapshot : null;
+    },
+
+    async listRevisions(id: number) {
+      await loadDetailById(id);
+      const rows = await db.select({ id: postRevision.id, createdAt: postRevision.createdAt, snapshot: postRevision.snapshot })
+        .from(postRevision).where(eq(postRevision.postId, id))
+        .orderBy(desc(postRevision.createdAt), desc(postRevision.id));
+      return rows.map((row) => ({
+        id: row.id, created_at: iso(row.createdAt), snapshot: row.snapshot as PostSnapshot,
+      }));
+    },
+
+    async restoreRevision(id: number, revisionId: number): Promise<PostSnapshot> {
+      const [revision] = await db.select({ snapshot: postRevision.snapshot })
+        .from(postRevision)
+        .where(and(eq(postRevision.id, revisionId), eq(postRevision.postId, id)))
+        .limit(1);
+      if (!revision) throw errors.notFound("版本不存在");
+      const snapshot = revision.snapshot as PostSnapshot;
+      await this.saveDraft(id, snapshot);
+      return snapshot;
+    },
+
+    async runDuePostSchedules(now = new Date()): Promise<number> {
+      const due = await db.select({ id: post.id, status: post.status })
+        .from(post)
+        .where(and(
+          inArray(post.status, ["scheduled", "unpublish_scheduled"]),
+          sql`${post.scheduledAt} IS NOT NULL AND ${post.scheduledAt} <= ${now.getTime()}`,
+        ));
+      let changed = 0;
+      for (const row of due) {
+        await this.update(row.id, { status: row.status === "scheduled" ? "published" : "archived" });
+        changed += 1;
+      }
+      return changed;
     },
 
     async remove(id: number): Promise<{ ok: true }> {
@@ -522,7 +642,7 @@ export function createPostsService(db: AppDatabase) {
 
       const categoryDeltas = new Map<number, number>();
       const tagDeltas = new Map<number, number>();
-      if (existing.status === "published") {
+      if (["published", "unpublish_scheduled"].includes(existing.status ?? "")) {
         if (existing.categoryId !== null) categoryDeltas.set(existing.categoryId, -1);
         for (const tagId of tagIds) tagDeltas.set(tagId, -1);
       }
@@ -536,7 +656,7 @@ export function createPostsService(db: AppDatabase) {
       const rows = await db
         .select({ slug: post.slug, updatedAt: post.updatedAt })
         .from(post)
-        .where(eq(post.status, "published"))
+        .where(inArray(post.status, ["published", "unpublish_scheduled"]))
         .orderBy(desc(post.updatedAt), desc(post.id));
 
       return rows.map((row) => ({
@@ -550,9 +670,9 @@ export function createPostsService(db: AppDatabase) {
         .select({ value: sql<number>`count(*)` })
         .from(post);
 
-      const [row] = status
-        ? await query.where(eq(post.status, status))
-        : await query;
+      const [row] = status === "published"
+        ? await query.where(inArray(post.status, ["published", "unpublish_scheduled"]))
+        : status ? await query.where(eq(post.status, status)) : await query;
       return row?.value ?? 0;
     },
 
@@ -561,7 +681,7 @@ export function createPostsService(db: AppDatabase) {
       unlike = false,
       visitorKey?: string,
     ): Promise<{ likes: number }> {
-      const where = and(eq(post.id, id), eq(post.status, "published"));
+      const where = and(eq(post.id, id), inArray(post.status, ["published", "unpublish_scheduled"]));
 
       // 同一个人重复点等于没点：先过记账表，只有真的新增/撤销才动计数器。
       const changed = await applyLike(db, {
@@ -606,7 +726,7 @@ export function createPostsService(db: AppDatabase) {
         const article = tx
           .select({ id: post.id })
           .from(post)
-          .where(and(eq(post.id, id), eq(post.status, "published")))
+          .where(and(eq(post.id, id), inArray(post.status, ["published", "unpublish_scheduled"])))
           .limit(1)
           .get();
         if (!article) throw errors.notFound("文章不存在");
@@ -622,7 +742,7 @@ export function createPostsService(db: AppDatabase) {
         const updated = tx
           .update(post)
           .set({ views: sql<number>`coalesce(${post.views}, 0) + 1` })
-          .where(and(eq(post.id, id), eq(post.status, "published")))
+          .where(and(eq(post.id, id), inArray(post.status, ["published", "unpublish_scheduled"])))
           .returning({ views: post.views })
           .get();
         if (!updated) throw errors.notFound("文章不存在");
