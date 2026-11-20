@@ -20,6 +20,7 @@ import {
   Wand2,
 } from "lucide-react";
 import AdminError from "./AdminError";
+import ImagebedSettingsPanel from "./ImagebedSettingsPanel";
 import AdminPageHeader from "./AdminPageHeader";
 import { useConfirm } from "./ConfirmProvider";
 import { adminRequest, describeAdminError } from "./admin-api";
@@ -53,6 +54,7 @@ const TABS = [
   { id: "share", label: "分享卡片", icon: Share2 },
   { id: "content", label: "内容与页脚", icon: Layers },
   { id: "music", label: "云音乐", icon: Music },
+  { id: "imagebed", label: "图床", icon: ImagePlus },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -398,7 +400,7 @@ function SiteSettingsEditor({
         eyebrow="Settings"
         title="站点设置"
         description="站点信息、外观背景、分享卡片、页脚与云音乐都在这里配置；保存后前台立即读取新值。"
-        actions={
+        actions={tab === "imagebed" ? null : (
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={discard} disabled={saving}>
               <RefreshCw className="size-4" aria-hidden />
@@ -409,10 +411,10 @@ function SiteSettingsEditor({
               {saving ? "保存中…" : "保存设置"}
             </Button>
           </div>
-        }
+        )}
       />
 
-      {dirty ? (
+      {tab !== "imagebed" && dirty ? (
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300">
           <TriangleAlert className="size-3.5" aria-hidden />
           有未保存的修改。
@@ -1013,8 +1015,11 @@ function SiteSettingsEditor({
         </div>
       ) : null}
 
+      {tab === "imagebed" ? <ImagebedSettingsPanel /> : null}
+
       {error ? <AdminError message={error} /> : null}
 
+      {tab !== "imagebed" ? (
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-lg shadow-slate-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80 dark:shadow-black/30">
         <p className="text-xs text-slate-500 dark:text-slate-400">
           {dirty ? "有未保存的修改" : "所有修改已保存"}
@@ -1037,6 +1042,7 @@ function SiteSettingsEditor({
           </Button>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

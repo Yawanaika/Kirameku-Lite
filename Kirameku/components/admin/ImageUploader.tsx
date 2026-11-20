@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 export interface UploadedImage {
   url: string;
   key: string;
-  storage: "oss" | "local";
+  storage: "oss" | "local" | "imagebed";
   width: number;
   height: number;
   orientation: "landscape" | "portrait";

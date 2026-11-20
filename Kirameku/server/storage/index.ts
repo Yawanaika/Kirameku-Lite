@@ -4,6 +4,8 @@ import { env } from "@/server/env";
 import { errors } from "@/server/http/errors";
 import { buildUploadKey, writeLocalImage } from "./local";
 import { inspectImage, MAX_IMAGE_BYTES, type ImageInfo } from "./image";
+import { getImagebedRuntimeConfig } from "@/server/modules/imagebed";
+import { uploadToImagebed } from "@/server/modules/imagebed/client";
 import {
   buildOssPublicUrl,
   getOssConfig,
@@ -15,7 +17,7 @@ export { MAX_IMAGE_BYTES, type ImageInfo } from "./image";
 export interface StoredImage {
   url: string;
   key: string;
-  storage: "oss" | "local";
+  storage: "oss" | "local" | "imagebed";
   width: number;
   height: number;
   orientation: ImageInfo["orientation"];
@@ -37,6 +39,22 @@ export async function storeImageFile(file: File): Promise<StoredImage> {
   const buffer = Buffer.from(await file.arrayBuffer());
   const image = inspectImage(buffer, file.type);
   const key = buildUploadKey(image.ext);
+  const imagebed = await getImagebedRuntimeConfig();
+
+  if (imagebed) {
+    const uploaded = await uploadToImagebed(imagebed, { key, buffer, contentType: image.mime });
+    return {
+      url: uploaded.url,
+      key: uploaded.remotePath,
+      storage: "imagebed",
+      width: image.width,
+      height: image.height,
+      orientation: image.orientation,
+      format: image.format,
+      size: image.size,
+    };
+  }
+
   const oss = getOssConfig();
 
   if (oss) {

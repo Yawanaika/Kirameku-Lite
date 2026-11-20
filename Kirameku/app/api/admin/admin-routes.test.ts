@@ -17,6 +17,7 @@ import { DELETE as deleteBackups, GET as getBackups } from "./backups/route";
 import { GET as getAnalytics } from "./analytics/route";
 import { GET as getMedia } from "./media/route";
 import { POST as previewMarkdown } from "./markdown/preview/route";
+import { GET as getImagebedSettings, PUT as putImagebedSettings } from "./imagebed-settings/route";
 
 /*
  * The admin guard reads `cookies()` from next/headers, so these route tests
@@ -515,5 +516,43 @@ describe("admin audit log", () => {
     const afterBody = await after.json();
 
     expect(afterBody.total).toBe(beforeBody.total);
+  });
+});
+
+describe("admin imagebed settings API", () => {
+  it("requires an admin session and does not expose a token", async () => {
+    const anonymous = await getImagebedSettings(request("/api/admin/imagebed-settings"));
+    expect(anonymous.status).toBe(401);
+
+    await asAdmin();
+    const response = await getImagebedSettings(request("/api/admin/imagebed-settings"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ enabled: false, tokenConfigured: false, uploadChannel: "telegram" });
+    expect(body).not.toHaveProperty("apiToken");
+  });
+
+  it("rejects cross-origin writes and accepts an authenticated same-origin update", async () => {
+    await asAdmin();
+    const payload = { enabled: false, baseUrl: "", apiToken: "", uploadFolder: "" };
+    const hostile = new Request("http://localhost:3000/api/admin/imagebed-settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json", origin: "https://attacker.example" },
+      body: JSON.stringify(payload),
+    });
+    expect((await putImagebedSettings(hostile)).status).toBe(403);
+
+    const update = new Request("http://localhost:3000/api/admin/imagebed-settings", {
+      method: "PUT",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body: JSON.stringify(payload),
+    });
+    const response = await putImagebedSettings(update);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ enabled: false, tokenConfigured: false });
+    expect(body).not.toHaveProperty("apiToken");
   });
 });
